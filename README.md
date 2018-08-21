@@ -1,4 +1,5 @@
 ![DroneBridge logo](https://github.com/DroneBridge/ESP32/blob/master/wiki/DroneBridgeLogo_text.png)
+
 # DroneBridge for ESP32
 DroneBridge enabled firmware for the popular ESP32 modules form Espressif Systems. Probably the cheapest way to communicate with your drone.
 
@@ -18,13 +19,12 @@ DroneBridge enabled firmware for the popular ESP32 modules form Espressif System
  - Reliable, low latency, light weight
  - Upload mission etc.
 
-Tested with: DOIT ESP32 module
 ![ESP32 module with VCP](https://github.com/DroneBridge/ESP32/blob/master/wiki/esp32_vcp_module.jpg)
 
- ## Setup
- ### Flashing the firmware
- #### Using the precompiled binarys
+Tested with: DOIT ESP32 module
 
+ ## Setup
+ ### Flashing the firmware using the precompiled binarys
   1. Download latest release from this repository or check out `db_esp32\releases` folder.
   2. Get the [latest Flash Download Tools from Espressif](https://www.espressif.com/en/products/hardware/esp32/resources)
   3. Settings
@@ -57,11 +57,12 @@ Connect UART of ESP32 to a 3.3V UART of your flight controller. Set the flight c
 
 ** Require restart/reset of ESP32 module
 
-### Use with DroneBridge for Android
+## Use with DroneBridge for Android
 ![DroneBridge for Android app screenshot](https://github.com/DroneBridge/ESP32/blob/master/wiki/dp_app-map-2017-10-29-kleiner.png)
+
 Use the Android app to display your telemetry data live. Mission planning capabilities of the app for MAVLink and MSP will follow.
 
-#### Compile yourselfe (developers)
+## Compile yourselfe (developers)
 
  You will need the Espressif SDK: esp-idf + toolchain. Check out their website for more info and on how to set it up.
  The code is written in pure C using the esp-idf (no arduino libs).
