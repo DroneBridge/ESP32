@@ -10,11 +10,10 @@ DroneBridge enabled firmware for the popular ESP32 modules form Espressif System
  - Very low price: **~7€**
  - Up to **150m** range
  - **Weight: <10 g**
- - Supported by: **DroneBridge android app, mwptools & QGroundcontrol**
+ - Supported by: **DroneBridge for Android (app), mwptools, QGroundcontrol, etc.**
  - **Easy to set up**: Power connection + UART connection to flight controller
- - **Fully configurable through easy to use web interface** (+ DroneBridge app in the future)
- - Out of the box compatible with DroneBridge & LTM/MSPv2
- - **Parsing of LTM & MSP** for more reliable connection and less packet loss
+ - **Fully configurable through easy to use web interface**
+ - **Parsing of LTM & MSPv2** for more reliable connection and less packet loss
  - **Fully transparent telemetry downlink option** for continuous streams like MAVLink or and other protocol
  - Reliable, low latency, light weight
  - Upload mission etc.
@@ -60,7 +59,7 @@ Connect UART of ESP32 to a 3.3V UART of your flight controller. Set the flight c
 ## Use with DroneBridge for Android
 ![DroneBridge for Android app screenshot](https://github.com/DroneBridge/ESP32/blob/master/wiki/dp_app-map-2017-10-29-kleiner.png)
 
-Use the Android app to display your telemetry data live. Mission planning capabilities of the app for MAVLink and MSP will follow.
+Use the Android app to display live telemetry data. Mission planning capabilities for MAVLink and MSP will follow.
 
 ## Compile yourselfe (developers)
 
