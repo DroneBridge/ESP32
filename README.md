@@ -1,7 +1,8 @@
+![DroneBridge logo](https://github.com/DroneBridge/ESP32/blob/master/wiki/DroneBridgeLogo_text.png)
 # DroneBridge for ESP32
 DroneBridge enabled firmware for the popular ESP32 modules form Espressif Systems. Probably the cheapest way to communicate with your drone.
 
-![ESP32 module with VCP](https://raw.githubusercontent.com/seeul8er/DroneBridge/master/wiki/esp32_vcp_module.jpg)
+![DroneBridge for ESP32 concept](https://github.com/DroneBridge/ESP32/blob/master/wiki/db_ESP32_setup.png)
 
 ## Features
  - Bi-directional link: **MAVLink, MSP & LTM**
@@ -18,6 +19,7 @@ DroneBridge enabled firmware for the popular ESP32 modules form Espressif System
  - Upload mission etc.
 
 Tested with: DOIT ESP32 module
+![ESP32 module with VCP](https://github.com/DroneBridge/ESP32/blob/master/wiki/esp32_vcp_module.jpg)
 
  ## Setup
  ### Flashing the firmware
@@ -32,13 +34,6 @@ Tested with: DOIT ESP32 module
   4. During flasing you might need to hold the "boot" button for 2-3 seconds because some drivers have issues with the process.
   5. If you dont get it check out google or [this link](http://iot-bits.com/esp32/esp32-flash-download-tool-tutorial/)
 
-#### Compile yourselfe (developers)
-
- You will need the Espressif SDK: esp-idf + toolchain. Check out their website for more info and on how to set it up.
- The code is written in pure C using the esp-idf (no arduino libs).
-
- Compile and flash by running: `make`, `make flash`
-
 ### Wiring
 TODO
 
@@ -49,7 +44,7 @@ Connect UART of ESP32 to a 3.3V UART of your flight controller. Set the flight c
  2. In your browser type: `dronebridge.local` (Chrome: `http://dronebridge.local`) or `192.168.2.1` into the address bar
  3. Configure as you please and hit `save`
 
-![DroneBridge for ESP32 web interface](https://raw.githubusercontent.com/seeul8er/DroneBridge/master/wiki/screen_config.png)
+![DroneBridge for ESP32 web interface](https://github.com/DroneBridge/ESP32/blob/master/wiki/screen_config.png)
 
 **Configuration Options:**
  - **`Wifi password`: Up to 64 character long
@@ -61,3 +56,14 @@ Connect UART of ESP32 to a 3.3V UART of your flight controller. Set the flight c
  - `MSP & LTM to same port`: Split MSP & LTM stream or send both to same port. Set to `Yes` if you want to use `mwptools`. Set to `No` if you use DroneBridge software (app etc.)
 
 ** Require restart/reset of ESP32 module
+
+### Use with DroneBridge for Android
+![DroneBridge for Android app screenshot](https://github.com/DroneBridge/ESP32/blob/master/wiki/dp_app-map-2017-10-29-kleiner.png)
+Use the Android app to display your telemetry data live. Mission planning capabilities of the app for MAVLink and MSP will follow.
+
+#### Compile yourselfe (developers)
+
+ You will need the Espressif SDK: esp-idf + toolchain. Check out their website for more info and on how to set it up.
+ The code is written in pure C using the esp-idf (no arduino libs).
+
+ Compile and flash by running: `make`, `make flash`
