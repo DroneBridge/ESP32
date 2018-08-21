@@ -49,7 +49,7 @@ Connect UART of ESP32 to a 3.3V UART of your flight controller. Set the flight c
  - **`Wifi password`: Up to 64 character long
  - **`UART baud rate`: Same as you configured on your flight controller
  - **`GPIO TX PIN Number` & `GPIO RX PIN Number`: The pins you want to use for TX & RX (UART). See pin out of manufacturer of your ESP32 device **Flight controller UART must be 3.3V or use an inverter.**
- - `ÙART serial protocol`: MultiWii based or MAVLink based - configures the parser
+ - `UART serial protocol`: MultiWii based or MAVLink based - configures the parser
  - `Transparent packet size`: Only used with 'serial protocol' set to transparent. Length of UDP packets
  - `LTM frames per packet`: Buffer the specified number of packets and send them at once in one packet
  - `MSP & LTM to same port`: Split MSP & LTM stream or send both to same port. Set to `Yes` if you want to use `mwptools`. Set to `No` if you use DroneBridge software (app etc.)
