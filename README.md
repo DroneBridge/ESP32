@@ -1,7 +1,7 @@
 ![DroneBridge logo](https://github.com/DroneBridge/ESP32/blob/master/wiki/DroneBridgeLogo_text.png)
 
 # DroneBridge for ESP32
-DroneBridge enabled firmware for the popular ESP32 modules form Espressif Systems. Probably the cheapest way to communicate with your drone.
+DroneBridge enabled firmware for the popular ESP32 modules frm Espressif Systems. Probably the cheapest way to communicate with your drone.
 
 ![DroneBridge for ESP32 concept](https://github.com/DroneBridge/ESP32/blob/master/wiki/db_ESP32_setup.png)
 
@@ -10,7 +10,7 @@ DroneBridge enabled firmware for the popular ESP32 modules form Espressif System
  - Very low price: **~7€**
  - Up to **150m** range
  - **Weight: <10 g**
- - Supported by: **DroneBridge for Android (app), mwptools, QGroundcontrol, etc.**
+ - Supported by: **DroneBridge for Android (app), mwptools, QGroundcontrol, impload etc.**
  - **Easy to set up**: Power connection + UART connection to flight controller
  - **Fully configurable through easy to use web interface**
  - **Parsing of LTM & MSPv2** for more reliable connection and less packet loss
