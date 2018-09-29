@@ -1,7 +1,7 @@
 ![DroneBridge logo](https://github.com/DroneBridge/ESP32/blob/master/wiki/DroneBridgeLogo_text.png)
 
 # DroneBridge for ESP32
-DroneBridge enabled firmware for the popular ESP32 modules frm Espressif Systems. Probably the cheapest way to communicate with your drone.
+DroneBridge enabled firmware for the popular ESP32 modules from Espressif Systems. Probably the cheapest way to communicate with your drone.
 
 ![DroneBridge for ESP32 concept](https://github.com/DroneBridge/ESP32/blob/master/wiki/db_ESP32_setup.png)
 
