@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "db_comm_protocol.h"
+#include "db_protocol.h"
 
 uint32_t calc_crc32(uint32_t crc, unsigned char *buf, size_t len)
 {
@@ -71,13 +72,13 @@ int finalize_message(uint8_t *msg_buf, char *req_json){
 }
 
 
-int gen_db_comm_sys_ident_json(uint8_t *message_buffer, int new_id, int new_hw_id, int new_fw_id){
+int gen_db_comm_sys_ident_json(uint8_t *message_buffer, int new_id, int new_fw_id){
     cJSON *root;
     root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, DB_COMM_KEY_DEST, 4);
+    cJSON_AddNumberToObject(root, DB_COMM_KEY_DEST, DB_COMM_DST_GCS);
     cJSON_AddStringToObject(root, DB_COMM_KEY_TYPE, DB_COMM_TYPE_SYS_IDENT_RESPONSE);
-    cJSON_AddStringToObject(root, DB_COMM_KEY_ORIGIN, DB_COMM_ORIGIN_GRND);
-    cJSON_AddNumberToObject(root, DB_COMM_KEY_HARDWID, DB_COMM_SYS_HID_ESP32);
+    cJSON_AddStringToObject(root, DB_COMM_KEY_ORIGIN, DB_COMM_ORIGIN_GND);
+    cJSON_AddNumberToObject(root, DB_COMM_KEY_HARDWID, DB_SYS_HID_ESP32);
     cJSON_AddNumberToObject(root, DB_COMM_KEY_FIRMWID, new_fw_id);
     cJSON_AddNumberToObject(root, DB_COMM_KEY_ID, new_id);
     return finalize_message(message_buffer, cJSON_Print(root));

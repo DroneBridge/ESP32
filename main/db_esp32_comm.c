@@ -51,7 +51,7 @@ void parse_comm_protocol(char *new_json_bytes){
 
         if (strcmp(type, DB_COMM_TYPE_SYS_IDENT_REQUEST) == 0){
             ESP_LOGI(TAGC, "Generating SYS_IDENT_RESPONSE");
-            resp_length = gen_db_comm_sys_ident_json(comm_resp_buf, id, DB_COMM_SYS_HID_ESP32, 101);
+            resp_length = gen_db_comm_sys_ident_json(comm_resp_buf, id, 101);
         } else if (strcmp(type, DB_COMM_TYPE_SETTINGS_CHANGE) == 0){
             // TODO
         } else if (strcmp(type, DB_COMM_TYPE_SETTINGS_REQUEST) == 0){
@@ -99,7 +99,7 @@ int open_comm_udp_socket() {
 
 void communication_module_server(void *parameters){
     open_comm_udp_socket();
-    ESP_LOGI(TAGC, "started communication module");
+    ESP_LOGI(TAGC, "Started communication module");
     while(true){
         memset(udp_comm_buffer, 0, UDP_COMM_BUF_SIZE);
         int msg_length = lwip_recvfrom(comm_udp_socket, udp_comm_buffer, UDP_COMM_BUF_SIZE, 0,
@@ -110,7 +110,7 @@ void communication_module_server(void *parameters){
             memcpy(json_byte_buf, udp_comm_buffer, (size_t) (msg_length-4));
             parse_comm_protocol((char *) udp_comm_buffer);
         } else {
-            ESP_LOGI(TAGC, "bad CRC!");
+            ESP_LOGI(TAGC, "Bad CRC!");
         }
     }
 }

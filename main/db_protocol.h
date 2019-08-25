@@ -73,4 +73,6 @@
 #define DB_UNIX_DOMAIN_VIDEO_PATH   "/tmp/db_video_out"
 #define DB_AP_CLIENT_IP             "192.168.2.1"   // default IP address of GCS connected via WiFi AP
 
+#define DB_SYS_HID_ESP32 1
+
 #endif // DB_PROTOCOL_H_INCLUDED

@@ -21,6 +21,6 @@
 #define DB_ESP32_DB_COMM_H
 
 int crc_ok(uint8_t * buf, int msg_length);
-int gen_db_comm_sys_ident_json(uint8_t *message_buffer, int new_id, int new_hw_id, int new_fw_id);
+int gen_db_comm_sys_ident_json(uint8_t *message_buffer, int new_id, int new_fw_id);
 
 #endif //DB_ESP32_DB_COMM_H

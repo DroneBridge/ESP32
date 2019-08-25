@@ -28,7 +28,7 @@
 #include "esp_log.h"
 #include "esp_event_loop.h"
 #include "db_esp32_control.h"
-#include "tcp_server.h"
+#include "http_server.h"
 #include "db_esp32_comm.h"
 
 EventGroupHandle_t wifi_event_group;

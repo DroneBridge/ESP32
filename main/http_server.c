@@ -324,8 +324,8 @@ char *create_response(char *website_response) {
     return website_response;
 }
 
-void tcp_server(void *parameter){
-    ESP_LOGI(TAG2,"tcp_server task started");
+void http_settings_server(void *parameter){
+    ESP_LOGI(TAG2,"http_settings_server task started");
     struct sockaddr_in tcpServerAddr;
     tcpServerAddr.sin_addr.s_addr = htonl(INADDR_ANY);
     tcpServerAddr.sin_family = AF_INET;
@@ -424,5 +424,5 @@ void tcp_server(void *parameter){
  * @brief Starts a TCP server that serves the page to change settings & handles the changes
  */
 void start_tcp_server(){
-    xTaskCreate(&tcp_server, "tcp_server", 10240, NULL, 5, NULL);
+    xTaskCreate(&http_settings_server, "http_settings_server", 10240, NULL, 5, NULL);
 }

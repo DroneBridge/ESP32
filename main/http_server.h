@@ -17,10 +17,10 @@
  *
  */
 
-#ifndef DB_ESP32_TCP_SERVER_H
-#define DB_ESP32_TCP_SERVER_H
+#ifndef DB_ESP32_HTTP_SERVER_H
+#define DB_ESP32_HTTP_SERVER_H
 
 void start_tcp_server();
 void write_settings_to_nvs();
 
-#endif //DB_ESP32_TCP_SERVER_H
+#endif //DB_ESP32_HTTP_SERVER_H
