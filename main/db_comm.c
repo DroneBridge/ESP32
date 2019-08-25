@@ -19,7 +19,6 @@
 #include <cJSON.h>
 #include <stdint.h>
 #include <string.h>
-#include "db_comm.h"
 #include "db_comm_protocol.h"
 
 uint32_t calc_crc32(uint32_t crc, unsigned char *buf, size_t len)

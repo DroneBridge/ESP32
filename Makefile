@@ -3,6 +3,7 @@
 # project subdirectory.
 #
 
-PROJECT_NAME := dronebridge_esp32
+PROJECT_NAME := db_esp32
 
 include $(IDF_PATH)/make/project.mk
+

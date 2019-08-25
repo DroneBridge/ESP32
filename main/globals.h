@@ -23,7 +23,7 @@
 #include <freertos/event_groups.h>
 
 #define MAX_LTM_FRAMES_IN_BUFFER 5
-#define BUILDVERSION 11    //v0.11
+#define BUILDVERSION 12    //v0.12
 
 // can be set by user
 extern uint8_t DEFAULT_PWD[64];

@@ -19,19 +19,15 @@
 
 #include <stdio.h>
 #include <nvs_flash.h>
-#include <esp_event.h>
-#include <driver/uart.h>
 #include <esp_wifi_types.h>
 #include <mdns.h>
 #include <string.h>
-#include "freertos/FreeRTOS.h"
+#include <driver/gpio.h>
 #include "freertos/event_groups.h"
 #include "esp_wifi.h"
 #include "esp_log.h"
 #include "esp_event_loop.h"
-#include "db_esp32_settings.h"
 #include "db_esp32_control.h"
-#include "globals.h"
 #include "tcp_server.h"
 #include "db_esp32_comm.h"
 

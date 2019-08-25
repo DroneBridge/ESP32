@@ -22,11 +22,11 @@
 #include <esp_log.h>
 #include <string.h>
 #include <nvs.h>
-#include "tcp_server.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "globals.h"
 #include <math.h>
+#include <driver/gpio.h>
 
 #define LISTENQ 2
 #define REQUEST_BUF_SIZE 1024
@@ -157,17 +157,17 @@ void parse_save_get_parameters(char *request_buffer, uint length){
 
 
 char *create_response(char *website_response) {
-    char baud_selection1[8] = ""; char baud_selection2[8] = "";
-    char baud_selection3[8] = ""; char baud_selection4[8] = "";
-    char baud_selection5[8] = ""; char baud_selection6[8] = "";
-    char baud_selection7[8] = "";
-    char uart_serial_selection1[8] = ""; char uart_serial_selection2[8] = "";
-    char trans_pack_size_selection1[8] = ""; char trans_pack_size_selection2[8] = "";
-    char trans_pack_size_selection3[8] = ""; char trans_pack_size_selection4[8] = "";
-    char trans_pack_size_selection5[8] = "";
-    char ltm_size_selection1[8] = ""; char ltm_size_selection2[8] = "";
-    char ltm_size_selection3[8] = ""; char ltm_size_selection4[8] = "", ltm_size_selection5[8] = "",
-            msp_ltm_same_selection1[8] = "", msp_ltm_same_selection2[8] = "";
+    char baud_selection1[9] = ""; char baud_selection2[9] = "";
+    char baud_selection3[9] = ""; char baud_selection4[9] = "";
+    char baud_selection5[9] = ""; char baud_selection6[9] = "";
+    char baud_selection7[9] = "";
+    char uart_serial_selection1[9] = ""; char uart_serial_selection2[9] = "";
+    char trans_pack_size_selection1[9] = ""; char trans_pack_size_selection2[9] = "";
+    char trans_pack_size_selection3[9] = ""; char trans_pack_size_selection4[9] = "";
+    char trans_pack_size_selection5[9] = "";
+    char ltm_size_selection1[9] = ""; char ltm_size_selection2[9] = "";
+    char ltm_size_selection3[9] = ""; char ltm_size_selection4[9] = "", ltm_size_selection5[9] = "",
+            msp_ltm_same_selection1[9] = "", msp_ltm_same_selection2[9] = "";
 
     switch (SERIAL_PROTOCOL){
         default:

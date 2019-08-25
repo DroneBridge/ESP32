@@ -19,7 +19,6 @@
 
 #include <sys/fcntl.h>
 #include <sys/param.h>
-#include <config.h>
 #include <string.h>
 #include "esp_log.h"
 #include "lwip/sockets.h"
@@ -204,7 +203,7 @@ void control_module_udp_server(void *parameter){
         select_return = select(udp_socket + 1, &fd_socket_set, NULL, NULL, &tv);
         if (select_return>0){
             if (FD_ISSET(udp_socket, &fd_socket_set)){
-                int recv_length = lwip_recvfrom_r(udp_socket, udp_buffer, UDP_BUF_SIZE, 0,
+                int recv_length = lwip_recvfrom(udp_socket, udp_buffer, UDP_BUF_SIZE, 0,
                                                   (struct sockaddr *) &client_proxy_addr, &proxy_addr_length);
                 if (recv_length > 0)
                     uart_write_bytes(UART_NUM_2, udp_buffer, (size_t) recv_length);

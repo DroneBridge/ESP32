@@ -20,7 +20,6 @@
 #include <esp_log.h>
 #include <string.h>
 #include <cJSON.h>
-#include "db_esp32_comm.h"
 #include "lwip/sockets.h"
 #include "globals.h"
 #include "db_esp32_control.h"

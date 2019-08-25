@@ -19,7 +19,6 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "esp_log.h"
 #include "msp_ltm_serial.h"
 #include "db_crc.h"
 
