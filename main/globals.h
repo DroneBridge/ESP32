@@ -23,7 +23,7 @@
 #include <freertos/event_groups.h>
 
 #define MAX_LTM_FRAMES_IN_BUFFER 5
-#define BUILDVERSION 12    //v0.12
+#define BUILDVERSION 3    //v0.3
 
 // can be set by user
 extern uint8_t DEFAULT_PWD[64];
@@ -36,9 +36,6 @@ extern uint32_t DB_UART_BAUD_RATE;
 extern uint16_t TRANSPARENT_BUF_SIZE;
 extern uint8_t LTM_FRAME_NUM_BUFFER;    // Number of LTM frames per UDP packet (min = 1; max = 5)
 extern EventGroupHandle_t wifi_event_group;
-
-// 0 = to separate ports (MSP to proxy_port: 1607; LTM to telemetry_port: 1604); 1=all data to proxy_port/request origin
-extern uint8_t MSP_LTM_TO_SAME_PORT;
 
 // system internally
 extern volatile bool client_connected;

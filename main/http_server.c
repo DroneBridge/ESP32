@@ -31,7 +31,8 @@
 #define LISTENQ 2
 #define REQUEST_BUF_SIZE 1024
 #define WEBSITE_RESPONSE_BUFFER_SIZE 3072
-const char *TAG2 = "TCP_SERVER";
+#define TAG "TCP_SERVER"
+
 const char *save_response = "HTTP/1.1 200 OK\r\n"
                             "Server: DroneBridgeESP32\r\n"
                             "Content-type: text/html, text, plain\r\n"
@@ -83,7 +84,7 @@ int http_request_type(uint8_t *request_buffer, uint length){
 
 
 void write_settings_to_nvs(){
-    ESP_LOGI(TAG2, "Saving to NVS");
+    ESP_LOGI(TAG, "Saving to NVS");
     nvs_handle my_handle;
     ESP_ERROR_CHECK(nvs_open("settings", NVS_READWRITE, &my_handle));
     ESP_ERROR_CHECK(nvs_set_str(my_handle, "wifi_pass", (char *) DEFAULT_PWD));
@@ -93,14 +94,13 @@ void write_settings_to_nvs(){
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "proto", SERIAL_PROTOCOL));
     ESP_ERROR_CHECK(nvs_set_u16(my_handle, "trans_pack_size", TRANSPARENT_BUF_SIZE));
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "ltm_per_packet", LTM_FRAME_NUM_BUFFER));
-    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "msp_ltm_same", MSP_LTM_TO_SAME_PORT));
     ESP_ERROR_CHECK(nvs_commit(my_handle));
     nvs_close(my_handle);
 }
 
 
 void parse_save_get_parameters(char *request_buffer, uint length){
-    ESP_LOGI(TAG2, "Parsing new settings:");
+    ESP_LOGI(TAG, "Parsing new settings:");
     char *ptr;
     char delimiter[] = "?=& ";
     ptr = strtok(request_buffer, delimiter);
@@ -109,21 +109,21 @@ void parse_save_get_parameters(char *request_buffer, uint length){
             ptr = strtok(NULL, delimiter);
             if (strlen(ptr)>=8){
                 strcpy((char *) DEFAULT_PWD, ptr);
-                ESP_LOGI(TAG2, "New password: %s", DEFAULT_PWD);
+                ESP_LOGI(TAG, "New password: %s", DEFAULT_PWD);
             }
         } else if (strcmp(ptr, "baud") == 0){
             ptr = strtok(NULL, delimiter);
             if (atoi(ptr)>2399)
                 DB_UART_BAUD_RATE = atoi(ptr);
-            ESP_LOGI(TAG2, "New baud: %i", DB_UART_BAUD_RATE);
+            ESP_LOGI(TAG, "New baud: %i", DB_UART_BAUD_RATE);
         }else if (strcmp(ptr, "gpio_tx") == 0){
             ptr = strtok(NULL, delimiter);
             if (atoi(ptr)<=GPIO_NUM_MAX) DB_UART_PIN_TX = atoi(ptr);
-            ESP_LOGI(TAG2, "New gpio_tx: %i", DB_UART_PIN_TX);
+            ESP_LOGI(TAG, "New gpio_tx: %i", DB_UART_PIN_TX);
         }else if (strcmp(ptr, "gpio_rx") == 0){
             ptr = strtok(NULL, delimiter);
             if (atoi(ptr)<=GPIO_NUM_MAX) DB_UART_PIN_RX = atoi(ptr);
-            ESP_LOGI(TAG2, "New gpio_rx: %i", DB_UART_PIN_RX);
+            ESP_LOGI(TAG, "New gpio_rx: %i", DB_UART_PIN_RX);
         } else if (strcmp(ptr, "proto") == 0){
             ptr = strtok(NULL, delimiter);
             if (strcmp(ptr,"msp_ltm") == 0){
@@ -131,23 +131,15 @@ void parse_save_get_parameters(char *request_buffer, uint length){
             } else {
                 SERIAL_PROTOCOL = 4;
             }
-            ESP_LOGI(TAG2, "New proto: %i", SERIAL_PROTOCOL);
+            ESP_LOGI(TAG, "New proto: %i", SERIAL_PROTOCOL);
         } else if (strcmp(ptr, "trans_pack_size") == 0){
             ptr = strtok(NULL, delimiter);
             TRANSPARENT_BUF_SIZE = atoi(ptr);
-            ESP_LOGI(TAG2, "New trans_pack_size: %i", TRANSPARENT_BUF_SIZE);
+            ESP_LOGI(TAG, "New trans_pack_size: %i", TRANSPARENT_BUF_SIZE);
         } else if (strcmp(ptr, "ltm_per_packet") == 0){
             ptr = strtok(NULL, delimiter);
             LTM_FRAME_NUM_BUFFER = atoi(ptr);
-            ESP_LOGI(TAG2, "New ltm_per_packet: %i", LTM_FRAME_NUM_BUFFER);
-        } else if (strcmp(ptr, "msp_ltm_same") == 0){
-            ptr = strtok(NULL, delimiter);
-            if (strcmp(ptr,"y") == 0){
-                MSP_LTM_TO_SAME_PORT = 1;
-            } else {
-                MSP_LTM_TO_SAME_PORT = 0;
-            }
-            ESP_LOGI(TAG2, "New msp_ltm_same: %i", MSP_LTM_TO_SAME_PORT);
+            ESP_LOGI(TAG, "New ltm_per_packet: %i", LTM_FRAME_NUM_BUFFER);
         } else {
             ptr = strtok(NULL, delimiter);
         }
@@ -166,8 +158,7 @@ char *create_response(char *website_response) {
     char trans_pack_size_selection3[9] = ""; char trans_pack_size_selection4[9] = "";
     char trans_pack_size_selection5[9] = "";
     char ltm_size_selection1[9] = ""; char ltm_size_selection2[9] = "";
-    char ltm_size_selection3[9] = ""; char ltm_size_selection4[9] = "", ltm_size_selection5[9] = "",
-            msp_ltm_same_selection1[9] = "", msp_ltm_same_selection2[9] = "";
+    char ltm_size_selection3[9] = ""; char ltm_size_selection4[9] = "", ltm_size_selection5[9] = "";
 
     switch (SERIAL_PROTOCOL){
         default:
@@ -215,15 +206,6 @@ char *create_response(char *website_response) {
             break;
         case 5:
             strcpy(ltm_size_selection5, "selected");
-            break;
-    }
-    switch (MSP_LTM_TO_SAME_PORT) {
-        default:
-        case 0:
-            strcpy(msp_ltm_same_selection1, "selected");
-            break;
-        case 1:
-            strcpy(msp_ltm_same_selection2, "selected");
             break;
     }
     switch (DB_UART_BAUD_RATE){
@@ -305,12 +287,10 @@ char *create_response(char *website_response) {
                               "<option %s value=\"4\">4</option>"
                               "<option %s value=\"5\">5</option>"
                               "</select>"
-                              "</td></tr><tr><td>MSP & LTM to same port</td><td>"
-                              "<select name=\"msp_ltm_same\" form=\"settings_form\">"
-                              "<option %s value=\"n\">No - MSP: 1607 LTM: 1604</option>"
-                              "<option %s value=\"y\">Yes - all: 1607</option>"
-                              "</select>"
-                              "</td></tr></tbody></table><p></p>"
+                              
+                             "</td></tr><tr><td></td><td>"
+                             "</td></tr></tbody></table><p></p>"
+                             
                               "<input target= \"_top\" type=\"submit\" value=\"Save\">"
                               "</form>"
                               "<p class=\"foot\">%s</p>\n"
@@ -320,12 +300,12 @@ char *create_response(char *website_response) {
             baud_selection5, baud_selection6, baud_selection7, DB_UART_PIN_TX, DB_UART_PIN_RX, uart_serial_selection1,
             uart_serial_selection2, trans_pack_size_selection1, trans_pack_size_selection2, trans_pack_size_selection3,
             trans_pack_size_selection4, trans_pack_size_selection5, ltm_size_selection1, ltm_size_selection2,
-            ltm_size_selection3, ltm_size_selection4, ltm_size_selection5, msp_ltm_same_selection1, msp_ltm_same_selection2, build_version);
+            ltm_size_selection3, ltm_size_selection4, ltm_size_selection5, build_version);
     return website_response;
 }
 
 void http_settings_server(void *parameter){
-    ESP_LOGI(TAG2,"http_settings_server task started");
+    ESP_LOGI(TAG,"http_settings_server task started");
     struct sockaddr_in tcpServerAddr;
     tcpServerAddr.sin_addr.s_addr = htonl(INADDR_ANY);
     tcpServerAddr.sin_family = AF_INET;
@@ -335,23 +315,22 @@ void http_settings_server(void *parameter){
     static struct sockaddr_in remote_addr;
     static unsigned int socklen;
     socklen = sizeof(remote_addr);
-    int client_socket;
     xEventGroupWaitBits(wifi_event_group, BIT2, false, true, portMAX_DELAY);
     while(1){
         tcp_socket = socket(AF_INET, SOCK_STREAM, 0);
         if(tcp_socket < 0) {
-            ESP_LOGE(TAG2, "... Failed to allocate socket");
+            ESP_LOGE(TAG, "... Failed to allocate socket");
             vTaskDelay(1000 / portTICK_PERIOD_MS);
             continue;
         }
         if(bind(tcp_socket, (struct sockaddr *)&tcpServerAddr, sizeof(tcpServerAddr)) != 0) {
-            ESP_LOGE(TAG2, "... socket bind failed errno=%d", errno);
+            ESP_LOGE(TAG, "... socket bind failed errno=%d", errno);
             close(tcp_socket);
             vTaskDelay(4000 / portTICK_PERIOD_MS);
             continue;
         }
         if(listen (tcp_socket, LISTENQ) != 0) {
-            ESP_LOGE(TAG2, "... socket listen failed errno=%d", errno);
+            ESP_LOGE(TAG, "... socket listen failed errno=%d", errno);
             close(tcp_socket);
             vTaskDelay(4000 / portTICK_PERIOD_MS);
             continue;
@@ -360,7 +339,7 @@ void http_settings_server(void *parameter){
         // char *website_response = malloc(WEBSITE_RESPONSE_BUFFER_SIZE*sizeof(char));
         char website_response[WEBSITE_RESPONSE_BUFFER_SIZE];
         while(1){
-            client_socket = accept(tcp_socket,(struct sockaddr *)&remote_addr, &socklen);
+            int client_socket = accept(tcp_socket,(struct sockaddr *)&remote_addr, &socklen);
             fcntl(client_socket, F_SETFL, O_NONBLOCK);
             uint rec_length = 0;
             do {
@@ -371,7 +350,7 @@ void http_settings_server(void *parameter){
                             memcpy(&request_buffer[rec_length], recv_buf, (size_t) r);
                             rec_length += r;
                     } else {
-                        ESP_LOGE(TAG2, "Request bigger than buffer");
+                        ESP_LOGE(TAG, "Request bigger than buffer");
                     }
                 }
             } while(r > 0);
@@ -385,7 +364,7 @@ void http_settings_server(void *parameter){
                 char *response = create_response(website_response);
                 if(write(client_socket , response , strlen(response)) < 0)
                 {
-                    ESP_LOGE(TAG2, "... Send failed");
+                    ESP_LOGE(TAG, "... Send failed");
                     close(tcp_socket);
                     vTaskDelay(4000 / portTICK_PERIOD_MS);
                     continue;
@@ -394,7 +373,7 @@ void http_settings_server(void *parameter){
                 parse_save_get_parameters((char *) request_buffer, rec_length);
                 if(write(client_socket , save_response , strlen(save_response)) < 0)
                 {
-                    ESP_LOGE(TAG2, "... Send failed");
+                    ESP_LOGE(TAG, "... Send failed");
                     close(tcp_socket);
                     vTaskDelay(4000 / portTICK_PERIOD_MS);
                     continue;
@@ -402,7 +381,7 @@ void http_settings_server(void *parameter){
             } else if (http_req == 2) {
                 if(write(client_socket , bad_gateway , strlen(bad_gateway)) < 0)
                 {
-                    ESP_LOGE(TAG2, "... Send failed");
+                    ESP_LOGE(TAG, "... Send failed");
                     close(tcp_socket);
                     vTaskDelay(4000 / portTICK_PERIOD_MS);
                     continue;
@@ -412,10 +391,9 @@ void http_settings_server(void *parameter){
         }
         //free(website_response);
         free(request_buffer);
-        ESP_LOGI(TAG2, "... server will be opened in 5 seconds");
         vTaskDelay(5000 / portTICK_PERIOD_MS);
     }
-    ESP_LOGI(TAG2, "...tcp_client task closed\n");
+    ESP_LOGI(TAG, "...tcp_client task closed\n");
     vTaskDelete(NULL);
 }
 

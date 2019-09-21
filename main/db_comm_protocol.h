@@ -52,6 +52,7 @@
 #define DB_COMM_KEY_DEST "destination"
 #define DB_COMM_KEY_HARDWID "HID"   // Hardware ID
 #define DB_COMM_KEY_FIRMWID "FID"   // Firmware version
+#define DB_COMM_KEY_MSG "message"
 
 #define DB_COMM_CHANGE_DB "db"
 #define DB_COMM_CHANGE_DBESP32 "dbesp32"
