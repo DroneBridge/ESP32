@@ -36,7 +36,7 @@ Connect UART of ESP32 to a 3.3V UART of your flight controller. Set the flight c
  **You might need to disable the cellular connection to force the browser to use the wifi connection**
  3. Configure as you please and hit `save`
 
-![DroneBridge for ESP32 web interface](https://github.com/DroneBridge/ESP32/blob/master/wiki/screen_config.png)
+![DroneBridge for ESP32 web interface](https://github.com/DroneBridge/ESP32/blob/master/wiki/DroneBridge_for_ESP32_web_interface.png)
 
 **Configuration Options:**
  - **`Wifi password`: Up to 64 character long

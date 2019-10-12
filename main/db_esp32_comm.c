@@ -57,6 +57,9 @@ void parse_comm_protocol(int client_socket, char *new_json_bytes) {
             lwip_send(client_socket, comm_resp_buf, resp_length, 0);
     } else {
         ESP_LOGI(TAG, "Message not for us (%i)", DB_COMM_DST_GND);
+        int id = cJSON_GetObjectItem(json_pointer, DB_COMM_KEY_ID)->valueint;
+        int resp_length = gen_db_comm_err_resp(comm_resp_buf, id, "Command not supported by DB for ESP32");
+        lwip_send(client_socket, comm_resp_buf, resp_length, 0);
     }
     cJSON_Delete(json_pointer);
 }
