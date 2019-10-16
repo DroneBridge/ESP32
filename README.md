@@ -22,35 +22,42 @@ Also allows for a fully transparent serial to wifi pass through with variable pa
  - Reliable, low latency, light weight
  - Upload mission etc.
 
-![ESP32 module with VCP](https://github.com/DroneBridge/ESP32/blob/master/wiki/esp32_vcp_module.jpg)
+![ESP32 module with VCP](https://upload.wikimedia.org/wikipedia/commons/thumb/2/20/ESP32_Espressif_ESP-WROOM-32_Dev_Board.jpg/313px-ESP32_Espressif_ESP-WROOM-32_Dev_Board.jpg)
 
 Tested with: DOIT ESP32 module
 
-## Setup
-### Flashing the firmware using the precompiled binaries
+## Installation/Flashing using precompiled binaries
 
 First download the latest release from this repository. 
 [You can find them here](https://github.com/DroneBridge/ESP32/releases).
 
-For flashing there are many ways of doing this. To easy ones are shown below. **You might need to press the reset/boot 
-button on your ESP to start the upload/flash process-**
+For flashing there are many ways of doing this. To easy ones are shown below.
 
-#### Windows only: Use flash download tools
+#### All platforms: Use Espressif firmware flashing tool
 
-[Get it here](https://www.espressif.com/en/support/download/other-tools)
-
-#### Use Espressif firmware flashing tool
+**recommended**
 
    1. `pip install esptool`
    2. Connect via USB/Serial. Find out the serial port via `dmesg` on linux or device manager on windows. 
-   In this example the serial connection to the ESP32 is on COM4.
-   3. `esptool.py --port COM4 write_flash 0x1000 db_esp32.bin`
+   In this example the serial connection to the ESP32 is on COM4 (in Linux e.g. `/dev/ttyUSB0`).
+   3. `esptool.py -p COM4 -b 460800 --after hard_reset write_flash 0x1000 bootloader.bin 0x8000 partition-table.bin 
+   0x10000 db_esp32.bin`. You might need to press the boot 
+   button on your ESP to start the upload/flash process. On Windows `esptool [...]` (with out `.py`) seems to work
 
 [Look here for more detailed information](https://github.com/espressif/esptool)
 
+#### Windows only: Use flash download tools
+
+   1. [Get it here](https://www.espressif.com/en/support/download/other-tools)
+   2. Select the firmware, bootloader & partition table and set everything as below
+   ![ESP download tool configuration](https://github.com/DroneBridge/ESP32/blob/master/wiki/ESP32Flasher.PNG)
+   3. Hit Start and power cycle your ESP32 after flashing
+
 ### Wiring
 
-Connect UART of ESP32 to a 3.3V UART of your flight controller. Set the flight controller port to the desired protocol. 
+   1. Connect UART of ESP32 to a 3.3V UART of your flight controller. 
+   2. Set the flight controller port to the desired protocol. 
+
 (Power the ESP32 module with a stable 5-12V power source) **Check out manufacturer datasheet! Only some modules can 
 take more than 3.3V/5V on VIN PIN**
 
@@ -62,17 +69,17 @@ Defaults: UART2 (RX2, TX2 on GPIO 16, 17)
  **You might need to disable the cellular connection to force the browser to use the wifi connection**
  3. Configure as you please and hit `save`
 
-![DroneBridge for ESP32 web interface](https://github.com/DroneBridge/ESP32/blob/master/wiki/screen_config.png)
+![DroneBridge for ESP32 web interface](https://github.com/DroneBridge/ESP32/blob/master/wiki/DroneBridge_for_ESP32_web_interface.png)
 
 **Configuration Options:**
- - **`Wifi password`: Up to 64 character long
- - **`UART baud rate`: Same as you configured on your flight controller
- - **`GPIO TX PIN Number` & `GPIO RX PIN Number`: The pins you want to use for TX & RX (UART). See pin out of manufacturer of your ESP32 device **Flight controller UART must be 3.3V or use an inverter.**
+ - `Wifi password`: Up to 64 character long
+ - `UART baud rate`: Same as you configured on your flight controller
+ - `GPIO TX PIN Number` & `GPIO RX PIN Number`: The pins you want to use for TX & RX (UART). See pin out of manufacturer of your ESP32 device **Flight controller UART must be 3.3V or use an inverter.**
  - `UART serial protocol`: MultiWii based or MAVLink based - configures the parser
  - `Transparent packet size`: Only used with 'serial protocol' set to transparent. Length of UDP packets
  - `LTM frames per packet`: Buffer the specified number of packets and send them at once in one packet
 
-** Require restart/reset of ESP32 module
+Most options require a restart/reset of ESP32 module
 
 ## Use with DroneBridge for Android or QGroundControl
 ![DroneBridge for Android app screenshot](https://github.com/DroneBridge/ESP32/blob/master/wiki/dp_app-map-2017-10-29-kleiner.png)
@@ -87,4 +94,4 @@ Defaults: UART2 (RX2, TX2 on GPIO 16, 17)
  
  **This project uses the v4.0 branch of ESP-IDF**
 
- Compile and flash by running: `make`, `make flash`
+ Compile and flash by running: `idf.py build`, `idf.py flash`

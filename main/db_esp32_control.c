@@ -20,6 +20,8 @@
 #include <sys/fcntl.h>
 #include <sys/param.h>
 #include <string.h>
+#include <esp_task_wdt.h>
+#include <esp_vfs_dev.h>
 #include "esp_log.h"
 #include "lwip/sockets.h"
 #include "driver/uart.h"
@@ -35,17 +37,6 @@ uint16_t app_port_proxy = APP_PORT_PROXY;
 uint8_t ltm_frame_buffer[MAX_LTM_FRAMES_IN_BUFFER * LTM_MAX_FRAME_SIZE];
 uint ltm_frames_in_buffer = 0;
 uint ltm_frames_in_buffer_pnt = 0;
-
-int get_socket_error_code(int socket) {
-    int result;
-    u32_t optlen = sizeof(int);
-    if (getsockopt(socket, SOL_SOCKET, SO_ERROR, &result, &optlen) == -1) {
-        ESP_LOGE(TAG, "getsockopt failed");
-        return -1;
-    }
-    return result;
-
-}
 
 int open_serial_socket() {
     int serial_socket;
@@ -65,6 +56,7 @@ int open_serial_socket() {
         uart_driver_delete(UART_NUM_2);
         return ESP_FAIL;
     }
+    esp_vfs_dev_uart_use_driver(2);
     return serial_socket;
 }
 
@@ -114,43 +106,40 @@ void parse_transparent(int tcp_clients[], uint8_t serial_buffer[], uint *serial_
         if (*serial_read_bytes == TRANSPARENT_BUF_SIZE) {
             send_to_all_tcp_clients(tcp_clients, serial_buffer, *serial_read_bytes);
             *serial_read_bytes = 0;
-            ESP_LOGV(TAG, "Sent message transparent");
         }
     }
 }
 
 void handle_tcp_master(const int tcp_master_socket, int tcp_clients[]) {
-    char tcp_buffer[TCP_BUFF_SIZ];
-    memset(tcp_buffer, 0, TCP_BUFF_SIZ);
     struct sockaddr_in6 source_addr; // Large enough for both IPv4 or IPv6
     uint addr_len = sizeof(source_addr);
     int new_tcp_client = accept(tcp_master_socket, (struct sockaddr *) &source_addr, &addr_len);
-    if (new_tcp_client < 0) {
-        ESP_LOGE(TAG, "Unable to accept connection: %s", lwip_strerr(errno));
-        return;
-    }
-    for (int i = 0; i < CONFIG_LWIP_MAX_ACTIVE_TCP; i++) {
-        if (tcp_clients[i] < 0) {
-            tcp_clients[i] = new_tcp_client;
-            char addr_str[128];
-            inet_ntoa_r(((struct sockaddr_in *) &source_addr)->sin_addr.s_addr, addr_str, sizeof(addr_str) - 1);
-            ESP_LOGI(TAG, "New client connected: %s", addr_str);
-            break;
+    if (new_tcp_client > 0) {
+        for (int i = 0; i < CONFIG_LWIP_MAX_ACTIVE_TCP; i++) {
+            if (tcp_clients[i] <= 0) {
+                tcp_clients[i] = new_tcp_client;
+                fcntl(tcp_clients[i], F_SETFL, O_NONBLOCK);
+                char addr_str[128];
+                inet_ntoa_r(((struct sockaddr_in *) &source_addr)->sin_addr.s_addr, addr_str, sizeof(addr_str) - 1);
+                ESP_LOGI(TAG, "New client connected: %s", addr_str);
+                return;
+            }
         }
+        ESP_LOGI(TAG, "Could not accept connection. Too many clients connected.");
     }
 }
 
 void control_module_tcp() {
-    int init_success = 1;
     int tcp_master_socket = open_tcp_server(app_port_proxy);
-    int tcp_clients[CONFIG_LWIP_MAX_ACTIVE_TCP];
-    for (int i = 0; i < CONFIG_LWIP_MAX_ACTIVE_TCP; i++)
-        tcp_clients[i] = -1;
     int uart_socket = open_serial_socket();
+    int tcp_clients[CONFIG_LWIP_MAX_ACTIVE_TCP];
+    for (int i = 0; i < CONFIG_LWIP_MAX_ACTIVE_TCP; i++) {
+        tcp_clients[i] = -1;
+    }
     if (tcp_master_socket == ESP_FAIL || uart_socket == ESP_FAIL) {
-        init_success = -1;
         ESP_LOGE(TAG, "Can not start control module");
     }
+    fcntl(tcp_master_socket, F_SETFL, O_NONBLOCK);
     uint read_transparent = 0;
     uint read_msp_ltm = 0;
     char tcp_client_buffer[TCP_BUFF_SIZ];
@@ -160,63 +149,42 @@ void control_module_tcp() {
     msp_ltm_port_t db_msp_ltm_port;
 
     ESP_LOGI(TAG, "Started control module");
-    while (init_success) {
-        fd_set read_set;
-        struct timeval tv = {.tv_sec = 1, .tv_usec = 0,};
-
-        FD_ZERO(&read_set);
-        FD_SET(uart_socket, &read_set);
-        FD_SET(tcp_master_socket, &read_set);
-        int max_sock_fd = MAX(uart_socket, tcp_master_socket);
+    while (1) {
+        handle_tcp_master(tcp_master_socket, tcp_clients);
         for (int i = 0; i < CONFIG_LWIP_MAX_ACTIVE_TCP; i++) {
             if (tcp_clients[i] > 0) {
-                FD_SET(tcp_clients[i], &read_set);
-                if (tcp_clients[i] > max_sock_fd)
-                    max_sock_fd = tcp_clients[i];
+                ssize_t recv_length = recv(tcp_clients[i], tcp_client_buffer, TCP_BUFF_SIZ, 0);
+                if (recv_length > 0) {
+                    ESP_LOGD(TAG, "Received %i bytes", recv_length);
+                    int written = uart_write_bytes(UART_NUM_2, tcp_client_buffer, (size_t) recv_length);
+                    if (written > 0)
+                        ESP_LOGD(TAG, "Wrote %i bytes", written);
+                    else
+                        ESP_LOGE(TAG, "Error writing to UART %s", esp_err_to_name(errno));
+                } else if (recv_length == 0) {
+                    shutdown(tcp_clients[i], 0);
+                    close(tcp_clients[i]);
+                    tcp_clients[i] = -1;
+                    ESP_LOGI(TAG, "TCP client disconnected");
+                } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                    ESP_LOGE(TAG, "Error receiving from TCP client %i (fd: %i): %d", i, tcp_clients[i], errno);
+                    shutdown(tcp_clients[i], 0);
+                    close(tcp_clients[i]);
+                    tcp_clients[i] = -1;
+                }
             }
         }
-
-        int select_ret = select(max_sock_fd + 1, &read_set, NULL, NULL, &tv);
-
-        if (select_ret < 0) {
-            ESP_LOGE(TAG, "Select failed: %s", lwip_strerr(errno));
-        } else if (select_ret == 0) {
-            ESP_LOGI(TAG, "Timeout has been reached and nothing has been received");
-        } else {
-            // Handle TCP connection requests
-            if (FD_ISSET(tcp_master_socket, &read_set)) {
-                handle_tcp_master(tcp_master_socket, tcp_clients);
-            }
-            // Handle incoming UART data
-            if (FD_ISSET(uart_socket, &read_set)) {
-                switch (SERIAL_PROTOCOL) {
-                    case 1:
-                    case 2:
-                        parse_msp_ltm(tcp_clients, msp_message_buffer, &read_msp_ltm, &db_msp_ltm_port);
-                        break;
-                    default:
-                    case 3:
-                    case 4:
-                    case 5:
-                        parse_transparent(tcp_clients, serial_buffer, &read_transparent);
-                        break;
-                }
-            }
-            // Handle TCP client connections
-            for (int i = 0; i < CONFIG_LWIP_MAX_ACTIVE_TCP; i++) {
-                if (tcp_clients[i] > 0 && FD_ISSET(tcp_clients[i], &read_set)) {
-                    ssize_t recv_length = lwip_recv(tcp_clients[i], tcp_client_buffer, TCP_BUFF_SIZ, 0);
-                    if (recv_length > 0) {
-                        uart_write_bytes(UART_NUM_2, tcp_client_buffer, (size_t) recv_length);
-                    } else if (recv_length == 0) {
-                        shutdown(tcp_clients[i], 0);
-                        close(tcp_clients[i]);
-                        tcp_clients[i] = -1;
-                        ESP_LOGI(TAG, "TCP client disconnected");
-                    } else
-                        ESP_LOGE(TAG, "Error receiving from TCP client: %s", lwip_strerr(errno));
-                }
-            }
+        switch (SERIAL_PROTOCOL) {
+                case 1:
+                case 2:
+                    parse_msp_ltm(tcp_clients, msp_message_buffer, &read_msp_ltm, &db_msp_ltm_port);
+                    break;
+                default:
+                case 3:
+                case 4:
+                case 5:
+                    parse_transparent(tcp_clients, serial_buffer, &read_transparent);
+                    break;
         }
     }
     vTaskDelete(NULL);

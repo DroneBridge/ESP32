@@ -28,7 +28,6 @@
 // can be set by user
 extern uint8_t DEFAULT_PWD[64];
 extern uint8_t DEFAULT_CHANNEL;
-extern char DEST_IP[15];
 extern uint8_t SERIAL_PROTOCOL;  // 1,2=MSP, 3,4,5=MAVLink/transparent
 extern uint8_t DB_UART_PIN_TX;
 extern uint8_t DB_UART_PIN_RX;
@@ -36,8 +35,5 @@ extern uint32_t DB_UART_BAUD_RATE;
 extern uint16_t TRANSPARENT_BUF_SIZE;
 extern uint8_t LTM_FRAME_NUM_BUFFER;    // Number of LTM frames per UDP packet (min = 1; max = 5)
 extern EventGroupHandle_t wifi_event_group;
-
-// system internally
-extern volatile bool client_connected;
 
 #endif //DB_ESP32_GLOBALS_H

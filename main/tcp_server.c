@@ -39,17 +39,17 @@ int open_tcp_server(int port) {
 
     int listen_sock = socket(addr_family, SOCK_STREAM, ip_protocol);
     if (listen_sock < 0) {
-        ESP_LOGE(TCP_TAG, "Unable to create socket: %s", lwip_strerr(errno));
+        ESP_LOGE(TCP_TAG, "Unable to create socket: %s", esp_err_to_name(errno));
         return ESP_FAIL;
     }
     int err = bind(listen_sock, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
     if (err != 0) {
-        ESP_LOGE(TCP_TAG, "Socket unable to bind: %s", lwip_strerr(errno));
+        ESP_LOGE(TCP_TAG, "Socket unable to bind: %s", esp_err_to_name(errno));
         return ESP_FAIL;
     }
     err = listen(listen_sock, 1);
     if (err != 0) {
-        ESP_LOGE(TCP_TAG, "Error occurred during listen: %s", lwip_strerr(errno));
+        ESP_LOGE(TCP_TAG, "Error occurred during listen: %s", esp_err_to_name(errno));
         return ESP_FAIL;
     }
     ESP_LOGI(TCP_TAG, "Opened TCP server on port %d", port);
@@ -59,9 +59,11 @@ int open_tcp_server(int port) {
 void send_to_all_tcp_clients(const int tcp_clients[], uint8_t data[], uint data_length) {
     for (int i = 0; i < CONFIG_LWIP_MAX_ACTIVE_TCP; i++) {
         if (tcp_clients[i] > 0) {
-            int err = lwip_send(tcp_clients[i], data, data_length, 0);
-            if (err < 0)
-                ESP_LOGE(TCP_TAG, "Error occurred during sending: %s", lwip_strerr(errno));
+            ESP_LOGD(TCP_TAG, "Sending %i bytes", data_length);
+            int err = write(tcp_clients[i], data, data_length);
+            if (err < 0) {
+                ESP_LOGE(TCP_TAG, "Error occurred during sending: %d", errno);
+            }
         }
     }
 
