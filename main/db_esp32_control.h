@@ -23,7 +23,6 @@
 #define UDP_BUF_SIZE (1024)
 #define UART_BUF_SIZE (1024)
 
-int get_socket_error_code(int socket);
 void control_module();
 
 #endif //DB_ESP32_DB_ESP32_CONTROL_H

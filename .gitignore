@@ -6,3 +6,6 @@ CMakeListsPrivate.txt
 .vscode/launch.json
 .clang_complete
 .gcc-flags.json
+/.idea/
+/cmake-build-debug/
+/build/

@@ -1,7 +1,7 @@
 /*
  *   This file is part of DroneBridge: https://github.com/seeul8er/DroneBridge
  *
- *   Copyright 2018 Wolfgang Christl
+ *   Copyright 2019 Wolfgang Christl
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -20,7 +20,9 @@
 #ifndef DB_ESP32_TCP_SERVER_H
 #define DB_ESP32_TCP_SERVER_H
 
-void start_tcp_server();
-void write_settings_to_nvs();
+#define TCP_BUFF_SIZ 4096
+
+int open_tcp_server(int port);
+void send_to_all_tcp_clients(const int tcp_clients[], uint8_t data[], uint data_length);
 
 #endif //DB_ESP32_TCP_SERVER_H

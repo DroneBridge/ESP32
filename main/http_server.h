@@ -17,17 +17,10 @@
  *
  */
 
-#ifndef DB_ESP32_DB_COMM_H
-#define DB_ESP32_DB_COMM_H
+#ifndef DB_ESP32_HTTP_SERVER_H
+#define DB_ESP32_HTTP_SERVER_H
 
-#define MAX_ERR_MSG_LENGTH 2048
+void start_tcp_server();
+void write_settings_to_nvs();
 
-int crc_ok(uint8_t *buf, int msg_length);
-
-int gen_db_comm_sys_ident_json(uint8_t *message_buffer, int new_id, int new_fw_id);
-
-int gen_db_comm_err_resp(uint8_t *message_buffer, int id, char error_message[MAX_ERR_MSG_LENGTH]);
-
-int gen_db_comm_ping_resp(uint8_t *message_buffer, int id);
-
-#endif //DB_ESP32_DB_COMM_H
+#endif //DB_ESP32_HTTP_SERVER_H
