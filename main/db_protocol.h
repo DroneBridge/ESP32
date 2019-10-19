@@ -63,7 +63,8 @@
 #define APP_PORT_COMM       1603
 #define APP_PORT_TELEMETRY  1604 // accepts MAVLink and LTM telemetry messages. Non MAVLink telemetry messages get rerouted internally to APP_PORT_PROXY
 #define PORT_TCP_SYSLOG_SERVER 1605
-#define APP_PORT_PROXY 		14556 // use this port for all MAVLink messages
+#define APP_PORT_PROXY 		5760 // use this port for all MAVLink messages (TCP)
+#define APP_PORT_PROXY_UDP	14550 // use this port for all MAVLink messages (UDP)
 #define APP_PORT_VIDEO      5000 // app accepts raw H.264 streams
 #define APP_PORT_VIDEO_FEC  5001 // app accepts raw DroneBridge video stream data, performs FEC on Android device
 
