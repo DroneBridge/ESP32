@@ -28,10 +28,18 @@
 #include "globals.h"
 #include "msp_ltm_serial.h"
 #include "db_protocol.h"
-#include "db_esp32_control.h"
 #include "tcp_server.h"
 
 #define TAG "DB_CONTROL"
+#define TRANS_RD_BYTES_NUM  8   // amount of bytes read form serial port at once when transparent is selected
+#define UDP_BUF_SIZE    2048
+#define UART_BUF_SIZE   (1024)
+#define MAX_UDP_CLIENTS 5
+
+struct db_udp_connection_t {
+    int udp_socket;
+    struct sockaddr_in6 udp_clients[MAX_UDP_CLIENTS];
+};
 
 uint16_t app_port_proxy = APP_PORT_PROXY;
 uint8_t ltm_frame_buffer[MAX_LTM_FRAMES_IN_BUFFER * LTM_MAX_FRAME_SIZE];
@@ -60,31 +68,92 @@ int open_serial_socket() {
     return serial_socket;
 }
 
+int open_udp_socket() {
+    char addr_str[128];
+    int addr_family;
+    int ip_protocol;
+
+    struct sockaddr_in server_addr;
+    server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(APP_PORT_PROXY_UDP);
+    addr_family = AF_INET;
+    ip_protocol = IPPROTO_IP;
+    inet_ntoa_r(server_addr.sin_addr, addr_str, sizeof(addr_str) - 1);
+
+    int udp_socket = socket(addr_family, SOCK_DGRAM, ip_protocol);
+    if (udp_socket < 0) {
+        ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
+        return -1;
+    }
+    int err = bind(udp_socket, (struct sockaddr *) &server_addr, sizeof(server_addr));
+    if (err < 0) {
+        ESP_LOGE(TAG, "Socket unable to bind: errno %d", errno);
+    }
+    ESP_LOGI(TAG, "Opened UDP socket on port %i", APP_PORT_PROXY_UDP);
+
+    return udp_socket;
+}
+
+/**
+ * Send to all connected TCP & UDP clients
+ *
+ * @param tcp_clients
+ * @param udp_conn
+ * @param data
+ * @param data_length
+ */
+void send_to_all_clients(int tcp_clients[], struct db_udp_connection_t *udp_conn, uint8_t data[], uint data_length) {
+    send_to_all_tcp_clients(tcp_clients, data, data_length);
+
+    for (int i = 0; i < MAX_UDP_CLIENTS; i++) {  // send to all UDP clients
+        if (udp_conn->udp_clients[i].sin6_len > 0) {
+            int sent = sendto(udp_conn->udp_socket, data, data_length, 0, (struct sockaddr *) &udp_conn->udp_clients[i],
+                              sizeof(udp_conn->udp_clients[i]));
+            if (sent != data_length) {
+                ESP_LOGE(TAG, "UDP - Error sending (%i/%i) because of %d", sent, data_length, errno);
+            }
+        }
+    }
+}
+
+void write_to_uart(const char tcp_client_buffer[], const size_t data_length) {
+    int written = uart_write_bytes(UART_NUM_2, tcp_client_buffer, data_length);
+    if (written > 0)
+        ESP_LOGD(TAG, "Wrote %i bytes", written);
+    else
+        ESP_LOGE(TAG, "Error writing to UART %s", esp_err_to_name(errno));
+}
+
 /**
  * @brief Parses & sends complete MSP & LTM messages
  */
 void parse_msp_ltm(int tcp_clients[], uint8_t msp_message_buffer[], uint *serial_read_bytes,
                    msp_ltm_port_t *db_msp_ltm_port) {
-    uint8_t serial_byte;
-    if (uart_read_bytes(UART_NUM_2, &serial_byte, 1, 200 / portTICK_RATE_MS) > 0) {
-        (*serial_read_bytes)++;
-        if (parse_msp_ltm_byte(db_msp_ltm_port, serial_byte)) {
-            msp_message_buffer[(*serial_read_bytes - 1)] = serial_byte;
-            if (db_msp_ltm_port->parse_state == MSP_PACKET_RECEIVED) {
-                *serial_read_bytes = 0;
-                send_to_all_tcp_clients(tcp_clients, msp_message_buffer, *serial_read_bytes);
-            } else if (db_msp_ltm_port->parse_state == LTM_PACKET_RECEIVED) {
-                memcpy(&ltm_frame_buffer[ltm_frames_in_buffer_pnt], db_msp_ltm_port->ltm_frame_buffer,
-                       (db_msp_ltm_port->ltm_payload_cnt + 4));
-                ltm_frames_in_buffer_pnt += (db_msp_ltm_port->ltm_payload_cnt + 4);
-                ltm_frames_in_buffer++;
-                if (ltm_frames_in_buffer == LTM_FRAME_NUM_BUFFER &&
-                    (LTM_FRAME_NUM_BUFFER <= MAX_LTM_FRAMES_IN_BUFFER)) {
-                    send_to_all_tcp_clients(tcp_clients, ltm_frame_buffer, ltm_frames_in_buffer_pnt);
-                    ESP_LOGV(TAG, "Sent %i LTM message(s) to telemetry port!", LTM_FRAME_NUM_BUFFER);
-                    ltm_frames_in_buffer = 0;
-                    ltm_frames_in_buffer_pnt = 0;
+    uint8_t serial_bytes[TRANS_RD_BYTES_NUM];
+    uint read = 0;
+    if ((read = uart_read_bytes(UART_NUM_2, serial_bytes, TRANS_RD_BYTES_NUM, 200 / portTICK_RATE_MS)) > 0) {
+        for (uint j = 0; j < read; j++) {
+            (*serial_read_bytes)++;
+            uint8_t serial_byte = serial_bytes[j];
+            if (parse_msp_ltm_byte(db_msp_ltm_port, serial_byte)) {
+                msp_message_buffer[(*serial_read_bytes - 1)] = serial_byte;
+                if (db_msp_ltm_port->parse_state == MSP_PACKET_RECEIVED) {
                     *serial_read_bytes = 0;
+                    send_to_all_tcp_clients(tcp_clients, msp_message_buffer, *serial_read_bytes);
+                } else if (db_msp_ltm_port->parse_state == LTM_PACKET_RECEIVED) {
+                    memcpy(&ltm_frame_buffer[ltm_frames_in_buffer_pnt], db_msp_ltm_port->ltm_frame_buffer,
+                           (db_msp_ltm_port->ltm_payload_cnt + 4));
+                    ltm_frames_in_buffer_pnt += (db_msp_ltm_port->ltm_payload_cnt + 4);
+                    ltm_frames_in_buffer++;
+                    if (ltm_frames_in_buffer == LTM_FRAME_NUM_BUFFER &&
+                        (LTM_FRAME_NUM_BUFFER <= MAX_LTM_FRAMES_IN_BUFFER)) {
+                        send_to_all_tcp_clients(tcp_clients, ltm_frame_buffer, ltm_frames_in_buffer_pnt);
+                        ESP_LOGV(TAG, "Sent %i LTM message(s) to telemetry port!", LTM_FRAME_NUM_BUFFER);
+                        ltm_frames_in_buffer = 0;
+                        ltm_frames_in_buffer_pnt = 0;
+                        *serial_read_bytes = 0;
+                    }
                 }
             }
         }
@@ -98,18 +167,26 @@ void parse_msp_ltm(int tcp_clients[], uint8_t msp_message_buffer[], uint *serial
  * @param tcp_clients Array of connected TCP clients
  * @param serial_read_bytes Number of bytes already read for the current packet
  */
-void parse_transparent(int tcp_clients[], uint8_t serial_buffer[], uint *serial_read_bytes) {
-    uint8_t serial_byte;
-    if (uart_read_bytes(UART_NUM_2, &serial_byte, 1, 200 / portTICK_RATE_MS) > 0) {
-        serial_buffer[*serial_read_bytes] = serial_byte;
-        (*serial_read_bytes)++;
-        if (*serial_read_bytes == TRANSPARENT_BUF_SIZE) {
-            send_to_all_tcp_clients(tcp_clients, serial_buffer, *serial_read_bytes);
+void parse_transparent(int tcp_clients[], struct db_udp_connection_t *udp_conn, uint8_t serial_buffer[],
+                       uint *serial_read_bytes) {
+    uint8_t serial_bytes[TRANS_RD_BYTES_NUM];
+    uint read = 0;
+    if ((read = uart_read_bytes(UART_NUM_2, serial_bytes, TRANS_RD_BYTES_NUM, 200 / portTICK_RATE_MS)) > 0) {
+        memcpy(&serial_buffer[*serial_read_bytes], serial_bytes, read);
+        *serial_read_bytes += read;
+        if (*serial_read_bytes >= TRANSPARENT_BUF_SIZE) {
+            send_to_all_clients(tcp_clients, udp_conn, serial_buffer, *serial_read_bytes);
             *serial_read_bytes = 0;
         }
     }
 }
 
+/**
+ * Check for incoming connections on TCP server
+ *
+ * @param tcp_master_socket
+ * @param tcp_clients
+ */
 void handle_tcp_master(const int tcp_master_socket, int tcp_clients[]) {
     struct sockaddr_in6 source_addr; // Large enough for both IPv4 or IPv6
     uint addr_len = sizeof(source_addr);
@@ -129,9 +206,50 @@ void handle_tcp_master(const int tcp_master_socket, int tcp_clients[]) {
     }
 }
 
+/**
+ * Add a new client to the list of known UDP clients. Check if client is already known
+ *
+ * @param connections Structure containing all UDP connection information
+ * @param new_client_addr Address of new client
+ */
+void add_udp_to_known_clients(struct db_udp_connection_t *connections, struct sockaddr_in6 new_client_addr) {
+    for (int i = 0; i < MAX_UDP_CLIENTS; i++) {
+        if (connections->udp_clients[i].sin6_port == new_client_addr.sin6_port) {
+            if (new_client_addr.sin6_family == PF_INET) {
+                if (((struct sockaddr_in *) &connections->udp_clients[i])->sin_addr.s_addr ==
+                    ((struct sockaddr_in *) &new_client_addr)->sin_addr.s_addr)
+                    return;
+            } else if (new_client_addr.sin6_family == PF_INET6) {
+                if (connections->udp_clients[i].sin6_addr.un.u32_addr == new_client_addr.sin6_addr.un.u32_addr)
+                    return;
+            }
+        } else if (connections->udp_clients[i].sin6_len == 0) {
+            connections->udp_clients[i] = new_client_addr;
+            char addr_str[128];
+            if (new_client_addr.sin6_family == PF_INET) {
+                inet_ntoa_r(((struct sockaddr_in *) &new_client_addr)->sin_addr.s_addr, addr_str, sizeof(addr_str) - 1);
+            } else if (new_client_addr.sin6_family == PF_INET6) {
+                inet6_ntoa_r(new_client_addr.sin6_addr, addr_str, sizeof(addr_str) - 1);
+            }
+            ESP_LOGI(TAG, "UDP: New client connected: %s:%i", addr_str, new_client_addr.sin6_port);
+            return;
+        }
+    }
+}
+
 void control_module_tcp() {
-    int tcp_master_socket = open_tcp_server(app_port_proxy);
     int uart_socket = open_serial_socket();
+    int tcp_master_socket = open_tcp_server(app_port_proxy);
+
+    struct db_udp_connection_t udp_conn;
+    udp_conn.udp_socket = open_udp_socket();
+    fcntl(udp_conn.udp_socket, F_SETFL, O_NONBLOCK);
+    char udp_buffer[UDP_BUF_SIZE];
+    struct sockaddr_in6 udp_source_addr;
+    socklen_t udp_socklen = sizeof(udp_source_addr);
+    for (int i = 0; i < MAX_UDP_CLIENTS; i++)
+        memset(&(udp_conn.udp_clients[i]), 0, sizeof(struct sockaddr_in6));
+
     int tcp_clients[CONFIG_LWIP_MAX_ACTIVE_TCP];
     for (int i = 0; i < CONFIG_LWIP_MAX_ACTIVE_TCP; i++) {
         tcp_clients[i] = -1;
@@ -151,16 +269,12 @@ void control_module_tcp() {
     ESP_LOGI(TAG, "Started control module");
     while (1) {
         handle_tcp_master(tcp_master_socket, tcp_clients);
-        for (int i = 0; i < CONFIG_LWIP_MAX_ACTIVE_TCP; i++) {
+        for (int i = 0; i < CONFIG_LWIP_MAX_ACTIVE_TCP; i++) {  // handle TCP clients
             if (tcp_clients[i] > 0) {
                 ssize_t recv_length = recv(tcp_clients[i], tcp_client_buffer, TCP_BUFF_SIZ, 0);
                 if (recv_length > 0) {
-                    ESP_LOGD(TAG, "Received %i bytes", recv_length);
-                    int written = uart_write_bytes(UART_NUM_2, tcp_client_buffer, (size_t) recv_length);
-                    if (written > 0)
-                        ESP_LOGD(TAG, "Wrote %i bytes", written);
-                    else
-                        ESP_LOGE(TAG, "Error writing to UART %s", esp_err_to_name(errno));
+                    ESP_LOGD(TAG, "TCP: Received %i bytes", recv_length);
+                    write_to_uart(tcp_client_buffer, recv_length);
                 } else if (recv_length == 0) {
                     shutdown(tcp_clients[i], 0);
                     close(tcp_clients[i]);
@@ -174,17 +288,25 @@ void control_module_tcp() {
                 }
             }
         }
+        // handle incoming UDP data
+        ssize_t recv_length = recvfrom(udp_conn.udp_socket, udp_buffer, UDP_BUF_SIZE, 0,
+                                       (struct sockaddr *) &udp_source_addr, &udp_socklen);
+        if (recv_length > 0) {
+            ESP_LOGD(TAG, "UDP: Received %i bytes", recv_length);
+            write_to_uart(udp_buffer, recv_length);
+            add_udp_to_known_clients(&udp_conn, udp_source_addr);
+        }
         switch (SERIAL_PROTOCOL) {
-                case 1:
-                case 2:
-                    parse_msp_ltm(tcp_clients, msp_message_buffer, &read_msp_ltm, &db_msp_ltm_port);
-                    break;
-                default:
-                case 3:
-                case 4:
-                case 5:
-                    parse_transparent(tcp_clients, serial_buffer, &read_transparent);
-                    break;
+            case 1:
+            case 2:
+                parse_msp_ltm(tcp_clients, msp_message_buffer, &read_msp_ltm, &db_msp_ltm_port);
+                break;
+            default:
+            case 3:
+            case 4:
+            case 5:
+                parse_transparent(tcp_clients, &udp_conn, serial_buffer, &read_transparent);
+                break;
         }
     }
     vTaskDelete(NULL);

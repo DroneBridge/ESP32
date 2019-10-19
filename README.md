@@ -9,6 +9,8 @@ Also allows for a fully transparent serial to wifi pass through with variable pa
 
 ![DroneBridge for ESP32 concept](https://github.com/DroneBridge/ESP32/blob/master/wiki/db_ESP32_setup.png)
 
+![DroneBridge for ESP32 block diagram blackbox](https://github.com/DroneBridge/ESP32/blob/master/wiki/DroneBridgeForESP32Blackbox.png)
+
 ## Features
  - Bi-directional link: MAVLink, MSP & LTM
  - Affordable: ~7€
@@ -85,7 +87,7 @@ Most options require a restart/reset of ESP32 module
 ![DroneBridge for Android app screenshot](https://github.com/DroneBridge/ESP32/blob/master/wiki/dp_app-map-2017-10-29-kleiner.png)
 
  - Use the Android app to display live telemetry data. Mission planning capabilities for MAVLink will follow.
- - Connect via **TCP on port 14556** to the ESP32 to send & receive data with a GCS of your choice
+ - Connect via **TCP on port 5760** or **UDP on port 14550** to the ESP32 to send & receive data with a GCS of your choice. **In case of a UDP connection the GCS must send at least one packet (e.g. MAVLink heart beat etc.) to the UDP port of the ESP32 to register as an end point.**
 
 ## Compile yourself (developers)
 
