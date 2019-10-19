@@ -9,3 +9,9 @@ CMakeListsPrivate.txt
 /.idea/
 /cmake-build-debug/
 /build/
+
+.idea/
+
+build/
+
+cmake-build-debug/
