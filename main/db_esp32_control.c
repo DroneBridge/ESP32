@@ -22,6 +22,8 @@
 #include <string.h>
 #include <esp_task_wdt.h>
 #include <esp_vfs_dev.h>
+#include <esp_wifi.h>
+#include <lwip/inet.h>
 #include "esp_log.h"
 #include "lwip/sockets.h"
 #include "driver/uart.h"
@@ -34,11 +36,12 @@
 #define TRANS_RD_BYTES_NUM  8   // amount of bytes read form serial port at once when transparent is selected
 #define UDP_BUF_SIZE    2048
 #define UART_BUF_SIZE   (1024)
-#define MAX_UDP_CLIENTS 5
+#define MAX_UDP_CLIENTS 8
 
 struct db_udp_connection_t {
     int udp_socket;
-    struct sockaddr_in6 udp_clients[MAX_UDP_CLIENTS];
+    struct sockaddr_in udp_clients[MAX_UDP_CLIENTS];
+    bool is_broadcast[MAX_UDP_CLIENTS];  // sockaddr_in at index is added because of station that connected
 };
 
 uint16_t app_port_proxy = APP_PORT_PROXY;
@@ -107,11 +110,12 @@ void send_to_all_clients(int tcp_clients[], struct db_udp_connection_t *udp_conn
     send_to_all_tcp_clients(tcp_clients, data, data_length);
 
     for (int i = 0; i < MAX_UDP_CLIENTS; i++) {  // send to all UDP clients
-        if (udp_conn->udp_clients[i].sin6_len > 0) {
+        if (udp_conn->udp_clients[i].sin_len > 0) {
             int sent = sendto(udp_conn->udp_socket, data, data_length, 0, (struct sockaddr *) &udp_conn->udp_clients[i],
                               sizeof(udp_conn->udp_clients[i]));
             if (sent != data_length) {
                 ESP_LOGE(TAG, "UDP - Error sending (%i/%i) because of %d", sent, data_length, errno);
+                udp_conn->udp_clients[i].sin_len = 0;
             }
         }
     }
@@ -128,7 +132,7 @@ void write_to_uart(const char tcp_client_buffer[], const size_t data_length) {
 /**
  * @brief Parses & sends complete MSP & LTM messages
  */
-void parse_msp_ltm(int tcp_clients[], uint8_t msp_message_buffer[], uint *serial_read_bytes,
+void parse_msp_ltm(int tcp_clients[], struct db_udp_connection_t *udp_conn, uint8_t msp_message_buffer[], uint *serial_read_bytes,
                    msp_ltm_port_t *db_msp_ltm_port) {
     uint8_t serial_bytes[TRANS_RD_BYTES_NUM];
     uint read = 0;
@@ -140,7 +144,7 @@ void parse_msp_ltm(int tcp_clients[], uint8_t msp_message_buffer[], uint *serial
                 msp_message_buffer[(*serial_read_bytes - 1)] = serial_byte;
                 if (db_msp_ltm_port->parse_state == MSP_PACKET_RECEIVED) {
                     *serial_read_bytes = 0;
-                    send_to_all_tcp_clients(tcp_clients, msp_message_buffer, *serial_read_bytes);
+                    send_to_all_clients(tcp_clients, udp_conn, msp_message_buffer, *serial_read_bytes);
                 } else if (db_msp_ltm_port->parse_state == LTM_PACKET_RECEIVED) {
                     memcpy(&ltm_frame_buffer[ltm_frames_in_buffer_pnt], db_msp_ltm_port->ltm_frame_buffer,
                            (db_msp_ltm_port->ltm_payload_cnt + 4));
@@ -148,7 +152,7 @@ void parse_msp_ltm(int tcp_clients[], uint8_t msp_message_buffer[], uint *serial
                     ltm_frames_in_buffer++;
                     if (ltm_frames_in_buffer == LTM_FRAME_NUM_BUFFER &&
                         (LTM_FRAME_NUM_BUFFER <= MAX_LTM_FRAMES_IN_BUFFER)) {
-                        send_to_all_tcp_clients(tcp_clients, ltm_frame_buffer, ltm_frames_in_buffer_pnt);
+                        send_to_all_clients(tcp_clients, udp_conn, ltm_frame_buffer, *serial_read_bytes);
                         ESP_LOGV(TAG, "Sent %i LTM message(s) to telemetry port!", LTM_FRAME_NUM_BUFFER);
                         ltm_frames_in_buffer = 0;
                         ltm_frames_in_buffer_pnt = 0;
@@ -198,11 +202,11 @@ void handle_tcp_master(const int tcp_master_socket, int tcp_clients[]) {
                 fcntl(tcp_clients[i], F_SETFL, O_NONBLOCK);
                 char addr_str[128];
                 inet_ntoa_r(((struct sockaddr_in *) &source_addr)->sin_addr.s_addr, addr_str, sizeof(addr_str) - 1);
-                ESP_LOGI(TAG, "New client connected: %s", addr_str);
+                ESP_LOGI(TAG, "TCP: New client connected: %s", addr_str);
                 return;
             }
         }
-        ESP_LOGI(TAG, "Could not accept connection. Too many clients connected.");
+        ESP_LOGI(TAG, "TCP: Could not accept connection. Too many clients connected.");
     }
 }
 
@@ -212,27 +216,60 @@ void handle_tcp_master(const int tcp_master_socket, int tcp_clients[]) {
  * @param connections Structure containing all UDP connection information
  * @param new_client_addr Address of new client
  */
-void add_udp_to_known_clients(struct db_udp_connection_t *connections, struct sockaddr_in6 new_client_addr) {
+void add_udp_to_known_clients(struct db_udp_connection_t *connections, struct sockaddr_in new_client_addr, bool is_brdcst) {
     for (int i = 0; i < MAX_UDP_CLIENTS; i++) {
-        if (connections->udp_clients[i].sin6_port == new_client_addr.sin6_port) {
-            if (new_client_addr.sin6_family == PF_INET) {
-                if (((struct sockaddr_in *) &connections->udp_clients[i])->sin_addr.s_addr ==
-                    ((struct sockaddr_in *) &new_client_addr)->sin_addr.s_addr)
+        if (connections->udp_clients[i].sin_port == new_client_addr.sin_port && new_client_addr.sin_family == PF_INET &&
+        ((struct sockaddr_in *) &connections->udp_clients[i])->sin_addr.s_addr == ((struct sockaddr_in *) &new_client_addr)->sin_addr.s_addr)
+        {
                     return;
-            } else if (new_client_addr.sin6_family == PF_INET6) {
-                if (connections->udp_clients[i].sin6_addr.un.u32_addr == new_client_addr.sin6_addr.un.u32_addr)
-                    return;
-            }
-        } else if (connections->udp_clients[i].sin6_len == 0) {
+        } else if (connections->udp_clients[i].sin_len == 0) {
             connections->udp_clients[i] = new_client_addr;
             char addr_str[128];
-            if (new_client_addr.sin6_family == PF_INET) {
+            if (new_client_addr.sin_family == PF_INET) {
                 inet_ntoa_r(((struct sockaddr_in *) &new_client_addr)->sin_addr.s_addr, addr_str, sizeof(addr_str) - 1);
-            } else if (new_client_addr.sin6_family == PF_INET6) {
-                inet6_ntoa_r(new_client_addr.sin6_addr, addr_str, sizeof(addr_str) - 1);
             }
-            ESP_LOGI(TAG, "UDP: New client connected: %s:%i", addr_str, new_client_addr.sin6_port);
+            connections->is_broadcast[i] = is_brdcst;
+            if (!is_brdcst)
+                ESP_LOGI(TAG, "UDP: New client connected: %s:%i", addr_str, new_client_addr.sin_port);
             return;
+        }
+    }
+}
+
+/**
+ * Get all connected clients to local AP and add to UDP connection list. List is updated every second
+ *
+ * @param pInt
+ */
+void update_udp_broadcast(int64_t *last_update, struct db_udp_connection_t *connections, const wifi_mode_t *wifi_mode) {
+    if (*wifi_mode == WIFI_MODE_AP && (esp_timer_get_time() - *last_update) >= 1000000) {
+        *last_update = esp_timer_get_time();
+        // clear all entries
+        for (int i = 0; i < MAX_UDP_CLIENTS; i++) {
+            if (connections->is_broadcast[i]) {
+                memset(&connections->udp_clients[i], 0, sizeof(connections->udp_clients[i]));
+            }
+        }
+        // add based on connected stations
+        wifi_sta_list_t sta_list;
+        tcpip_adapter_sta_list_t tcpip_sta_list;
+        memset(&sta_list, 0, sizeof(sta_list));
+        memset(&tcpip_sta_list, 0, sizeof(tcpip_sta_list));
+        ESP_ERROR_CHECK(esp_wifi_ap_get_sta_list(&sta_list));
+        ESP_ERROR_CHECK( tcpip_adapter_get_sta_list(&sta_list, &tcpip_sta_list));
+        for(int i = 0; i < tcpip_sta_list.num; i++) {
+            tcpip_adapter_sta_info_t station = tcpip_sta_list.sta[i];
+
+            struct sockaddr_in new_client_addr;
+            new_client_addr.sin_family = PF_INET;
+            new_client_addr.sin_port = htons(APP_PORT_PROXY_UDP);
+            new_client_addr.sin_len = 16;
+            char ip[100];
+            sprintf(ip, IPSTR, IP2STR(&station.ip));
+            inet_pton(AF_INET, ip, &new_client_addr.sin_addr);
+            ESP_LOGD(TAG, "%i %s " IPSTR " " MACSTR"", tcpip_sta_list.num, ip4addr_ntoa(&(station.ip)), IP2STR(&station.ip), MAC2STR(station.mac));
+            if (ip[0] != '0')  // DHCP bug. Assigns 0.0.0.0 to station when directly connected on startup
+                add_udp_to_known_clients(connections, new_client_addr, true);
         }
     }
 }
@@ -245,10 +282,10 @@ void control_module_tcp() {
     udp_conn.udp_socket = open_udp_socket();
     fcntl(udp_conn.udp_socket, F_SETFL, O_NONBLOCK);
     char udp_buffer[UDP_BUF_SIZE];
-    struct sockaddr_in6 udp_source_addr;
+    struct sockaddr_in udp_source_addr;
     socklen_t udp_socklen = sizeof(udp_source_addr);
     for (int i = 0; i < MAX_UDP_CLIENTS; i++)
-        memset(&(udp_conn.udp_clients[i]), 0, sizeof(struct sockaddr_in6));
+        memset(&(udp_conn.udp_clients[i]), 0, sizeof(struct sockaddr_in));
 
     int tcp_clients[CONFIG_LWIP_MAX_ACTIVE_TCP];
     for (int i = 0; i < CONFIG_LWIP_MAX_ACTIVE_TCP; i++) {
@@ -265,6 +302,10 @@ void control_module_tcp() {
     uint8_t msp_message_buffer[UART_BUF_SIZE];
     uint8_t serial_buffer[TRANSPARENT_BUF_SIZE];
     msp_ltm_port_t db_msp_ltm_port;
+
+    int64_t last_udp_brdc_update = esp_timer_get_time();  // time since boot for UDP broadcast update
+    wifi_mode_t wifi_mode;
+    esp_wifi_get_mode(&wifi_mode);
 
     ESP_LOGI(TAG, "Started control module");
     while (1) {
@@ -294,12 +335,13 @@ void control_module_tcp() {
         if (recv_length > 0) {
             ESP_LOGD(TAG, "UDP: Received %i bytes", recv_length);
             write_to_uart(udp_buffer, recv_length);
-            add_udp_to_known_clients(&udp_conn, udp_source_addr);
+            add_udp_to_known_clients(&udp_conn, udp_source_addr, false);
         }
+        update_udp_broadcast(&last_udp_brdc_update, &udp_conn, &wifi_mode);
         switch (SERIAL_PROTOCOL) {
             case 1:
             case 2:
-                parse_msp_ltm(tcp_clients, msp_message_buffer, &read_msp_ltm, &db_msp_ltm_port);
+                parse_msp_ltm(tcp_clients, &udp_conn, msp_message_buffer, &read_msp_ltm, &db_msp_ltm_port);
                 break;
             default:
             case 3:

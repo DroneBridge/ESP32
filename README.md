@@ -28,7 +28,8 @@ Tested with: DOIT ESP32 module
 
 ![DroneBridge for ESP32 block diagram blackbox](https://raw.githubusercontent.com/DroneBridge/ESP32/master/wiki/DroneBridgeForESP32Blackbox.png)
 
-Blackbox concept. UDP & TCP connections possible.
+Blackbox concept. UDP & TCP connections possible. Automatic UDP uni-cast of messages to port 14550 to all 
+connected devices/stations. Allows additional clients to register for UDP. Client must send a packet with length > 0 to UDP port of ESP32.
 
 ## Installation/Flashing using precompiled binaries
 
@@ -87,6 +88,7 @@ Most options require a restart/reset of ESP32 module
 ![DroneBridge for Android app screenshot](https://raw.githubusercontent.com/DroneBridge/ESP32/master/wiki/dp_app-map-2017-10-29-kleiner.png)
 
 -   Use the Android app to display live telemetry data. Mission planning capabilities for MAVLink will follow.
+-   The ESP will auto broadcast messages to all connected devices via UDP to port 14550. QGroundControl should auto connect
 -   Connect via **TCP on port 5760** or **UDP on port 14550** to the ESP32 to send & receive data with a GCS of your choice. **In case of a UDP connection the GCS must send at least one packet (e.g. MAVLink heart beat etc.) to the UDP port of the ESP32 to register as an end point.**
 
 ## Compile yourself (developers)
