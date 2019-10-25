@@ -34,8 +34,8 @@
 
 EventGroupHandle_t wifi_event_group;
 static const char *TAG = "DB_ESP32";
-#define DEFAULT_SSID "DroneBridge ESP32"
 
+uint8_t DEFAULT_SSID[32] = "DroneBridge ESP32";
 uint8_t DEFAULT_PWD[64] = "dronebridge";
 uint8_t DEFAULT_CHANNEL = 6;
 uint8_t SERIAL_PROTOCOL = 2;  // 1,2=MSP, 3,4,5=MAVLink/transparent
@@ -101,7 +101,7 @@ void init_wifi(){
     ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
     wifi_config_t ap_config = {
             .ap = {
-                    .ssid = DEFAULT_SSID,
+                    .ssid = "Init DroneBridge ESP32",
                     .ssid_len = 0,
                     .authmode = WIFI_AUTH_WPA_PSK,
                     .channel = DEFAULT_CHANNEL,
@@ -110,6 +110,7 @@ void init_wifi(){
                     .max_connection = 10
             },
     };
+    xthal_memcpy(ap_config.ap.ssid, DEFAULT_SSID, 32);
     xthal_memcpy(ap_config.ap.password, DEFAULT_PWD, 64);
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
     ESP_ERROR_CHECK(esp_wifi_set_protocol(ESP_IF_WIFI_AP, WIFI_PROTOCOL_11B));
@@ -138,10 +139,17 @@ void read_settings_nvs(){
     } else {
         ESP_LOGI(TAG, "Reading settings from NVS");
         size_t required_size = 0;
+        ESP_ERROR_CHECK(nvs_get_str(my_handle, "ssid", NULL, &required_size));
+        char* ssid = malloc(required_size);
+        ESP_ERROR_CHECK(nvs_get_str(my_handle, "ssid", ssid, &required_size));
+        memcpy(DEFAULT_SSID, ssid, required_size);
+
         ESP_ERROR_CHECK(nvs_get_str(my_handle, "wifi_pass", NULL, &required_size));
         char* wifi_pass = malloc(required_size);
         ESP_ERROR_CHECK(nvs_get_str(my_handle, "wifi_pass", wifi_pass, &required_size));
         memcpy(DEFAULT_PWD, wifi_pass, required_size);
+
+        ESP_ERROR_CHECK(nvs_get_u8(my_handle, "wifi_chan", &DEFAULT_CHANNEL));
         ESP_ERROR_CHECK(nvs_get_u32(my_handle, "baud", &DB_UART_BAUD_RATE));
         ESP_ERROR_CHECK(nvs_get_u8(my_handle, "gpio_tx", &DB_UART_PIN_TX));
         ESP_ERROR_CHECK(nvs_get_u8(my_handle, "gpio_rx", &DB_UART_PIN_RX));
@@ -150,6 +158,7 @@ void read_settings_nvs(){
         ESP_ERROR_CHECK(nvs_get_u8(my_handle, "ltm_per_packet", &LTM_FRAME_NUM_BUFFER));
         nvs_close(my_handle);
         free(wifi_pass);
+        free(ssid);
     }
 }
 

@@ -132,7 +132,8 @@ void write_to_uart(const char tcp_client_buffer[], const size_t data_length) {
 /**
  * @brief Parses & sends complete MSP & LTM messages
  */
-void parse_msp_ltm(int tcp_clients[], struct db_udp_connection_t *udp_conn, uint8_t msp_message_buffer[], uint *serial_read_bytes,
+void parse_msp_ltm(int tcp_clients[], struct db_udp_connection_t *udp_conn, uint8_t msp_message_buffer[],
+                   uint *serial_read_bytes,
                    msp_ltm_port_t *db_msp_ltm_port) {
     uint8_t serial_bytes[TRANS_RD_BYTES_NUM];
     uint read = 0;
@@ -216,12 +217,13 @@ void handle_tcp_master(const int tcp_master_socket, int tcp_clients[]) {
  * @param connections Structure containing all UDP connection information
  * @param new_client_addr Address of new client
  */
-void add_udp_to_known_clients(struct db_udp_connection_t *connections, struct sockaddr_in new_client_addr, bool is_brdcst) {
+void
+add_udp_to_known_clients(struct db_udp_connection_t *connections, struct sockaddr_in new_client_addr, bool is_brdcst) {
     for (int i = 0; i < MAX_UDP_CLIENTS; i++) {
         if (connections->udp_clients[i].sin_port == new_client_addr.sin_port && new_client_addr.sin_family == PF_INET &&
-        ((struct sockaddr_in *) &connections->udp_clients[i])->sin_addr.s_addr == ((struct sockaddr_in *) &new_client_addr)->sin_addr.s_addr)
-        {
-                    return;
+            ((struct sockaddr_in *) &connections->udp_clients[i])->sin_addr.s_addr ==
+            ((struct sockaddr_in *) &new_client_addr)->sin_addr.s_addr) {
+            return;
         } else if (connections->udp_clients[i].sin_len == 0) {
             connections->udp_clients[i] = new_client_addr;
             char addr_str[128];
@@ -256,8 +258,8 @@ void update_udp_broadcast(int64_t *last_update, struct db_udp_connection_t *conn
         memset(&sta_list, 0, sizeof(sta_list));
         memset(&tcpip_sta_list, 0, sizeof(tcpip_sta_list));
         ESP_ERROR_CHECK(esp_wifi_ap_get_sta_list(&sta_list));
-        ESP_ERROR_CHECK( tcpip_adapter_get_sta_list(&sta_list, &tcpip_sta_list));
-        for(int i = 0; i < tcpip_sta_list.num; i++) {
+        ESP_ERROR_CHECK(tcpip_adapter_get_sta_list(&sta_list, &tcpip_sta_list));
+        for (int i = 0; i < tcpip_sta_list.num; i++) {
             tcpip_adapter_sta_info_t station = tcpip_sta_list.sta[i];
 
             struct sockaddr_in new_client_addr;
@@ -267,7 +269,8 @@ void update_udp_broadcast(int64_t *last_update, struct db_udp_connection_t *conn
             char ip[100];
             sprintf(ip, IPSTR, IP2STR(&station.ip));
             inet_pton(AF_INET, ip, &new_client_addr.sin_addr);
-            ESP_LOGD(TAG, "%i %s " IPSTR " " MACSTR"", tcpip_sta_list.num, ip4addr_ntoa(&(station.ip)), IP2STR(&station.ip), MAC2STR(station.mac));
+            ESP_LOGD(TAG, "%i %s " IPSTR " " MACSTR "", tcpip_sta_list.num, ip4addr_ntoa(&(station.ip)),
+                    IP2STR(&station.ip), MAC2STR(station.mac));
             if (ip[0] != '0')  // DHCP bug. Assigns 0.0.0.0 to station when directly connected on startup
                 add_udp_to_known_clients(connections, new_client_addr, true);
         }

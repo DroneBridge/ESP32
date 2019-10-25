@@ -23,9 +23,10 @@
 #include <freertos/event_groups.h>
 
 #define MAX_LTM_FRAMES_IN_BUFFER 5
-#define BUILDVERSION 5    //v0.5
+#define BUILDVERSION 6    //v0.6
 
 // can be set by user
+extern uint8_t DEFAULT_SSID[32];
 extern uint8_t DEFAULT_PWD[64];
 extern uint8_t DEFAULT_CHANNEL;
 extern uint8_t SERIAL_PROTOCOL;  // 1,2=MSP, 3,4,5=MAVLink/transparent
