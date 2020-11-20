@@ -163,13 +163,7 @@ void parse_save_get_parameters(char *request_buffer, uint length) {
 
 
 char *create_response(char *website_response) {
-    char baud_selection1[9] = "";
-    char baud_selection2[9] = "";
-    char baud_selection3[9] = "";
-    char baud_selection4[9] = "";
-    char baud_selection5[9] = "";
-    char baud_selection6[9] = "";
-    char baud_selection7[9] = "";
+    char baud_selection[11][9] = {""};
     char uart_serial_selection1[9] = "";
     char uart_serial_selection2[9] = "";
     char trans_pack_size_selection1[9] = "";
@@ -232,26 +226,38 @@ char *create_response(char *website_response) {
     }
     switch (DB_UART_BAUD_RATE) {
         default:
+        case 5000000:
+            strcpy(baud_selection[0], "selected");
+            break;
+        case 1500000:
+            strcpy(baud_selection[1], "selected");
+            break;
+        case 1000000:
+            strcpy(baud_selection[2], "selected");
+            break;
+        case 500000:
+            strcpy(baud_selection[3], "selected");
+            break;
         case 115200:
-            strcpy(baud_selection1, "selected");
+            strcpy(baud_selection[4], "selected");
             break;
         case 57600:
-            strcpy(baud_selection2, "selected");
+            strcpy(baud_selection[5], "selected");
             break;
         case 38400:
-            strcpy(baud_selection3, "selected");
+            strcpy(baud_selection[6], "selected");
             break;
         case 19200:
-            strcpy(baud_selection4, "selected");
+            strcpy(baud_selection[7], "selected");
             break;
         case 9600:
-            strcpy(baud_selection5, "selected");
+            strcpy(baud_selection[8], "selected");
             break;
         case 4800:
-            strcpy(baud_selection6, "selected");
+            strcpy(baud_selection[9], "selected");
             break;
         case 2400:
-            strcpy(baud_selection7, "selected");
+            strcpy(baud_selection[10], "selected");
             break;
     }
     char build_version[16];
@@ -283,6 +289,10 @@ char *create_response(char *website_response) {
                               "<td><input type=\"number\" name=\"wifi_chan\" min=\"0\" max=\"13\" value=\"%i\"></td></tr>"
                               "<tr><td>UART baud rate</td><td>"
                               "<select name=\"baud\" form=\"settings_form\">"
+                              "<option %s value=\"5000000\">5000000</option>"
+                              "<option %s value=\"1500000\">1500000</option>"
+                              "<option %s value=\"1000000\">1000000</option>"
+                              "<option %s value=\"500000\">500000</option>"
                               "<option %s value=\"115200\">115200</option>"
                               "<option %s value=\"57600\">57600</option>"
                               "<option %s value=\"38400\">38400</option>"
@@ -323,8 +333,7 @@ char *create_response(char *website_response) {
                               "<p class=\"foot\">%s</p>\n"
                               "<p class=\"foot\">&copy; Wolfgang Christl 2018 - Apache 2.0 License</p>"
                               "</body></html>\n"
-                              "", DEFAULT_SSID, DEFAULT_PWD, DEFAULT_CHANNEL, baud_selection1, baud_selection2, baud_selection3, baud_selection4,
-            baud_selection5, baud_selection6, baud_selection7, DB_UART_PIN_TX, DB_UART_PIN_RX, uart_serial_selection1,
+                              "", DEFAULT_SSID, DEFAULT_PWD, DEFAULT_CHANNEL, baud_selection[0], baud_selection[1], baud_selection[2], baud_selection[3], baud_selection[4], baud_selection[5], baud_selection[6], baud_selection[7], baud_selection[8], baud_selection[9], baud_selection[10], DB_UART_PIN_TX, DB_UART_PIN_RX, uart_serial_selection1,
             uart_serial_selection2, trans_pack_size_selection1, trans_pack_size_selection2, trans_pack_size_selection3,
             trans_pack_size_selection4, trans_pack_size_selection5, ltm_size_selection1, ltm_size_selection2,
             ltm_size_selection3, ltm_size_selection4, ltm_size_selection5, build_version);
