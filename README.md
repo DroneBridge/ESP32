@@ -7,6 +7,8 @@ communicate with your drone, UAV, UAS, ground based vehicle or whatever you may 
 Also allows for a fully transparent serial to wifi pass through with variable packet size
 (Continuous stream of data required).
 
+DroneBridge for ESP32 is a telemetry/low data rate only solution. There is no support for cameras connected to the ESP32 since it does not support video encoding.
+
 ![DroneBridge for ESP32 concept](https://raw.githubusercontent.com/DroneBridge/ESP32/master/wiki/db_ESP32_setup.png)
 
 ## Features
