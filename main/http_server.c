@@ -1,5 +1,5 @@
 /*
- *   This file is part of DroneBridge: https://github.com/seeul8er/DroneBridge
+ *   This file is part of DroneBridge: https://github.com/DroneBridge/ESP32
  *
  *   Copyright 2018 Wolfgang Christl
  *
@@ -351,7 +351,6 @@ void http_settings_server(void *parameter) {
     static struct sockaddr_in remote_addr;
     static unsigned int socklen;
     socklen = sizeof(remote_addr);
-    xEventGroupWaitBits(wifi_event_group, BIT2, false, true, portMAX_DELAY);
     while (1) {
         tcp_socket = socket(AF_INET, SOCK_STREAM, 0);
         if (tcp_socket < 0) {

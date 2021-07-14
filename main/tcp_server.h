@@ -1,5 +1,5 @@
 /*
- *   This file is part of DroneBridge: https://github.com/seeul8er/DroneBridge
+ *   This file is part of DroneBridge: https://github.com/DroneBridge/ESP32
  *
  *   Copyright 2019 Wolfgang Christl
  *

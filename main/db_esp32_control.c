@@ -24,6 +24,7 @@
 #include <esp_vfs_dev.h>
 #include <esp_wifi.h>
 #include <lwip/inet.h>
+#include <esp_netif_sta_list.h>
 #include "esp_log.h"
 #include "lwip/sockets.h"
 #include "driver/uart.h"
@@ -254,24 +255,21 @@ void update_udp_broadcast(int64_t *last_update, struct db_udp_connection_t *conn
         }
         // add based on connected stations
         wifi_sta_list_t sta_list;
-        tcpip_adapter_sta_list_t tcpip_sta_list;
+        esp_netif_sta_list_t netif_sta_list;
         memset(&sta_list, 0, sizeof(sta_list));
-        memset(&tcpip_sta_list, 0, sizeof(tcpip_sta_list));
+        memset(&netif_sta_list, 0, sizeof(esp_netif_sta_list_t));
         ESP_ERROR_CHECK(esp_wifi_ap_get_sta_list(&sta_list));
-        ESP_ERROR_CHECK(tcpip_adapter_get_sta_list(&sta_list, &tcpip_sta_list));
-        for (int i = 0; i < tcpip_sta_list.num; i++) {
-            tcpip_adapter_sta_info_t station = tcpip_sta_list.sta[i];
+        ESP_ERROR_CHECK(esp_netif_get_sta_list(&sta_list, &netif_sta_list));
+        for (int i = 0; i < netif_sta_list.num; i++) {
+            esp_netif_sta_info_t station = netif_sta_list.sta[i];
 
             struct sockaddr_in new_client_addr;
             new_client_addr.sin_family = PF_INET;
             new_client_addr.sin_port = htons(APP_PORT_PROXY_UDP);
             new_client_addr.sin_len = 16;
-            char ip[100];
-            sprintf(ip, IPSTR, IP2STR(&station.ip));
-            inet_pton(AF_INET, ip, &new_client_addr.sin_addr);
-            ESP_LOGD(TAG, "%i %s " IPSTR " " MACSTR "", tcpip_sta_list.num, ip4addr_ntoa(&(station.ip)),
-                    IP2STR(&station.ip), MAC2STR(station.mac));
-            if (ip[0] != '0')  // DHCP bug. Assigns 0.0.0.0 to station when directly connected on startup
+            new_client_addr.sin_addr.s_addr = station.ip.addr;
+            ESP_LOGD(TAG, "%i " IPSTR " " MACSTR "", netif_sta_list.num, IP2STR(&station.ip), MAC2STR(station.mac));
+            if (station.ip.addr != 0)  // DHCP bug. Assigns 0.0.0.0 to station when directly connected on startup
                 add_udp_to_known_clients(connections, new_client_addr, true);
         }
     }
@@ -364,6 +362,5 @@ void control_module_tcp() {
  * MAVLink is passed through (fully transparent). Can be used with any protocol.
  */
 void control_module() {
-    xEventGroupWaitBits(wifi_event_group, BIT2, false, true, portMAX_DELAY);
     xTaskCreate(&control_module_tcp, "control_tcp", 40960, NULL, 5, NULL);
 }

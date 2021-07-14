@@ -1,5 +1,5 @@
 /*
- *   This file is part of DroneBridge: https://github.com/seeul8er/DroneBridge
+ *   This file is part of DroneBridge: https://github.com/DroneBridge/ESP32
  *
  *   Copyright 2018 Wolfgang Christl
  *
@@ -23,7 +23,7 @@
 #include <freertos/event_groups.h>
 
 #define MAX_LTM_FRAMES_IN_BUFFER 5
-#define BUILDVERSION 6    //v0.6
+#define BUILDVERSION 7    //v0.7
 
 // can be set by user
 extern uint8_t DEFAULT_SSID[32];
@@ -35,6 +35,5 @@ extern uint8_t DB_UART_PIN_RX;
 extern uint32_t DB_UART_BAUD_RATE;
 extern uint16_t TRANSPARENT_BUF_SIZE;
 extern uint8_t LTM_FRAME_NUM_BUFFER;    // Number of LTM frames per UDP packet (min = 1; max = 5)
-extern EventGroupHandle_t wifi_event_group;
 
 #endif //DB_ESP32_GLOBALS_H

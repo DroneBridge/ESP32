@@ -1,5 +1,5 @@
 /*
- *   This file is part of DroneBridge: https://github.com/seeul8er/DroneBridge
+ *   This file is part of DroneBridge: https://github.com/DroneBridge/ESP32
  *
  *   Copyright 2018 Wolfgang Christl
  *
@@ -23,6 +23,7 @@
 #include <mdns.h>
 #include <string.h>
 #include <driver/gpio.h>
+#include <lwip/apps/netbiosns.h>
 #include "freertos/event_groups.h"
 #include "esp_wifi.h"
 #include "esp_log.h"
@@ -31,8 +32,10 @@
 #include "http_server.h"
 #include "db_esp32_comm.h"
 #include "db_protocol.h"
+#include "esp_vfs_semihost.h"
+#include "esp_spiffs.h"
+#include "http_server_new.h"
 
-EventGroupHandle_t wifi_event_group;
 static const char *TAG = "DB_ESP32";
 
 uint8_t DEFAULT_SSID[32] = "DroneBridge ESP32";
@@ -45,35 +48,24 @@ uint32_t DB_UART_BAUD_RATE = 115200;
 uint16_t TRANSPARENT_BUF_SIZE = 64;
 uint8_t LTM_FRAME_NUM_BUFFER = 1;
 
-static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+static void wifi_event_handler(void* arg, esp_event_base_t event_base,
+                               int32_t event_id, void* event_data)
 {
-    wifi_event_ap_staconnected_t *event;
-    wifi_event_ap_stadisconnected_t* evente;
-    switch (event_id) {
-        case SYSTEM_EVENT_AP_START:
-            ESP_LOGI(TAG, "Wifi AP started!");
-            xEventGroupSetBits(wifi_event_group, BIT2);
-            break;
-        case SYSTEM_EVENT_AP_STOP:
-            ESP_LOGI(TAG, "Wifi AP stopped!");
-            break;
-        case SYSTEM_EVENT_AP_STACONNECTED:
-            event = (wifi_event_ap_staconnected_t *) event_data;
-            ESP_LOGI(TAG, "Client connected - station:"MACSTR", AID=%d", MAC2STR(event->mac), event->aid);
-            break;
-        case SYSTEM_EVENT_AP_STADISCONNECTED:
-            evente = (wifi_event_ap_stadisconnected_t*) event_data;
-            ESP_LOGI(TAG, "Client disconnected - station:"MACSTR", AID=%d",
-                     MAC2STR(evente->mac), evente->aid);
-            break;
-        default:
-            break;
+    if (event_id == WIFI_EVENT_AP_STACONNECTED) {
+        wifi_event_ap_staconnected_t* event = (wifi_event_ap_staconnected_t*) event_data;
+        ESP_LOGI(TAG, "Client connected - station:"MACSTR", AID=%d", MAC2STR(event->mac), event->aid);
+    } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
+        wifi_event_ap_stadisconnected_t* event = (wifi_event_ap_stadisconnected_t*) event_data;
+        ESP_LOGI(TAG, "Client disconnected - station:"MACSTR", AID=%d", MAC2STR(event->mac), event->aid);
+    } else if (event_id == WIFI_EVENT_AP_START) {
+        ESP_LOGI(TAG, "AP started!");
+    } else if (event_id == WIFI_EVENT_AP_STOP) {
+        ESP_LOGI(TAG, "AP stopped!");
     }
 }
 
 void start_mdns_service()
 {
-    xEventGroupWaitBits(wifi_event_group, BIT2, false, true, portMAX_DELAY);
     //initialize mDNS service
     esp_err_t err = mdns_init();
     if (err) {
@@ -89,19 +81,67 @@ void start_mdns_service()
     ESP_ERROR_CHECK(mdns_service_instance_name_set("_http", "_tcp", "DroneBridge for ESP32"));
 }
 
+#if CONFIG_WEB_DEPLOY_SEMIHOST
+esp_err_t init_fs(void) {
+    esp_err_t ret = esp_vfs_semihost_register(CONFIG_WEB_MOUNT_POINT, CONFIG_HOST_PATH_TO_MOUNT);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to register semihost driver (%s)!", esp_err_to_name(ret));
+        return ESP_FAIL;
+    }
+    return ESP_OK;
+}
+#endif
 
-void init_wifi(){
-    wifi_event_group = xEventGroupCreate();
-    tcpip_adapter_init();
+
+#if CONFIG_WEB_DEPLOY_SF
+esp_err_t init_fs(void) {
+    esp_vfs_spiffs_conf_t conf = {
+        .base_path = CONFIG_WEB_MOUNT_POINT,
+        .partition_label = NULL,
+        .max_files = 5,
+        .format_if_mount_failed = false
+    };
+    esp_err_t ret = esp_vfs_spiffs_register(&conf);
+
+    if (ret != ESP_OK) {
+        if (ret == ESP_FAIL) {
+            ESP_LOGE(TAG, "Failed to mount or format filesystem");
+        } else if (ret == ESP_ERR_NOT_FOUND) {
+            ESP_LOGE(TAG, "Failed to find SPIFFS partition");
+        } else {
+            ESP_LOGE(TAG, "Failed to initialize SPIFFS (%s)", esp_err_to_name(ret));
+        }
+        return ESP_FAIL;
+    }
+
+    size_t total = 0, used = 0;
+    ret = esp_spiffs_info(NULL, &total, &used);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get SPIFFS partition information (%s)", esp_err_to_name(ret));
+    } else {
+        ESP_LOGI(TAG, "Partition size: total: %d, used: %d", total, used);
+    }
+    return ESP_OK;
+}
+#endif
+
+void init_wifi(void) {
+    ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
+    esp_netif_t *esp_net = esp_netif_create_default_wifi_ap();
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
-    wifi_config_t ap_config = {
+
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
+                                                        ESP_EVENT_ANY_ID,
+                                                        &wifi_event_handler,
+                                                        NULL,
+                                                        NULL));
+
+    wifi_config_t wifi_config = {
             .ap = {
-                    .ssid = "Init DroneBridge ESP32",
+                    .ssid = "DroneBridge_ESP32_Init",
                     .ssid_len = 0,
                     .authmode = WIFI_AUTH_WPA_PSK,
                     .channel = DEFAULT_CHANNEL,
@@ -110,23 +150,26 @@ void init_wifi(){
                     .max_connection = 10
             },
     };
-    xthal_memcpy(ap_config.ap.ssid, DEFAULT_SSID, 32);
-    xthal_memcpy(ap_config.ap.password, DEFAULT_PWD, 64);
+    xthal_memcpy(wifi_config.ap.ssid, DEFAULT_SSID, 32);
+    xthal_memcpy(wifi_config.ap.password, DEFAULT_PWD, 64);
+
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
-    ESP_ERROR_CHECK(esp_wifi_set_protocol(ESP_IF_WIFI_AP, WIFI_PROTOCOL_11B));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_config));
+    ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B));
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
     wifi_country_t wifi_country = {.cc = "XX", .schan = 1, .nchan = 13, .policy = WIFI_COUNTRY_POLICY_MANUAL};
     ESP_ERROR_CHECK(esp_wifi_set_country(&wifi_country));
     ESP_ERROR_CHECK(esp_wifi_start());
-    ESP_ERROR_CHECK(tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_AP, "DBESP32"));
 
-    ESP_ERROR_CHECK(tcpip_adapter_dhcps_stop(TCPIP_ADAPTER_IF_AP));
-    tcpip_adapter_ip_info_t ip_info;
-    IP4_ADDR(&ip_info.ip, 192,168,2,1);
-    IP4_ADDR(&ip_info.gw, 192,168,2,1);
-    IP4_ADDR(&ip_info.netmask, 255,255,255,0);
-    ESP_ERROR_CHECK(tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_AP, &ip_info));
-    ESP_ERROR_CHECK(tcpip_adapter_dhcps_start(TCPIP_ADAPTER_IF_AP));
+    esp_netif_ip_info_t ip;
+    memset(&ip, 0 , sizeof(esp_netif_ip_info_t));
+    ip.ip.addr = ipaddr_addr("192.168.2.1");
+    ip.netmask.addr = ipaddr_addr("255.255.255.0");
+    ip.gw.addr = ipaddr_addr("192.168.2.1");
+    ESP_ERROR_CHECK(esp_netif_dhcps_stop(esp_net));
+    ESP_ERROR_CHECK(esp_netif_set_ip_info(esp_net, &ip));
+    ESP_ERROR_CHECK(esp_netif_dhcps_start(esp_net));
+
+    ESP_ERROR_CHECK(esp_netif_set_hostname(esp_net, "DBESP32"));
 }
 
 
@@ -163,8 +206,7 @@ void read_settings_nvs(){
 }
 
 
-void app_main()
-{
+void app_main() {
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES) {
         ESP_ERROR_CHECK(nvs_flash_erase());
@@ -175,7 +217,13 @@ void app_main()
     esp_log_level_set("*", ESP_LOG_INFO);
     init_wifi();
     start_mdns_service();
+    netbiosns_init();
+    netbiosns_set_name("dronebridge");
+
+    ESP_ERROR_CHECK(init_fs());
+
     control_module();
-    start_tcp_server();
+    ESP_ERROR_CHECK(start_rest_server(CONFIG_WEB_MOUNT_POINT));
+//    start_tcp_server();
     communication_module();
 }

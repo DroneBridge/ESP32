@@ -1,57 +1,57 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml">
 <head>
-<title>DB for ESP32 Settings</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<style>
-h1 {
-  font-family: Verdana, Geneva, sans-serif;
-  color: #FF7900;
-}
-table.DroneBridge {
-  font-family: Verdana, Geneva, sans-serif;
-  background-color: #145396;
-  text-align: right;
-  border-collapse: collapse;
-}
-@media only screen and (max-width:768px) {
-  /* For mobile phones: */
-  .DroneBridge {
-    width:100%;
-  }
-}
-table.DroneBridge td, table.DroneBridge th {
-  padding: 6px 0px;
-}
-table.DroneBridge tbody td {
-  font-size: 1em;
-  font-weight: bold;
-  color: #FFFFFF;
-  padding: 0.5em;
-}
-table.DroneBridge td:nth-child(even) {
-  background: #FF7900;
-}
-.foot{
-  color: #145396;
-  font-family: Verdana, Geneva, sans-serif;
-  font-size: 0.8em;
-}
-</style>
+  <title>DB for ESP32 Settings</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <style>
+    h1 {
+      font-family: Verdana, Geneva, sans-serif;
+      color: #FF7900;
+    }
+    table.DroneBridge {
+      font-family: Verdana, Geneva, sans-serif;
+      background-color: #145396;
+      text-align: right;
+      border-collapse: collapse;
+    }
+    @media only screen and (max-width:768px) {
+      /* For mobile phones: */
+      .DroneBridge {
+        width:100%;
+      }
+    }
+    table.DroneBridge td, table.DroneBridge th {
+      padding: 6px 0px;
+    }
+    table.DroneBridge tbody td {
+      font-size: 1em;
+      font-weight: bold;
+      color: #FFFFFF;
+      padding: 0.5em;
+    }
+    table.DroneBridge td:nth-child(even) {
+      background: #FF7900;
+    }
+    .foot{
+      color: #145396;
+      font-family: Verdana, Geneva, sans-serif;
+      font-size: 0.8em;
+    }
+  </style>
 </head>
 <body>
 
 <h1>DroneBridge for ESP32</h1>
 <form action="/settings.html" id="settings_form" method="get" target="_blank">
-<table class="DroneBridge">
-	<tbody>
-		<tr>
-			<td>Wifi password</td>
-			<td><input type="text" name="wifi_pass" value="dronebridge"></td>
-		</tr>
-		<tr>
-			<td>UART baud rate</td>
-			<td>
+  <table class="DroneBridge">
+    <tbody>
+    <tr>
+      <td>Wifi password</td>
+      <td><input type="text" name="wifi_pass" value="dronebridge"></td>
+    </tr>
+    <tr>
+      <td>UART baud rate</td>
+      <td>
         <select name="baud" form="settings_form">
           <option %s value="5000000">5000000</option>
           <option %s value="1500000">1500000</option>
@@ -65,29 +65,29 @@ table.DroneBridge td:nth-child(even) {
           <option value="4800">4800</option>
           <option value="2400">2400</option>
         </select>
-</td>
-		</tr>
-		<tr>
-			<td>GPIO TX pin number</td>
-			<td><input type="text" name="gpio_tx" value="17"></td>
-		</tr>
-		<tr>
-			<td>GPIO RX pin number</td>
-			<td><input type="text" name="gpio_rx" value="16"></td>
-		</tr>
-		<tr>
-			<td>UART serial protocol</td>
-			<td>
+      </td>
+    </tr>
+    <tr>
+      <td>GPIO TX pin number</td>
+      <td><input type="text" name="gpio_tx" value="17"></td>
+    </tr>
+    <tr>
+      <td>GPIO RX pin number</td>
+      <td><input type="text" name="gpio_rx" value="16"></td>
+    </tr>
+    <tr>
+      <td>UART serial protocol</td>
+      <td>
         <select name="proto" form="settings_form">
           <option value="msp_ltm">MSP/LTM</option>
           <option value="trans">Transparent/MAVLink</option>
         </select>
 
       </td>
-		</tr>
-		<tr>
-			<td>Transparent packet size</td>
-			<td>
+    </tr>
+    <tr>
+      <td>Transparent packet size</td>
+      <td>
         <select name="trans_pack_size" form="settings_form">
           <option value="16">16</option>
           <option value="32">32</option>
@@ -96,10 +96,10 @@ table.DroneBridge td:nth-child(even) {
           <option value="256">256</option>
         </select>
       </td>
-		</tr>
-		<tr>
-			<td>LTM frames per packet</td>
-			<td>
+    </tr>
+    <tr>
+      <td>LTM frames per packet</td>
+      <td>
         <select name="ltm_per_packet" form="settings_form">
           <option value="1">1</option>
           <option value="2">2</option>
@@ -108,7 +108,7 @@ table.DroneBridge td:nth-child(even) {
           <option value="5">5</option>
         </select>
       </td>
-		</tr>
+    </tr>
     <tr>
       <td>MSP & LTM to same port</td>
       <td>
@@ -118,10 +118,10 @@ table.DroneBridge td:nth-child(even) {
         </select>
       </td>
     </tr>
-	</tbody>
-</table>
-<p></p>
-<input target= "_top" type="submit" value="Save">
+    </tbody>
+  </table>
+  <p></p>
+  <input target= "_top" type="submit" value="Save">
 </form>
 <p class="foot">v0.1</p>
 <p class="foot">&copy; Wolfgang Christl 2018 - Apache 2.0 License</p>
