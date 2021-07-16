@@ -36,6 +36,8 @@
 #include "esp_spiffs.h"
 #include "http_server_new.h"
 
+#define NVS_NAMESPACE "settings"
+
 static const char *TAG = "DB_ESP32";
 
 uint8_t DEFAULT_SSID[32] = "DroneBridge ESP32";
@@ -175,9 +177,9 @@ void init_wifi(void) {
 }
 
 void write_settings_to_nvs() {
-    ESP_LOGI(TAG, "Saving to NVS");
+    ESP_LOGI(TAG, "Saving to NVS %s", NVS_NAMESPACE);
     nvs_handle my_handle;
-    ESP_ERROR_CHECK(nvs_open("settings", NVS_READWRITE, &my_handle));
+    ESP_ERROR_CHECK(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &my_handle));
     ESP_ERROR_CHECK(nvs_set_str(my_handle, "ssid", (char *) DEFAULT_SSID));
     ESP_ERROR_CHECK(nvs_set_str(my_handle, "wifi_pass", (char *) DEFAULT_PWD));
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "wifi_chan", DEFAULT_CHANNEL));
@@ -196,10 +198,11 @@ void write_settings_to_nvs() {
 
 void read_settings_nvs() {
     nvs_handle my_handle;
-    if (nvs_open("settings", NVS_READONLY, &my_handle) != ESP_OK){
+    if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &my_handle) != ESP_OK){
         // First start
         nvs_close(my_handle);
-        nvs_flash_erase();
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ESP_ERROR_CHECK(nvs_flash_init());
         write_settings_to_nvs();
     } else {
         ESP_LOGI(TAG, "Reading settings from NVS");

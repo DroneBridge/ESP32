@@ -117,8 +117,8 @@ static esp_err_t rest_common_get_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-/* Simple handler for light brightness control */
-static esp_err_t light_brightness_post_handler(httpd_req_t *req) {
+/* Simple handler for settings change */
+static esp_err_t settings_change_post_handler(httpd_req_t *req) {
     int total_len = req->content_len;
     int cur_len = 0;
     char *buf = ((rest_server_context_t *)(req->user_ctx))->scratch;
@@ -140,12 +140,21 @@ static esp_err_t light_brightness_post_handler(httpd_req_t *req) {
     buf[total_len] = '\0';
 
     cJSON *root = cJSON_Parse(buf);
-    int red = cJSON_GetObjectItem(root, "red")->valueint;
-    int green = cJSON_GetObjectItem(root, "green")->valueint;
-    int blue = cJSON_GetObjectItem(root, "blue")->valueint;
-    ESP_LOGI(REST_TAG, "Light control: red = %d, green = %d, blue = %d", red, green, blue);
+    strncpy((char *) DEFAULT_SSID, cJSON_GetObjectItem(root, "wifi_ssid")->valuestring, sizeof (DEFAULT_SSID));
+    strncpy((char *) DEFAULT_PWD, cJSON_GetObjectItem(root, "wifi_pass")->valuestring, sizeof (DEFAULT_PWD));
+    DEFAULT_CHANNEL = cJSON_GetObjectItem(root, "ap_channel")->valueint;
+    TRANSPARENT_BUF_SIZE = cJSON_GetObjectItem(root, "trans_pack_size")->valueint;
+    DB_UART_PIN_TX = cJSON_GetObjectItem(root, "tx_pin")->valueint;
+    DB_UART_PIN_RX = cJSON_GetObjectItem(root, "rx_pin")->valueint;
+    DB_UART_BAUD_RATE = cJSON_GetObjectItem(root, "baud")->valueint;
+    SERIAL_PROTOCOL = cJSON_GetObjectItem(root, "telem_proto")->valueint;
+    LTM_FRAME_NUM_BUFFER = cJSON_GetObjectItem(root, "ltm_pp")->valueint;
+    MSP_LTM_SAMEPORT = cJSON_GetObjectItem(root, "msp_ltm_port")->valueint;
+    strncpy(DEFAULT_AP_IP, cJSON_GetObjectItem(root, "ap_ip")->valuestring, sizeof (DEFAULT_AP_IP));
+
+    ESP_LOGI(REST_TAG, "Settings changed!");
     cJSON_Delete(root);
-    httpd_resp_sendstr(req, "Post control value successfully");
+    httpd_resp_sendstr(req, "Settings changed!");
     return ESP_OK;
 }
 
@@ -155,9 +164,22 @@ static esp_err_t system_info_get_handler(httpd_req_t *req) {
     cJSON *root = cJSON_CreateObject();
     esp_chip_info_t chip_info;
     esp_chip_info(&chip_info);
-    cJSON_AddStringToObject(root, "version", IDF_VER);
-    cJSON_AddNumberToObject(root, "cores", chip_info.cores);
+    cJSON_AddStringToObject(root, "idf_version", IDF_VER);
     cJSON_AddNumberToObject(root, "db_build_version", BUILDVERSION);
+    const char *sys_info = cJSON_Print(root);
+    httpd_resp_sendstr(req, sys_info);
+    free((void *)sys_info);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
+/* Simple handler for getting system handler */
+static esp_err_t system_stats_get_handler(httpd_req_t *req) {
+    httpd_resp_set_type(req, "application/json");
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddNumberToObject(root, "read_bytes", 14986);
+    cJSON_AddNumberToObject(root, "tcp_connected", 1);
+    cJSON_AddNumberToObject(root, "udp_connected", 2);
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
     free((void *)sys_info);
@@ -169,16 +191,16 @@ static esp_err_t system_info_get_handler(httpd_req_t *req) {
 static esp_err_t settings_data_get_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "application/json");
     cJSON *root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, "ap_name", (char *) DEFAULT_SSID);
-    cJSON_AddStringToObject(root, "ap_password", (char *) DEFAULT_PWD);
+    cJSON_AddStringToObject(root, "wifi_ssid", (char *) DEFAULT_SSID);
+    cJSON_AddStringToObject(root, "wifi_pass", (char *) DEFAULT_PWD);
     cJSON_AddNumberToObject(root, "ap_channel", DEFAULT_CHANNEL);
-    cJSON_AddNumberToObject(root, "trans_buff_size", TRANSPARENT_BUF_SIZE);
+    cJSON_AddNumberToObject(root, "trans_pack_size", TRANSPARENT_BUF_SIZE);
     cJSON_AddNumberToObject(root, "tx_pin", DB_UART_PIN_TX);
     cJSON_AddNumberToObject(root, "rx_pin", DB_UART_PIN_RX);
     cJSON_AddNumberToObject(root, "baud", DB_UART_BAUD_RATE);
-    cJSON_AddNumberToObject(root, "serial_proto", SERIAL_PROTOCOL);
+    cJSON_AddNumberToObject(root, "telem_proto", SERIAL_PROTOCOL);
     cJSON_AddNumberToObject(root, "ltm_pp", LTM_FRAME_NUM_BUFFER);
-    cJSON_AddNumberToObject(root, "msp_ltm_same", MSP_LTM_SAMEPORT);
+    cJSON_AddNumberToObject(root, "msp_ltm_port", MSP_LTM_SAMEPORT);
     cJSON_AddStringToObject(root, "ap_ip", DEFAULT_AP_IP);
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
@@ -209,14 +231,32 @@ esp_err_t start_rest_server(const char *base_path) {
     };
     httpd_register_uri_handler(server, &system_info_get_uri);
 
-    /* URI handler for fetching temperature data */
+    /* URI handler for fetching system info */
+    httpd_uri_t system_stats_get_uri = {
+            .uri = "/api/system/stats",
+            .method = HTTP_GET,
+            .handler = system_stats_get_handler,
+            .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &system_stats_get_uri);
+
+    /* URI handler for fetching settings data */
     httpd_uri_t temperature_data_get_uri = {
-            .uri = "/api/system/settings",
+            .uri = "/api/settings/request",
             .method = HTTP_GET,
             .handler = settings_data_get_handler,
             .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &temperature_data_get_uri);
+
+    /* URI handler for light brightness control */
+    httpd_uri_t settings_change_post_uri = {
+            .uri = "/api/settings/change",
+            .method = HTTP_POST,
+            .handler = settings_change_post_handler,
+            .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &settings_change_post_uri);
 
     /* URI handler for getting web server files */
     httpd_uri_t common_get_uri = {

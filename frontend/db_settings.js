@@ -19,8 +19,19 @@ function toJSONString(form) {
     return JSON.stringify(obj)
 }
 
+function get_system_info() {
+    let req_url = window.location.href + "api/system/info"
+    console.log("Requesting " + req_url);
+    const userAction = async () => {
+        const response = await fetch(req_url)
+        const myJson = await response.json() //extract JSON from the http response
+        console.log(myJson)
+        document.getElementById("about").value = "DroneBridge for ESP32 - 0." + myJson["db_build_version"] + " - esp-idf " + myJson["idf_version"]
+    }
+}
+
 function get_stats() {
-    let req_url = window.location.href + "/api/system/stats";
+    let req_url = window.location.href + "api/system/stats"
     console.log("Requesting " + req_url);
     const userAction = async () => {
         const response = await fetch(req_url)
@@ -51,7 +62,7 @@ function get_stats() {
 }
 
 function get_settings() {
-    let req_url = window.location.href + "/api/system/settings";
+    let req_url = window.location.href + "api/settings/request";
     console.log("Requesting " + req_url);
     const userAction = async () => {
         const response = await fetch(req_url)
@@ -73,7 +84,7 @@ function save_settings() {
     let json_data = toJSONString(form)
     console.log(json_data)
 
-    let post_url = window.location.href + "/api/system/write_settings";
+    let post_url = window.location.href + "api/settings/change";
     const userAction = async () => {
         await fetch(post_url, {
             method: 'POST',

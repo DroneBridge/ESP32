@@ -10,6 +10,9 @@
     <link rel="stylesheet" href="skeleton.css">
     <script src="db_settings.js"></script>
     <style>
+        form {
+            margin-bottom: 0.5rem;
+        }
         h2 {
             font-size: x-large;
             padding-top: 2rem;
@@ -72,21 +75,27 @@
             <div class="row">
                 <div class="six columns">
                     <label for="wifi_ssid">Wifi SSID</label>
-                    <input type="text" name="wifi_ssid" value="DroneBridge ESP32" id="wifi_ssid">
+                    <input type="text" name="wifi_ssid" value="" id="wifi_ssid">
                 </div>
                 <div class="six columns">
                     <label for="wifi_pass">Wifi Password</label>
-                    <input type="text" name="wifi_pass" value="dronebridge" id="wifi_pass">
+                    <input type="text" name="wifi_pass" value="" id="wifi_pass">
+                </div>
+            </div>
+            <div class="row">
+                <div class="twelve columns">
+                    <label for="ap_channel">Wifi Channel</label>
+                    <input type="text" name="ap_channel" value="" id="ap_channel">
                 </div>
             </div>
             <div class="row">
                 <div class="six columns">
                     <label for="tx_pin">UART TX Pin</label>
-                    <input type="text" name="tx_pin" value="17" id="tx_pin">
+                    <input type="text" name="tx_pin" value="" id="tx_pin">
                 </div>
                 <div class="six columns">
                     <label for="rx_pin">UART RX Pin</label>
-                    <input type="text" name="rx_pin" value="16" id="rx_pin">
+                    <input type="text" name="rx_pin" value="" id="rx_pin">
                 </div>
             </div>
             <div class="row">
@@ -123,6 +132,18 @@
                     </select>
                 </div>
                 <div class="six columns">
+                    <label for="ltm_pp">LTM frames per packet</label>
+                    <select id="ltm_pp" name="ltm_pp" form="settings_form">
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="4">4</option>
+                        <option value="6">6</option>
+                        <option value="10">10</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row">
+                <div class="twelve columns">
                     <label for="trans_pack_size">Transparent packet size</label>
                     <select id="trans_pack_size" name="trans_pack_size" form="settings_form">
                         <option value="16">16</option>
@@ -136,7 +157,7 @@
             <div class="row">
                 <div class="six columns">
                     <label for="ap_ip">Gateway IP address</label>
-                    <input type="text" name="ap_ip" value="192.168.2.1" id="ap_ip">
+                    <input type="text" name="ap_ip" value="" id="ap_ip">
                 </div>
             </div>
         </div>
@@ -144,11 +165,12 @@
     <button class="button-primary" onclick="save_settings()">Save Settings</button>
 </div>
 <div class="container">
-    <div class="row">DroneBridge for ESP32 - v0.7</div>
+    <div id="about" style="margin-top: 1rem" class="row">DroneBridge for ESP32 - waiting for response from the ESP32</div>
     <div style="margin-bottom: 2rem" class="row">&copy; Wolfgang Christl 2018 - Apache 2.0 License</div>
 </div>
 <script>
     // get settings once upon page load
+    get_system_info()
     get_settings()
     // get stats every half a second
     setInterval(get_stats, 500);
