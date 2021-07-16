@@ -82,25 +82,6 @@ int http_request_type(uint8_t *request_buffer, uint length) {
     return -1;
 }
 
-
-void write_settings_to_nvs() {
-    ESP_LOGI(TAG, "Saving to NVS");
-    nvs_handle my_handle;
-    ESP_ERROR_CHECK(nvs_open("settings", NVS_READWRITE, &my_handle));
-    ESP_ERROR_CHECK(nvs_set_str(my_handle, "ssid", (char *) DEFAULT_SSID));
-    ESP_ERROR_CHECK(nvs_set_str(my_handle, "wifi_pass", (char *) DEFAULT_PWD));
-    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "wifi_chan", DEFAULT_CHANNEL));
-    ESP_ERROR_CHECK(nvs_set_u32(my_handle, "baud", DB_UART_BAUD_RATE));
-    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "gpio_tx", DB_UART_PIN_TX));
-    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "gpio_rx", DB_UART_PIN_RX));
-    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "proto", SERIAL_PROTOCOL));
-    ESP_ERROR_CHECK(nvs_set_u16(my_handle, "trans_pack_size", TRANSPARENT_BUF_SIZE));
-    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "ltm_per_packet", LTM_FRAME_NUM_BUFFER));
-    ESP_ERROR_CHECK(nvs_commit(my_handle));
-    nvs_close(my_handle);
-}
-
-
 void parse_save_get_parameters(char *request_buffer, uint length) {
     ESP_LOGI(TAG, "Parsing new settings:");
     char *ptr;
@@ -158,7 +139,7 @@ void parse_save_get_parameters(char *request_buffer, uint length) {
             ptr = strtok(NULL, delimiter);
         }
     }
-    write_settings_to_nvs();
+//    write_settings_to_nvs();
 }
 
 

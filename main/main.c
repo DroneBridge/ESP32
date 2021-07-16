@@ -40,6 +40,7 @@ static const char *TAG = "DB_ESP32";
 
 uint8_t DEFAULT_SSID[32] = "DroneBridge ESP32";
 uint8_t DEFAULT_PWD[64] = "dronebridge";
+char DEFAULT_AP_IP[32] = "192.168.2.1";
 uint8_t DEFAULT_CHANNEL = 6;
 uint8_t SERIAL_PROTOCOL = 2;  // 1,2=MSP, 3,4,5=MAVLink/transparent
 uint8_t DB_UART_PIN_TX = GPIO_NUM_17;
@@ -47,6 +48,7 @@ uint8_t DB_UART_PIN_RX = GPIO_NUM_16;
 uint32_t DB_UART_BAUD_RATE = 115200;
 uint16_t TRANSPARENT_BUF_SIZE = 64;
 uint8_t LTM_FRAME_NUM_BUFFER = 1;
+uint8_t MSP_LTM_SAMEPORT = 0;
 
 static void wifi_event_handler(void* arg, esp_event_base_t event_base,
                                int32_t event_id, void* event_data)
@@ -162,9 +164,9 @@ void init_wifi(void) {
 
     esp_netif_ip_info_t ip;
     memset(&ip, 0 , sizeof(esp_netif_ip_info_t));
-    ip.ip.addr = ipaddr_addr("192.168.2.1");
+    ip.ip.addr = ipaddr_addr(DEFAULT_AP_IP);
     ip.netmask.addr = ipaddr_addr("255.255.255.0");
-    ip.gw.addr = ipaddr_addr("192.168.2.1");
+    ip.gw.addr = ipaddr_addr(DEFAULT_AP_IP);
     ESP_ERROR_CHECK(esp_netif_dhcps_stop(esp_net));
     ESP_ERROR_CHECK(esp_netif_set_ip_info(esp_net, &ip));
     ESP_ERROR_CHECK(esp_netif_dhcps_start(esp_net));
@@ -172,12 +174,32 @@ void init_wifi(void) {
     ESP_ERROR_CHECK(esp_netif_set_hostname(esp_net, "DBESP32"));
 }
 
-
-void read_settings_nvs(){
+void write_settings_to_nvs() {
+    ESP_LOGI(TAG, "Saving to NVS");
     nvs_handle my_handle;
-    if (nvs_open("settings", NVS_READONLY, &my_handle) == ESP_ERR_NVS_NOT_FOUND){
+    ESP_ERROR_CHECK(nvs_open("settings", NVS_READWRITE, &my_handle));
+    ESP_ERROR_CHECK(nvs_set_str(my_handle, "ssid", (char *) DEFAULT_SSID));
+    ESP_ERROR_CHECK(nvs_set_str(my_handle, "wifi_pass", (char *) DEFAULT_PWD));
+    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "wifi_chan", DEFAULT_CHANNEL));
+    ESP_ERROR_CHECK(nvs_set_u32(my_handle, "baud", DB_UART_BAUD_RATE));
+    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "gpio_tx", DB_UART_PIN_TX));
+    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "gpio_rx", DB_UART_PIN_RX));
+    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "proto", SERIAL_PROTOCOL));
+    ESP_ERROR_CHECK(nvs_set_u16(my_handle, "trans_pack_size", TRANSPARENT_BUF_SIZE));
+    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "ltm_per_packet", LTM_FRAME_NUM_BUFFER));
+    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "msp_ltm", MSP_LTM_SAMEPORT));
+    ESP_ERROR_CHECK(nvs_set_str(my_handle, "ap_ip", DEFAULT_AP_IP));
+    ESP_ERROR_CHECK(nvs_commit(my_handle));
+    nvs_close(my_handle);
+}
+
+
+void read_settings_nvs() {
+    nvs_handle my_handle;
+    if (nvs_open("settings", NVS_READONLY, &my_handle) != ESP_OK){
         // First start
         nvs_close(my_handle);
+        nvs_flash_erase();
         write_settings_to_nvs();
     } else {
         ESP_LOGI(TAG, "Reading settings from NVS");
@@ -192,6 +214,11 @@ void read_settings_nvs(){
         ESP_ERROR_CHECK(nvs_get_str(my_handle, "wifi_pass", wifi_pass, &required_size));
         memcpy(DEFAULT_PWD, wifi_pass, required_size);
 
+        ESP_ERROR_CHECK(nvs_get_str(my_handle, "ap_ip", NULL, &required_size));
+        char* ap_ip = malloc(required_size);
+        ESP_ERROR_CHECK(nvs_get_str(my_handle, "ap_ip", ap_ip, &required_size));
+        memcpy(DEFAULT_AP_IP, ap_ip, required_size);
+
         ESP_ERROR_CHECK(nvs_get_u8(my_handle, "wifi_chan", &DEFAULT_CHANNEL));
         ESP_ERROR_CHECK(nvs_get_u32(my_handle, "baud", &DB_UART_BAUD_RATE));
         ESP_ERROR_CHECK(nvs_get_u8(my_handle, "gpio_tx", &DB_UART_PIN_TX));
@@ -199,12 +226,13 @@ void read_settings_nvs(){
         ESP_ERROR_CHECK(nvs_get_u8(my_handle, "proto", &SERIAL_PROTOCOL));
         ESP_ERROR_CHECK(nvs_get_u16(my_handle, "trans_pack_size", &TRANSPARENT_BUF_SIZE));
         ESP_ERROR_CHECK(nvs_get_u8(my_handle, "ltm_per_packet", &LTM_FRAME_NUM_BUFFER));
+        ESP_ERROR_CHECK(nvs_get_u8(my_handle, "msp_ltm", &MSP_LTM_SAMEPORT));
         nvs_close(my_handle);
         free(wifi_pass);
         free(ssid);
+        free(ap_ip);
     }
 }
-
 
 void app_main() {
     esp_err_t ret = nvs_flash_init();

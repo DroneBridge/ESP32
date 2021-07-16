@@ -166,10 +166,20 @@ static esp_err_t system_info_get_handler(httpd_req_t *req) {
 }
 
 /* Simple handler for getting temperature data */
-static esp_err_t temperature_data_get_handler(httpd_req_t *req) {
+static esp_err_t settings_data_get_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "application/json");
     cJSON *root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "raw", esp_random() % 20);
+    cJSON_AddStringToObject(root, "ap_name", (char *) DEFAULT_SSID);
+    cJSON_AddStringToObject(root, "ap_password", (char *) DEFAULT_PWD);
+    cJSON_AddNumberToObject(root, "ap_channel", DEFAULT_CHANNEL);
+    cJSON_AddNumberToObject(root, "trans_buff_size", TRANSPARENT_BUF_SIZE);
+    cJSON_AddNumberToObject(root, "tx_pin", DB_UART_PIN_TX);
+    cJSON_AddNumberToObject(root, "rx_pin", DB_UART_PIN_RX);
+    cJSON_AddNumberToObject(root, "baud", DB_UART_BAUD_RATE);
+    cJSON_AddNumberToObject(root, "serial_proto", SERIAL_PROTOCOL);
+    cJSON_AddNumberToObject(root, "ltm_pp", LTM_FRAME_NUM_BUFFER);
+    cJSON_AddNumberToObject(root, "msp_ltm_same", MSP_LTM_SAMEPORT);
+    cJSON_AddStringToObject(root, "ap_ip", DEFAULT_AP_IP);
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
     free((void *)sys_info);
@@ -201,9 +211,9 @@ esp_err_t start_rest_server(const char *base_path) {
 
     /* URI handler for fetching temperature data */
     httpd_uri_t temperature_data_get_uri = {
-            .uri = "/api/telem/status",
+            .uri = "/api/system/settings",
             .method = HTTP_GET,
-            .handler = temperature_data_get_handler,
+            .handler = settings_data_get_handler,
             .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &temperature_data_get_uri);
