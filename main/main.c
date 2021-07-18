@@ -34,7 +34,7 @@
 #include "db_protocol.h"
 #include "esp_vfs_semihost.h"
 #include "esp_spiffs.h"
-#include "http_server_new.h"
+#include "http_server.h"
 #include "main.h"
 
 #define NVS_NAMESPACE "settings"
@@ -261,6 +261,5 @@ void app_main() {
 
     control_module();
     ESP_ERROR_CHECK(start_rest_server(CONFIG_WEB_MOUNT_POINT));
-//    start_tcp_server();
     communication_module();
 }

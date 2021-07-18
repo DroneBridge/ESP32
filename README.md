@@ -40,21 +40,25 @@ First download the latest release from this repository.
 
 For flashing there are many ways of doing this. To easy ones are shown below.
 
+**Erase the flash before flashing a new release!**
+
 #### All platforms: Use Espressif firmware flashing tool
 
-**recommended**
+#### Recommended
 
 1.  `pip install esptool`
 2.  Connect via USB/Serial. Find out the serial port via `dmesg` on linux or device manager on windows.
   In this example the serial connection to the ESP32 is on COM4 (in Linux e.g. `/dev/ttyUSB0`).
-3.  `esptool.py -p COM4 -b 460800 --after hard_reset write_flash 0x1000 bootloader.bin 0x8000 partition-table.bin 0x10000 db_esp32.bin`. You might need to press the boot button on your ESP to start the upload/flash process. On Windows `esptool [...]` (with out `.py`) seems to work
+3.  `esptool.py -p COM4 erase_flash`
+4. `esptool.py -p COM4 -b 460800 --after hard_reset write_flash 0x1000 bootloader.bin 0x8000 partition-table.bin 0x10000 db_esp32.bin`. You might need to press the boot button on your ESP to start the upload/flash process. On Windows `esptool [...]` (with out `.py`) seems to work
 
 [Look here for more detailed information](https://github.com/espressif/esptool)
 
 #### Windows only: Use flash download tools
 
 1.  [Get it here](https://www.espressif.com/en/support/download/other-tools)
-2.  Select the firmware, bootloader & partition table and set everything as below
+2. Erase the flash of the ESP32 befor flashing a new release
+3. Select the firmware, bootloader & partition table and set everything as below
    ![ESP download tool configuration](https://raw.githubusercontent.com/DroneBridge/ESP32/master/wiki/ESP32Flasher.PNG)
 3.  Hit Start and power cycle your ESP32 after flashing
 
@@ -74,15 +78,17 @@ Defaults: UART2 (RX2, TX2 on GPIO 16, 17)
  **You might need to disable the cellular connection to force the browser to use the wifi connection**
 3.  Configure as you please and hit `save`
 
-![DroneBridge for ESP32 web interface](https://raw.githubusercontent.com/DroneBridge/ESP32/master/wiki/DroneBridge_for_ESP32_web_interface.png)
+![DroneBridge for ESP32 web interface](wiki/dbesp32_webinterface.png)
 
 **Configuration Options:**
--   `Wifi password`: Up to 64 character long
+-   `Wifi SSID`: Up to 31 character long
+-   `Wifi password`: Up to 63 character long
 -   `UART baud rate`: Same as you configured on your flight controller
 -   `GPIO TX PIN Number` & `GPIO RX PIN Number`: The pins you want to use for TX & RX (UART). See pin out of manufacturer of your ESP32 device **Flight controller UART must be 3.3V or use an inverter.**
 -   `UART serial protocol`: MultiWii based or MAVLink based - configures the parser
 -   `Transparent packet size`: Only used with 'serial protocol' set to transparent. Length of UDP packets
 -   `LTM frames per packet`: Buffer the specified number of packets and send them at once in one packet
+-   `Gateway IP address`: IPv4 address you want the ESP32 access point to have
 
 Most options require a restart/reset of ESP32 module
 
@@ -103,6 +109,48 @@ Most options require a restart/reset of ESP32 module
 
  Compile and flash by running: `idf.py build`, `idf.py flash`
 
+ ### API
+The webinterface communicates with a REST:API on the ESP32. You can use that API to set configurations not slectable 
+via the web-interface (e.g. baud rate). It also allows you to easily integrate DroneBridge for ESP32.
+
+
+**To request the settings**
+```http request
+http://dronebridge.local/api/settings/request
+```
+
+**To request stats**
+```http request
+http://dronebridge.local/api/system/stats
+```
+
+**Trigger a reboot**
+```http request
+http://dronebridge.local/api/system/reboot
+```
+
+**Trigger a settings change:** Send a valid JSON
+```json
+{
+  "wifi_ssid": "DroneBridge ESP32",
+  "wifi_pass": "dronebridge",
+  "ap_channel": 6,
+  "tx_pin": 17,
+  "rx_pin": 16,
+  "telem_proto": 4,
+  "baud": 115200,
+  "msp_ltm_port": 0,
+  "ltm_pp": 2,
+  "trans_pack_size": 64,
+  "ap_ip": "192.168.2.1"
+}
+```
+to
+```http request
+http://dronebridge.local/api/settings/change
+```
+
+
  ### Testing
  To test the frontend without the ESP32 run 
 
@@ -110,5 +158,3 @@ Most options require a restart/reset of ESP32 module
  npm install -g json-server
  json-server db.json --routes routes.json
  ```
-
-Change 

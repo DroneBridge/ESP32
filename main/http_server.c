@@ -1,7 +1,7 @@
 /*
  *   This file is part of DroneBridge: https://github.com/DroneBridge/ESP32
  *
- *   Copyright 2018 Wolfgang Christl
+ *   Copyright 2021 Wolfgang Christl
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -17,403 +17,333 @@
  *
  */
 
-#include <sys/socket.h>
-#include <freertos/event_groups.h>
-#include <esp_log.h>
+#include "http_server.h"
 #include <string.h>
-#include <nvs.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
+#include <fcntl.h>
+#include <lwip/sockets.h>
+#include "esp_http_server.h"
+#include "esp_system.h"
+#include "esp_log.h"
+#include "esp_vfs.h"
+#include "cJSON.h"
 #include "globals.h"
-#include <math.h>
-#include <driver/gpio.h>
+#include "main.h"
 
-#define LISTENQ 2
-#define REQUEST_BUF_SIZE 1024
-#define WEBSITE_RESPONSE_BUFFER_SIZE 3072
-#define TAG "TCP_SERVER"
+static const char *REST_TAG = "DB_HTTP_REST";
+#define REST_CHECK(a, str, goto_tag, ...)                                              \
+    do                                                                                 \
+    {                                                                                  \
+        if (!(a))                                                                      \
+        {                                                                              \
+            ESP_LOGE(REST_TAG, "%s(%d): " str, __FUNCTION__, __LINE__, ##__VA_ARGS__); \
+            goto goto_tag;                                                             \
+        }                                                                              \
+    } while (0)
 
-const char *save_response = "HTTP/1.1 200 OK\r\n"
-                            "Server: DroneBridgeESP32\r\n"
-                            "Content-type: text/html, text, plain\r\n"
-                            "\r\n"
-                            "<!DOCTYPE html>\n"
-                            "<html>\n"
-                            "<head>\n"
-                            "  <style>\n"
-                            "  .mytext {\n"
-                            "    font-family: Verdana, Geneva, sans-serif;\n"
-                            "    color: #FFFFF;\n"
-                            "  }\n"
-                            "  h1 {\n"
-                            "    font-family: Verdana, Geneva, sans-serif;\n"
-                            "    color: #FF7900;\n"
-                            "  }\n"
-                            "  </style>\n"
-                            "<title>DB for ESP32 Settings</title>\n"
-                            "<meta name=\"viewport\" content=\"width=device-width, user-scalable=no\" />\n"
-                            "</head>\n"
-                            "<body>\n"
-                            "  <h1>DroneBridge for ESP32</h1>\n"
-                            "  <p class=\"mytext\">Saved settings!</p>\n"
-                            "  <a class=\"mytext\" href=\"/\">Back to settings</a>\n"
-                            "</body>\n"
-                            "</html>\n"
-                            "";
+#define FILE_PATH_MAX (ESP_VFS_PATH_MAX + 128)
+#define SCRATCH_BUFSIZE (10240)
 
-const char *bad_gateway = "HTTP/1.1 502 Bad Gateway \r\n"
-                          "Server: DroneBridgeESP32 \r\n"
-                          "Content-Type: text/html \r\n"
-                          "\r\n";
+typedef struct rest_server_context {
+    char base_path[ESP_VFS_PATH_MAX + 1];
+    char scratch[SCRATCH_BUFSIZE];
+} rest_server_context_t;
 
-/**
- * @brief Check if we got a simple request or new settings
- * @param request_buffer
- * @param length
- * @return 0 if GET-Request, 1 if new settings, -1 if none
- */
-int http_request_type(uint8_t *request_buffer, uint length) {
-    uint8_t http_get_header[] = {'G', 'E', 'T', ' ', '/', ' ', 'H', 'T', 'T', 'P'};
-    uint8_t http_get_header_settings[] = {'G', 'E', 'T', ' ', '/', 's', 'e', 't', 't', 'i', 'n', 'g', 's'};
-    uint8_t http_get_header_other_data[] = {'G', 'E', 'T', ' ', '/'};
-    if (memcmp(request_buffer, http_get_header, sizeof(http_get_header)) == 0) return 0;
-    if (memcmp(request_buffer, http_get_header_settings, sizeof(http_get_header_settings)) == 0) return 1;
-    if (memcmp(request_buffer, http_get_header_other_data, sizeof(http_get_header_other_data)) == 0) return 2;
-    return -1;
+#define CHECK_FILE_EXTENSION(filename, ext) (strcasecmp(&filename[strlen(filename) - strlen(ext)], ext) == 0)
+
+bool is_valid_ip4(char *ipAddress) {
+    struct sockaddr_in sa;
+    int result = inet_pton(AF_INET, ipAddress, &(sa.sin_addr));
+    return result != 0;
 }
 
-void parse_save_get_parameters(char *request_buffer, uint length) {
-    ESP_LOGI(TAG, "Parsing new settings:");
-    char *ptr;
-    char delimiter[] = "?=& ";
-    ptr = strtok(request_buffer, delimiter);
-    while (ptr != NULL) {
-        if (strcmp(ptr, "ssid") == 0) {
-            ptr = strtok(NULL, delimiter);
-            if (strlen(ptr) >= 1) {
-                strcpy((char *) DEFAULT_SSID, ptr);
-                for(size_t i = 0; i <= strlen((char *) DEFAULT_SSID); i++)
-                    if(DEFAULT_SSID[i] == '+'){ DEFAULT_SSID[i] = ' '; }  // replace + with space
-                ESP_LOGI(TAG, "New ssid: %s", DEFAULT_SSID);
-            }
-        } else if (strcmp(ptr, "wifi_pass") == 0) {
-            ptr = strtok(NULL, delimiter);
-            if (strlen(ptr) >= 8) {
-                strcpy((char *) DEFAULT_PWD, ptr);
-                ESP_LOGI(TAG, "New password: %s", DEFAULT_PWD);
-            }
-        } else if (strcmp(ptr, "wifi_chan") == 0) {
-            ptr = strtok(NULL, delimiter);
-            if (atoi(ptr) <= 13) DEFAULT_CHANNEL = atoi(ptr);
-            ESP_LOGI(TAG, "New wifi channel: %i", DEFAULT_CHANNEL);
-        } else if (strcmp(ptr, "baud") == 0) {
-            ptr = strtok(NULL, delimiter);
-            if (atoi(ptr) > 2399)
-                DB_UART_BAUD_RATE = atoi(ptr);
-            ESP_LOGI(TAG, "New baud: %i", DB_UART_BAUD_RATE);
-        } else if (strcmp(ptr, "gpio_tx") == 0) {
-            ptr = strtok(NULL, delimiter);
-            if (atoi(ptr) <= GPIO_NUM_MAX) DB_UART_PIN_TX = atoi(ptr);
-            ESP_LOGI(TAG, "New gpio_tx: %i", DB_UART_PIN_TX);
-        } else if (strcmp(ptr, "gpio_rx") == 0) {
-            ptr = strtok(NULL, delimiter);
-            if (atoi(ptr) <= GPIO_NUM_MAX) DB_UART_PIN_RX = atoi(ptr);
-            ESP_LOGI(TAG, "New gpio_rx: %i", DB_UART_PIN_RX);
-        } else if (strcmp(ptr, "proto") == 0) {
-            ptr = strtok(NULL, delimiter);
-            if (strcmp(ptr, "msp_ltm") == 0) {
-                SERIAL_PROTOCOL = 2;
-            } else {
-                SERIAL_PROTOCOL = 4;
-            }
-            ESP_LOGI(TAG, "New proto: %i", SERIAL_PROTOCOL);
-        } else if (strcmp(ptr, "trans_pack_size") == 0) {
-            ptr = strtok(NULL, delimiter);
-            TRANSPARENT_BUF_SIZE = atoi(ptr);
-            ESP_LOGI(TAG, "New trans_pack_size: %i", TRANSPARENT_BUF_SIZE);
-        } else if (strcmp(ptr, "ltm_per_packet") == 0) {
-            ptr = strtok(NULL, delimiter);
-            LTM_FRAME_NUM_BUFFER = atoi(ptr);
-            ESP_LOGI(TAG, "New ltm_per_packet: %i", LTM_FRAME_NUM_BUFFER);
-        } else {
-            ptr = strtok(NULL, delimiter);
-        }
+/* Set HTTP response content type according to file extension */
+static esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filepath) {
+    const char *type = "text/plain";
+    if (CHECK_FILE_EXTENSION(filepath, ".html")) {
+        type = "text/html";
+    } else if (CHECK_FILE_EXTENSION(filepath, ".js")) {
+        type = "application/javascript";
+    } else if (CHECK_FILE_EXTENSION(filepath, ".css")) {
+        type = "text/css";
+    } else if (CHECK_FILE_EXTENSION(filepath, ".png")) {
+        type = "image/png";
+    } else if (CHECK_FILE_EXTENSION(filepath, ".ico")) {
+        type = "image/x-icon";
+    } else if (CHECK_FILE_EXTENSION(filepath, ".svg")) {
+        type = "text/xml";
     }
-//    write_settings_to_nvs();
+    return httpd_resp_set_type(req, type);
 }
 
+/* Send HTTP response with the contents of the requested file */
+static esp_err_t rest_common_get_handler(httpd_req_t *req) {
+    char filepath[FILE_PATH_MAX];
 
-char *create_response(char *website_response) {
-    char baud_selection[11][9] = {""};
-    char uart_serial_selection1[9] = "";
-    char uart_serial_selection2[9] = "";
-    char trans_pack_size_selection1[9] = "";
-    char trans_pack_size_selection2[9] = "";
-    char trans_pack_size_selection3[9] = "";
-    char trans_pack_size_selection4[9] = "";
-    char trans_pack_size_selection5[9] = "";
-    char ltm_size_selection1[9] = "";
-    char ltm_size_selection2[9] = "";
-    char ltm_size_selection3[9] = "";
-    char ltm_size_selection4[9] = "", ltm_size_selection5[9] = "";
-
-    switch (SERIAL_PROTOCOL) {
-        default:
-        case 1:
-        case 2:
-            strcpy(uart_serial_selection1, "selected");
-            break;
-        case 3:
-        case 4:
-        case 5:
-            strcpy(uart_serial_selection2, "selected");
-            break;
+    rest_server_context_t *rest_context = (rest_server_context_t *) req->user_ctx;
+    strlcpy(filepath, rest_context->base_path, sizeof(filepath));
+    if (req->uri[strlen(req->uri) - 1] == '/') {
+        strlcat(filepath, "/index.html", sizeof(filepath));
+    } else {
+        strlcat(filepath, req->uri, sizeof(filepath));
     }
-    switch (TRANSPARENT_BUF_SIZE) {
-        case 16:
-            strcpy(trans_pack_size_selection1, "selected");
-            break;
-        case 32:
-            strcpy(trans_pack_size_selection2, "selected");
-            break;
-        default:
-        case 64:
-            strcpy(trans_pack_size_selection3, "selected");
-            break;
-        case 128:
-            strcpy(trans_pack_size_selection4, "selected");
-            break;
-        case 256:
-            strcpy(trans_pack_size_selection5, "selected");
-            break;
+    int fd = open(filepath, O_RDONLY, 0);
+    if (fd == -1) {
+        ESP_LOGE(REST_TAG, "Failed to open file : %s", filepath);
+        /* Respond with 500 Internal Server Error */
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to read existing file");
+        return ESP_FAIL;
     }
-    switch (LTM_FRAME_NUM_BUFFER) {
-        default:
-        case 1:
-            strcpy(ltm_size_selection1, "selected");
-            break;
-        case 2:
-            strcpy(ltm_size_selection2, "selected");
-            break;
-        case 3:
-            strcpy(ltm_size_selection3, "selected");
-            break;
-        case 4:
-            strcpy(ltm_size_selection4, "selected");
-            break;
-        case 5:
-            strcpy(ltm_size_selection5, "selected");
-            break;
-    }
-    switch (DB_UART_BAUD_RATE) {
-        default:
-        case 5000000:
-            strcpy(baud_selection[0], "selected");
-            break;
-        case 1500000:
-            strcpy(baud_selection[1], "selected");
-            break;
-        case 1000000:
-            strcpy(baud_selection[2], "selected");
-            break;
-        case 500000:
-            strcpy(baud_selection[3], "selected");
-            break;
-        case 115200:
-            strcpy(baud_selection[4], "selected");
-            break;
-        case 57600:
-            strcpy(baud_selection[5], "selected");
-            break;
-        case 38400:
-            strcpy(baud_selection[6], "selected");
-            break;
-        case 19200:
-            strcpy(baud_selection[7], "selected");
-            break;
-        case 9600:
-            strcpy(baud_selection[8], "selected");
-            break;
-        case 4800:
-            strcpy(baud_selection[9], "selected");
-            break;
-        case 2400:
-            strcpy(baud_selection[10], "selected");
-            break;
-    }
-    char build_version[16];
-    sprintf(build_version, "v%.2f", floorf(BUILDVERSION) / 100);
-    sprintf(website_response, "HTTP/1.1 200 OK\r\n"
-                              "Server: DroneBridgeESP32\r\n"
-                              "Content-type: text/html, text, plain\r\n"
-                              "\r\n"
-                              "<!DOCTYPE html><html><head><title>DB for ESP32 Settings</title>"
-                              "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">"
-                              "<style> "
-                              "h1 { font-family: Verdana, Geneva, sans-serif; color: #FF7900; } "
-                              "table.DroneBridge { font-family: Verdana, Geneva, sans-serif; background-color: #145396; text-align: right; border-collapse: collapse; } "
-                              "table.DroneBridge td, table.DroneBridge th { padding: 6px 0px; } "
-                              "table.DroneBridge tbody td { font-size: 1rm; font-weight: bold; color: #FFFFFF; padding: 0.5em; } "
-                              "table.DroneBridge td:nth-child(even) { background: #FF7900; }"
-                              "@media only screen and (max-width:768px) { .DroneBridge {width:100%%; }}"
-                              ".foot{color: #145396;font-family: Verdana, Geneva, sans-serif;font-size: 0.8em;}"
-                              "</style>"
-                              "</head>\n"
-                              "<body><h1>DroneBridge for ESP32</h1>"
-                              "<form action=\"/settings.html\" id=\"settings_form\" method=\"get\" target=\"_blank\">"
-                              "<table class=\"DroneBridge\"><tbody>"
-                              "<tr><td>Wifi SSID</td>"
-                              "<td><input type=\"text\" name=\"ssid\" value=\"%s\"></td></tr>"
-                              "<tr><td>Wifi password</td>"
-                              "<td><input type=\"text\" name=\"wifi_pass\" value=\"%s\"></td></tr>"
-                              "<tr><td>Wifi channel</td>"
-                              "<td><input type=\"number\" name=\"wifi_chan\" min=\"0\" max=\"13\" value=\"%i\"></td></tr>"
-                              "<tr><td>UART baud rate</td><td>"
-                              "<select name=\"baud\" form=\"settings_form\">"
-                              "<option %s value=\"5000000\">5000000</option>"
-                              "<option %s value=\"1500000\">1500000</option>"
-                              "<option %s value=\"1000000\">1000000</option>"
-                              "<option %s value=\"500000\">500000</option>"
-                              "<option %s value=\"115200\">115200</option>"
-                              "<option %s value=\"57600\">57600</option>"
-                              "<option %s value=\"38400\">38400</option>"
-                              "<option %s value=\"19200\">19200</option>"
-                              "<option %s value=\"9600\">9600</option>"
-                              "<option %s value=\"4800\">4800</option>"
-                              "<option %s value=\"2400\">2400</option>"
-                              "</select>"
-                              "</td></tr><tr><td>GPIO TX pin number</td>"
-                              "<td><input type=\"text\" name=\"gpio_tx\" value=\"%i\"></td></tr>"
-                              "<tr><td>GPIO RX pin number</td><td>"
-                              "<input type=\"text\" name=\"gpio_rx\" value=\"%i\">"
-                              "</td></tr><tr><td>UART serial protocol</td><td>"
-                              "<select name=\"proto\" form=\"settings_form\">"
-                              "<option %s value=\"msp_ltm\">MSP/LTM</option>"
-                              "<option %s value=\"trans\">Transparent/MAVLink</option>"
-                              "</select>"
-                              "</td></tr><tr><td>Transparent packet size</td><td>"
-                              "<select name=\"trans_pack_size\" form=\"settings_form\">"
-                              "<option %s value=\"16\">16</option><option %s value=\"32\">32</option>"
-                              "<option %s value=\"64\">64</option><option %s value=\"128\">128</option>"
-                              "<option %s value=\"256\">256</option>"
-                              "</select>"
-                              "</td></tr><tr><td>LTM frames per packet</td><td>"
-                              "<select name=\"ltm_per_packet\" form=\"settings_form\">"
-                              "<option %s value=\"1\">1</option>"
-                              "<option %s value=\"2\">2</option>"
-                              "<option %s value=\"3\">3</option>"
-                              "<option %s value=\"4\">4</option>"
-                              "<option %s value=\"5\">5</option>"
-                              "</select>"
 
-                              "</td></tr><tr><td></td><td>"
-                              "</td></tr></tbody></table><p></p>"
+    set_content_type_from_file(req, filepath);
 
-                              "<input target= \"_top\" type=\"submit\" value=\"Save\">"
-                              "</form>"
-                              "<p class=\"foot\">%s</p>\n"
-                              "<p class=\"foot\">&copy; Wolfgang Christl 2018 - Apache 2.0 License</p>"
-                              "</body></html>\n"
-                              "", DEFAULT_SSID, DEFAULT_PWD, DEFAULT_CHANNEL, baud_selection[0], baud_selection[1], baud_selection[2], baud_selection[3], baud_selection[4], baud_selection[5], baud_selection[6], baud_selection[7], baud_selection[8], baud_selection[9], baud_selection[10], DB_UART_PIN_TX, DB_UART_PIN_RX, uart_serial_selection1,
-            uart_serial_selection2, trans_pack_size_selection1, trans_pack_size_selection2, trans_pack_size_selection3,
-            trans_pack_size_selection4, trans_pack_size_selection5, ltm_size_selection1, ltm_size_selection2,
-            ltm_size_selection3, ltm_size_selection4, ltm_size_selection5, build_version);
-    return website_response;
-}
-
-void http_settings_server(void *parameter) {
-    ESP_LOGI(TAG, "http_settings_server task started");
-    struct sockaddr_in tcpServerAddr;
-    tcpServerAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    tcpServerAddr.sin_family = AF_INET;
-    tcpServerAddr.sin_port = htons(80);
-    int tcp_socket, r;
-    char recv_buf[64];
-    static struct sockaddr_in remote_addr;
-    static unsigned int socklen;
-    socklen = sizeof(remote_addr);
-    while (1) {
-        tcp_socket = socket(AF_INET, SOCK_STREAM, 0);
-        if (tcp_socket < 0) {
-            ESP_LOGE(TAG, "... Failed to allocate socket");
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-            continue;
-        }
-        if (bind(tcp_socket, (struct sockaddr *) &tcpServerAddr, sizeof(tcpServerAddr)) != 0) {
-            ESP_LOGE(TAG, "... socket bind failed errno=%d", errno);
-            close(tcp_socket);
-            vTaskDelay(4000 / portTICK_PERIOD_MS);
-            continue;
-        }
-        if (listen(tcp_socket, LISTENQ) != 0) {
-            ESP_LOGE(TAG, "... socket listen failed errno=%d", errno);
-            close(tcp_socket);
-            vTaskDelay(4000 / portTICK_PERIOD_MS);
-            continue;
-        }
-        uint8_t *request_buffer = malloc(REQUEST_BUF_SIZE * sizeof(uint8_t));
-        // char *website_response = malloc(WEBSITE_RESPONSE_BUFFER_SIZE*sizeof(char));
-        char website_response[WEBSITE_RESPONSE_BUFFER_SIZE];
-        while (1) {
-            int client_socket = accept(tcp_socket, (struct sockaddr *) &remote_addr, &socklen);
-            fcntl(client_socket, F_SETFL, O_NONBLOCK);
-            uint rec_length = 0;
-            do {
-                bzero(recv_buf, sizeof(recv_buf));
-                r = recv(client_socket, recv_buf, sizeof(recv_buf) - 1, 0);
-                if (r > 0) {
-                    if (REQUEST_BUF_SIZE >= (rec_length + r)) {
-                        memcpy(&request_buffer[rec_length], recv_buf, (size_t) r);
-                        rec_length += r;
-                    } else {
-                        ESP_LOGE(TAG, "Request bigger than buffer");
-                    }
-                }
-            } while (r > 0);
-            // prints the requests for debugging
-//            ESP_LOGI(TAG2,"New connection request,Request data:");
-//            for(int i = 0; i < rec_length; i++) {
-//                putchar(request_buffer[i]);
-//            }
-            int http_req = http_request_type(request_buffer, rec_length);
-            if (http_req == 0) {
-                char *response = create_response(website_response);
-                if (write(client_socket, response, strlen(response)) < 0) {
-                    ESP_LOGE(TAG, "... Send failed");
-                    close(tcp_socket);
-                    vTaskDelay(4000 / portTICK_PERIOD_MS);
-                    continue;
-                }
-            } else if (http_req == 1) {
-                parse_save_get_parameters((char *) request_buffer, rec_length);
-                if (write(client_socket, save_response, strlen(save_response)) < 0) {
-                    ESP_LOGE(TAG, "... Send failed");
-                    close(tcp_socket);
-                    vTaskDelay(4000 / portTICK_PERIOD_MS);
-                    continue;
-                }
-            } else if (http_req == 2) {
-                if (write(client_socket, bad_gateway, strlen(bad_gateway)) < 0) {
-                    ESP_LOGE(TAG, "... Send failed");
-                    close(tcp_socket);
-                    vTaskDelay(4000 / portTICK_PERIOD_MS);
-                    continue;
-                }
+    char *chunk = rest_context->scratch;
+    ssize_t read_bytes;
+    do {
+        /* Read file in chunks into the scratch buffer */
+        read_bytes = read(fd, chunk, SCRATCH_BUFSIZE);
+        if (read_bytes == -1) {
+            ESP_LOGE(REST_TAG, "Failed to read file : %s", filepath);
+        } else if (read_bytes > 0) {
+            /* Send the buffer contents as HTTP response chunk */
+            if (httpd_resp_send_chunk(req, chunk, read_bytes) != ESP_OK) {
+                close(fd);
+                ESP_LOGE(REST_TAG, "File sending failed!");
+                /* Abort sending file */
+                httpd_resp_sendstr_chunk(req, NULL);
+                /* Respond with 500 Internal Server Error */
+                httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to send file");
+                return ESP_FAIL;
             }
-            close(client_socket);
         }
-        //free(website_response);
-        free(request_buffer);
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
-    }
-    ESP_LOGI(TAG, "...tcp_client task closed\n");
-    vTaskDelete(NULL);
+    } while (read_bytes > 0);
+    /* Close file after sending complete */
+    close(fd);
+    ESP_LOGI(REST_TAG, "File sending complete");
+    /* Respond with an empty chunk to signal HTTP response completion */
+    httpd_resp_send_chunk(req, NULL, 0);
+    return ESP_OK;
 }
 
+/* Simple handler for settings change */
+static esp_err_t settings_change_post_handler(httpd_req_t *req) {
+    int total_len = req->content_len;
+    int cur_len = 0;
+    char *buf = ((rest_server_context_t *) (req->user_ctx))->scratch;
+    int received = 0;
+    if (total_len >= SCRATCH_BUFSIZE) {
+        /* Respond with 500 Internal Server Error */
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
+        return ESP_FAIL;
+    }
+    while (cur_len < total_len) {
+        received = httpd_req_recv(req, buf + cur_len, total_len);
+        if (received <= 0) {
+            /* Respond with 500 Internal Server Error */
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to post control value");
+            return ESP_FAIL;
+        }
+        cur_len += received;
+    }
+    buf[total_len] = '\0';
 
-/**
- * @brief Starts a TCP server that serves the page to change settings & handles the changes
- */
-void start_tcp_server() {
-    xTaskCreate(&http_settings_server, "http_settings_server", 10240, NULL, 5, NULL);
+    cJSON *root = cJSON_Parse(buf);
+    cJSON *json = cJSON_GetObjectItem(root, "wifi_ssid");
+    if (json && strlen(json->valuestring) < 32 && strlen(json->valuestring) > 0)
+        strncpy((char *) DEFAULT_SSID, json->valuestring, sizeof(DEFAULT_SSID) - 1);
+    else if (json)
+        ESP_LOGE(REST_TAG, "Invalid SSID length (1-31)");
+
+    json = cJSON_GetObjectItem(root, "wifi_pass");
+    if (json && strlen(json->valuestring) < 64 && strlen(json->valuestring) > 7)
+        strncpy((char *) DEFAULT_PWD, json->valuestring, sizeof(DEFAULT_PWD) - 1);
+    else if (json)
+        ESP_LOGE(REST_TAG, "Invalid password length (8-63)");
+
+
+    json = cJSON_GetObjectItem(root, "ap_channel");
+    if (json && json->valueint > 0 && json->valueint < 14) {
+        DEFAULT_CHANNEL = json->valueint;
+    } else if (json) {
+        ESP_LOGE(REST_TAG, "No a valid wifi channel (1-13). Not changing!");
+    }
+
+    json = cJSON_GetObjectItem(root, "trans_pack_size");
+    if (json) TRANSPARENT_BUF_SIZE = json->valueint;
+    json = cJSON_GetObjectItem(root, "tx_pin");
+    if (json) DB_UART_PIN_TX = json->valueint;
+    json = cJSON_GetObjectItem(root, "rx_pin");
+    if (json) DB_UART_PIN_RX = json->valueint;
+    json = cJSON_GetObjectItem(root, "baud");
+    if (json) DB_UART_BAUD_RATE = json->valueint;
+
+    json = cJSON_GetObjectItem(root, "telem_proto");
+    if (json && (json->valueint == 1 || json->valueint == 4)) {
+        SERIAL_PROTOCOL = json->valueint;
+    } else if (json) {
+        ESP_LOGW(REST_TAG, "telem_proto is not 1 (LTM/MSP) or 4 (MAVLink/Transparent). Changing to transparent");
+        SERIAL_PROTOCOL = 4;
+    }
+
+    json = cJSON_GetObjectItem(root, "ltm_pp");
+    if (json) LTM_FRAME_NUM_BUFFER = json->valueint;
+
+    json = cJSON_GetObjectItem(root, "msp_ltm_port");
+    if (json && (json->valueint == 0 || json->valueint == 1))
+        MSP_LTM_SAMEPORT = json->valueint;
+    else if (json)
+        ESP_LOGE(REST_TAG, "Only option 0 or 1 are allowed for msp_ltm_port parameter! Not changing!");
+
+    json = cJSON_GetObjectItem(root, "ap_ip");
+    if (json && is_valid_ip4(json->valuestring)) {
+        strncpy(DEFAULT_AP_IP, json->valuestring, sizeof(DEFAULT_AP_IP) - 1);
+    } else if (json) {
+        ESP_LOGE(REST_TAG, "New IP \"%s\" is not a valid IP address! Not changing!", json->valuestring);
+    }
+    write_settings_to_nvs();
+    ESP_LOGI(REST_TAG, "Settings changed!");
+    cJSON_Delete(root);
+    httpd_resp_sendstr(req, "{\n"
+                            "    \"status\": \"success\",\n"
+                            "    \"msg\": \"Settings changed!\"\n"
+                            "  }");
+    return ESP_OK;
+}
+
+/* Simple handler for getting system handler */
+static esp_err_t system_info_get_handler(httpd_req_t *req) {
+    httpd_resp_set_type(req, "application/json");
+    cJSON *root = cJSON_CreateObject();
+    esp_chip_info_t chip_info;
+    esp_chip_info(&chip_info);
+    cJSON_AddStringToObject(root, "idf_version", IDF_VER);
+    cJSON_AddNumberToObject(root, "db_build_version", BUILDVERSION);
+    cJSON_AddNumberToObject(root, "major_version", MAJOR_VERSION);
+    cJSON_AddNumberToObject(root, "minor_version", MINOR_VERSION);
+    const char *sys_info = cJSON_Print(root);
+    httpd_resp_sendstr(req, sys_info);
+    free((void *) sys_info);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
+/* Simple handler for getting system handler */
+static esp_err_t system_stats_get_handler(httpd_req_t *req) {
+    httpd_resp_set_type(req, "application/json");
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddNumberToObject(root, "read_bytes", uart_byte_count);
+    cJSON_AddNumberToObject(root, "tcp_connected", num_connected_tcp_clients);
+    cJSON_AddNumberToObject(root, "udp_connected", num_connected_udp_clients);
+    const char *sys_info = cJSON_Print(root);
+    httpd_resp_sendstr(req, sys_info);
+    free((void *) sys_info);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
+static esp_err_t system_reboot_get_handler(httpd_req_t *req) {
+    httpd_resp_set_type(req, "application/json");
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "msg", "Rebooting!");
+    const char *sys_info = cJSON_Print(root);
+    httpd_resp_sendstr(req, sys_info);
+    free((void *) sys_info);
+    cJSON_Delete(root);
+    esp_restart();
+    return ESP_OK;
+}
+
+/* Simple handler for getting temperature data */
+static esp_err_t settings_data_get_handler(httpd_req_t *req) {
+    httpd_resp_set_type(req, "application/json");
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "wifi_ssid", (char *) DEFAULT_SSID);
+    cJSON_AddStringToObject(root, "wifi_pass", (char *) DEFAULT_PWD);
+    cJSON_AddNumberToObject(root, "ap_channel", DEFAULT_CHANNEL);
+    cJSON_AddNumberToObject(root, "trans_pack_size", TRANSPARENT_BUF_SIZE);
+    cJSON_AddNumberToObject(root, "tx_pin", DB_UART_PIN_TX);
+    cJSON_AddNumberToObject(root, "rx_pin", DB_UART_PIN_RX);
+    cJSON_AddNumberToObject(root, "baud", DB_UART_BAUD_RATE);
+    cJSON_AddNumberToObject(root, "telem_proto", SERIAL_PROTOCOL);
+    cJSON_AddNumberToObject(root, "ltm_pp", LTM_FRAME_NUM_BUFFER);
+    cJSON_AddNumberToObject(root, "msp_ltm_port", MSP_LTM_SAMEPORT);
+    cJSON_AddStringToObject(root, "ap_ip", DEFAULT_AP_IP);
+    const char *sys_info = cJSON_Print(root);
+    httpd_resp_sendstr(req, sys_info);
+    free((void *) sys_info);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
+esp_err_t start_rest_server(const char *base_path) {
+    REST_CHECK(base_path, "wrong base path", err);
+    rest_server_context_t *rest_context = calloc(1, sizeof(rest_server_context_t));
+    REST_CHECK(rest_context, "No memory for rest context", err);
+    strlcpy(rest_context->base_path, base_path, sizeof(rest_context->base_path));
+
+    httpd_handle_t server = NULL;
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.uri_match_fn = httpd_uri_match_wildcard;
+
+    ESP_LOGI(REST_TAG, "Starting HTTP Server");
+    REST_CHECK(httpd_start(&server, &config) == ESP_OK, "Start server failed", err_start);
+
+    /* URI handler for fetching system info */
+    httpd_uri_t system_info_get_uri = {
+            .uri = "/api/system/info",
+            .method = HTTP_GET,
+            .handler = system_info_get_handler,
+            .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &system_info_get_uri);
+
+    /* URI handler for fetching system info */
+    httpd_uri_t system_stats_get_uri = {
+            .uri = "/api/system/stats",
+            .method = HTTP_GET,
+            .handler = system_stats_get_handler,
+            .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &system_stats_get_uri);
+
+    /* URI handler for triggering system reboot */
+    httpd_uri_t system_reboot_get_uri = {
+            .uri = "/api/system/reboot",
+            .method = HTTP_GET,
+            .handler = system_reboot_get_handler,
+            .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &system_reboot_get_uri);
+
+    /* URI handler for fetching settings data */
+    httpd_uri_t temperature_data_get_uri = {
+            .uri = "/api/settings/request",
+            .method = HTTP_GET,
+            .handler = settings_data_get_handler,
+            .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &temperature_data_get_uri);
+
+    /* URI handler for light brightness control */
+    httpd_uri_t settings_change_post_uri = {
+            .uri = "/api/settings/change",
+            .method = HTTP_POST,
+            .handler = settings_change_post_handler,
+            .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &settings_change_post_uri);
+
+    /* URI handler for getting web server files */
+    httpd_uri_t common_get_uri = {
+            .uri = "/*",
+            .method = HTTP_GET,
+            .handler = rest_common_get_handler,
+            .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &common_get_uri);
+
+    return ESP_OK;
+    err_start:
+    free(rest_context);
+    err:
+    return ESP_FAIL;
 }
