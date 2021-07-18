@@ -1,3 +1,6 @@
+// const ROOT_URL = "http://localhost:3000/"   // for testing with local json server
+const ROOT_URL = window.location.href       // for production code
+
 function toJSONString(form) {
     let obj = {}
     let elements = form.querySelectorAll("input, select")
@@ -19,86 +22,89 @@ function toJSONString(form) {
     return JSON.stringify(obj)
 }
 
-function get_system_info() {
-    let req_url = window.location.href + "api/system/info"
-    console.log("Requesting " + req_url);
-    const userAction = async () => {
-        const response = await fetch(req_url)
-        const myJson = await response.json() //extract JSON from the http response
-        console.log(myJson)
-        document.getElementById("about").value = "DroneBridge for ESP32 - 0." + myJson["db_build_version"] + " - esp-idf " + myJson["idf_version"]
+async function get_json(api_path) {
+    let req_url = ROOT_URL + api_path;
+    const response = await fetch(req_url);
+    if (!response.ok) {
+        const message = `An error has occured: ${response.status}`;
+        throw new Error(message);
     }
+    return await response.json();
+}
+
+async function send_json(api_path, json_data) {
+    let post_url = ROOT_URL + api_path;
+    const response = await fetch(post_url, {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        },
+        body: json_data
+    });
+    if (!response.ok) {
+        const message = `An error has occured: ${response.status}`;
+        throw new Error(message);
+    }
+    return await response.json();
+}
+
+function get_system_info() {
+    get_json("api/system/info").then(json_data => {
+        console.log("Received settings: " + json_data)
+        document.getElementById("about").innerHTML = "DroneBridge for ESP32 - v" + json_data["major_version"] +
+            "." + json_data["minor_version"] + " - esp-idf " + json_data["idf_version"]
+    }).catch(error => {
+        error.message;
+    });
 }
 
 function get_stats() {
-    let req_url = window.location.href + "api/system/stats"
-    console.log("Requesting " + req_url);
-    const userAction = async () => {
-        const response = await fetch(req_url)
-        const myJson = await response.json() //extract JSON from the http response
-        console.log(myJson)
-
-        let bytes = parseInt(myJson["read_bytes"])
+    get_json("api/system/stats").then(json_data => {
+        let bytes = parseInt(json_data["read_bytes"])
         if (!isNaN(bytes) && bytes > 1000) {
-            document.getElementById("read_bytes").value = (bytes/1000) + " kb"
+            document.getElementById("read_bytes").innerHTML = (bytes / 1000) + " kb"
         } else if (!isNaN(bytes)) {
-            document.getElementById("read_bytes").value = bytes + " bytes"
+            document.getElementById("read_bytes").innerHTML = bytes + " bytes"
         }
 
-        let tcp_clients = parseInt(myJson["tcp_connected"])
+        let tcp_clients = parseInt(json_data["tcp_connected"])
         if (!isNaN(tcp_clients) && tcp_clients > 1) {
-            document.getElementById("tcp_connected").value = tcp_clients + " clients"
+            document.getElementById("tcp_connected").innerHTML = tcp_clients + " clients"
         } else if (!isNaN(tcp_clients)) {
-            document.getElementById("tcp_connected").value = tcp_clients + " client"
+            document.getElementById("tcp_connected").innerHTML = tcp_clients + " client"
         }
 
-        let udp_clients = parseInt(myJson["udp_connected"])
+        let udp_clients = parseInt(json_data["udp_connected"])
         if (!isNaN(udp_clients) && udp_clients > 1) {
-            document.getElementById("udp_connected").value = udp_clients + " clients"
+            document.getElementById("udp_connected").innerHTML = udp_clients + " clients"
         } else if (!isNaN(udp_clients)) {
-            document.getElementById("udp_connected").value = udp_clients + " client"
+            document.getElementById("udp_connected").innerHTML = udp_clients + " client"
         }
-    }
+    }).catch(error => {
+        error.message;
+    });
 }
 
 function get_settings() {
-    let req_url = window.location.href + "api/settings/request";
-    console.log("Requesting " + req_url);
-    const userAction = async () => {
-        const response = await fetch(req_url)
-        const settingsJSON = await response.json() //extract JSON from the http response
-        console.log("Received settings: " + settingsJSON)
-        // const settingsJSON = JSON.parse(raw_json);
-        for (const key in settingsJSON){
-            if(settingsJSON.hasOwnProperty(key)){
+    get_json("api/settings/request").then(json_data => {
+        console.log("Received settings: " + json_data)
+        for (const key in json_data) {
+            if (json_data.hasOwnProperty(key)) {
                 let elem = document.getElementById(key)
-                elem.value = settingsJSON[key] + ""
+                elem.value = json_data[key] + ""
             }
         }
-    }
-    // let raw_json = "{\"wifi_ssid\":\"DroneBridge ESP32343\",\"wifi_pass\":\"dronebridge123\",\"tx_pin\":22,\"rx_pin\":100,\"telem_proto\":4,\"baud\":9600,\"msp_ltm_port\":1,\"trans_pack_size\":64,\"ap_ip\":\"192.168.2.100\"}"
+    }).catch(error => {
+        error.message;
+    });
 }
 
 function save_settings() {
     let form = document.getElementById("settings_form")
     let json_data = toJSONString(form)
-    console.log(json_data)
-
-    let post_url = window.location.href + "api/settings/change";
-    const userAction = async () => {
-        await fetch(post_url, {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            },
-            body: json_data
-        }).then(rawResponse => {
-            const content = rawResponse.json();
-            rawResponse.status
-            console.log(content);
-            get_settings()  // update UI with new settings
-        });
-
-    }
+    send_json("api/settings/change", json_data).then(send_response => {
+        console.log(send_response);
+        get_settings()  // update UI with new settings
+    });
 }

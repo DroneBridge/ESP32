@@ -1,0 +1,6 @@
+{
+  "/api/system/info": "/info",
+  "/api/settings/request": "/settings",
+  "/api/system/stats": "/stats",
+  "/api/settings/change": "/change"
+}

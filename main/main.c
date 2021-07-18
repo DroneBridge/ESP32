@@ -35,6 +35,7 @@
 #include "esp_vfs_semihost.h"
 #include "esp_spiffs.h"
 #include "http_server_new.h"
+#include "main.h"
 
 #define NVS_NAMESPACE "settings"
 
@@ -52,14 +53,13 @@ uint16_t TRANSPARENT_BUF_SIZE = 64;
 uint8_t LTM_FRAME_NUM_BUFFER = 1;
 uint8_t MSP_LTM_SAMEPORT = 0;
 
-static void wifi_event_handler(void* arg, esp_event_base_t event_base,
-                               int32_t event_id, void* event_data)
-{
+static void wifi_event_handler(void *arg, esp_event_base_t event_base,
+                               int32_t event_id, void *event_data) {
     if (event_id == WIFI_EVENT_AP_STACONNECTED) {
-        wifi_event_ap_staconnected_t* event = (wifi_event_ap_staconnected_t*) event_data;
+        wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *) event_data;
         ESP_LOGI(TAG, "Client connected - station:"MACSTR", AID=%d", MAC2STR(event->mac), event->aid);
     } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
-        wifi_event_ap_stadisconnected_t* event = (wifi_event_ap_stadisconnected_t*) event_data;
+        wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *) event_data;
         ESP_LOGI(TAG, "Client disconnected - station:"MACSTR", AID=%d", MAC2STR(event->mac), event->aid);
     } else if (event_id == WIFI_EVENT_AP_START) {
         ESP_LOGI(TAG, "AP started!");
@@ -68,8 +68,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
     }
 }
 
-void start_mdns_service()
-{
+void start_mdns_service() {
     //initialize mDNS service
     esp_err_t err = mdns_init();
     if (err) {
@@ -98,12 +97,13 @@ esp_err_t init_fs(void) {
 
 
 #if CONFIG_WEB_DEPLOY_SF
+
 esp_err_t init_fs(void) {
     esp_vfs_spiffs_conf_t conf = {
-        .base_path = CONFIG_WEB_MOUNT_POINT,
-        .partition_label = NULL,
-        .max_files = 5,
-        .format_if_mount_failed = false
+            .base_path = CONFIG_WEB_MOUNT_POINT,
+            .partition_label = NULL,
+            .max_files = 5,
+            .format_if_mount_failed = false
     };
     esp_err_t ret = esp_vfs_spiffs_register(&conf);
 
@@ -127,6 +127,7 @@ esp_err_t init_fs(void) {
     }
     return ESP_OK;
 }
+
 #endif
 
 void init_wifi(void) {
@@ -165,7 +166,7 @@ void init_wifi(void) {
     ESP_ERROR_CHECK(esp_wifi_start());
 
     esp_netif_ip_info_t ip;
-    memset(&ip, 0 , sizeof(esp_netif_ip_info_t));
+    memset(&ip, 0, sizeof(esp_netif_ip_info_t));
     ip.ip.addr = ipaddr_addr(DEFAULT_AP_IP);
     ip.netmask.addr = ipaddr_addr("255.255.255.0");
     ip.gw.addr = ipaddr_addr(DEFAULT_AP_IP);
@@ -177,6 +178,11 @@ void init_wifi(void) {
 }
 
 void write_settings_to_nvs() {
+    ESP_LOGI(TAG,
+             "Trying to save: ssid %s\nwifi_pass %s\nwifi_chan %i\nbaud %i\ngpio_tx %i\ngpio_rx %i\nproto %i\n"
+             "trans_pack_size %i\nltm_per_packet %i\nmsp_ltm %i\nap_ip %s",
+             DEFAULT_SSID, DEFAULT_PWD, DEFAULT_CHANNEL, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
+             SERIAL_PROTOCOL, TRANSPARENT_BUF_SIZE, LTM_FRAME_NUM_BUFFER, MSP_LTM_SAMEPORT, DEFAULT_AP_IP);
     ESP_LOGI(TAG, "Saving to NVS %s", NVS_NAMESPACE);
     nvs_handle my_handle;
     ESP_ERROR_CHECK(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &my_handle));
@@ -198,7 +204,7 @@ void write_settings_to_nvs() {
 
 void read_settings_nvs() {
     nvs_handle my_handle;
-    if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &my_handle) != ESP_OK){
+    if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &my_handle) != ESP_OK) {
         // First start
         nvs_close(my_handle);
         ESP_ERROR_CHECK(nvs_flash_erase());
@@ -208,17 +214,17 @@ void read_settings_nvs() {
         ESP_LOGI(TAG, "Reading settings from NVS");
         size_t required_size = 0;
         ESP_ERROR_CHECK(nvs_get_str(my_handle, "ssid", NULL, &required_size));
-        char* ssid = malloc(required_size);
+        char *ssid = malloc(required_size);
         ESP_ERROR_CHECK(nvs_get_str(my_handle, "ssid", ssid, &required_size));
         memcpy(DEFAULT_SSID, ssid, required_size);
 
         ESP_ERROR_CHECK(nvs_get_str(my_handle, "wifi_pass", NULL, &required_size));
-        char* wifi_pass = malloc(required_size);
+        char *wifi_pass = malloc(required_size);
         ESP_ERROR_CHECK(nvs_get_str(my_handle, "wifi_pass", wifi_pass, &required_size));
         memcpy(DEFAULT_PWD, wifi_pass, required_size);
 
         ESP_ERROR_CHECK(nvs_get_str(my_handle, "ap_ip", NULL, &required_size));
-        char* ap_ip = malloc(required_size);
+        char *ap_ip = malloc(required_size);
         ESP_ERROR_CHECK(nvs_get_str(my_handle, "ap_ip", ap_ip, &required_size));
         memcpy(DEFAULT_AP_IP, ap_ip, required_size);
 

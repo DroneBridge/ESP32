@@ -20,12 +20,14 @@
 #include "http_server_new.h"
 #include <string.h>
 #include <fcntl.h>
+#include <lwip/sockets.h>
 #include "esp_http_server.h"
 #include "esp_system.h"
 #include "esp_log.h"
 #include "esp_vfs.h"
 #include "cJSON.h"
 #include "globals.h"
+#include "main.h"
 
 static const char *REST_TAG = "DB_HTTP_REST";
 #define REST_CHECK(a, str, goto_tag, ...)                                              \
@@ -48,9 +50,14 @@ typedef struct rest_server_context {
 
 #define CHECK_FILE_EXTENSION(filename, ext) (strcasecmp(&filename[strlen(filename) - strlen(ext)], ext) == 0)
 
+bool is_valid_ip4(char *ipAddress) {
+    struct sockaddr_in sa;
+    int result = inet_pton(AF_INET, ipAddress, &(sa.sin_addr));
+    return result != 0;
+}
+
 /* Set HTTP response content type according to file extension */
-static esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filepath)
-{
+static esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filepath) {
     const char *type = "text/plain";
     if (CHECK_FILE_EXTENSION(filepath, ".html")) {
         type = "text/html";
@@ -72,7 +79,7 @@ static esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filepa
 static esp_err_t rest_common_get_handler(httpd_req_t *req) {
     char filepath[FILE_PATH_MAX];
 
-    rest_server_context_t *rest_context = (rest_server_context_t *)req->user_ctx;
+    rest_server_context_t *rest_context = (rest_server_context_t *) req->user_ctx;
     strlcpy(filepath, rest_context->base_path, sizeof(filepath));
     if (req->uri[strlen(req->uri) - 1] == '/') {
         strlcat(filepath, "/index.html", sizeof(filepath));
@@ -121,7 +128,7 @@ static esp_err_t rest_common_get_handler(httpd_req_t *req) {
 static esp_err_t settings_change_post_handler(httpd_req_t *req) {
     int total_len = req->content_len;
     int cur_len = 0;
-    char *buf = ((rest_server_context_t *)(req->user_ctx))->scratch;
+    char *buf = ((rest_server_context_t *) (req->user_ctx))->scratch;
     int received = 0;
     if (total_len >= SCRATCH_BUFSIZE) {
         /* Respond with 500 Internal Server Error */
@@ -140,21 +147,63 @@ static esp_err_t settings_change_post_handler(httpd_req_t *req) {
     buf[total_len] = '\0';
 
     cJSON *root = cJSON_Parse(buf);
-    strncpy((char *) DEFAULT_SSID, cJSON_GetObjectItem(root, "wifi_ssid")->valuestring, sizeof (DEFAULT_SSID));
-    strncpy((char *) DEFAULT_PWD, cJSON_GetObjectItem(root, "wifi_pass")->valuestring, sizeof (DEFAULT_PWD));
-    DEFAULT_CHANNEL = cJSON_GetObjectItem(root, "ap_channel")->valueint;
+//    if (strlen(cJSON_GetObjectItem(root, "wifi_ssid")->valuestring) < 32 &&
+//            strlen(cJSON_GetObjectItem(root, "wifi_ssid")->valuestring) > 0) {
+//        strncpy((char *) DEFAULT_SSID, cJSON_GetObjectItem(root, "wifi_ssid")->valuestring, sizeof(DEFAULT_SSID));
+//    } else {
+//        ESP_LOGE(REST_TAG, "Invalid SSID length (1-31) - \"%s\"", cJSON_GetObjectItem(root, "wifi_ssid")->valuestring);
+//    }
+//
+//    if (strlen(cJSON_GetObjectItem(root, "wifi_pass")->valuestring) < 64 &&
+//        strlen(cJSON_GetObjectItem(root, "wifi_pass")->valuestring) > 7) {
+//        strncpy((char *) DEFAULT_PWD, cJSON_GetObjectItem(root, "wifi_pass")->valuestring, sizeof(DEFAULT_PWD));
+//    } else {
+//        ESP_LOGE(REST_TAG, "Invalid password length (8-63) - \"%s\"", cJSON_GetObjectItem(root, "wifi_pass")->valuestring);
+//    }
+//
+    cJSON ap_channel = cJSON_GetObjectItem(root, "ap_channel");
+    if (cJSON_GetObjectItem(root, "ap_channel") &&
+        cJSON_GetObjectItem(root, "ap_channel")->valueint > 0 &&
+        cJSON_GetObjectItem(root, "ap_channel")->valueint < 14) {
+        DEFAULT_CHANNEL = cJSON_GetObjectItem(root, "ap_channel")->valueint;
+    } else {
+        ESP_LOGE(REST_TAG, "%i is not a valid wifi channel (1-13). Not changing!",
+                 cJSON_GetObjectItem(root, "ap_channel")->valueint);
+    }
+
     TRANSPARENT_BUF_SIZE = cJSON_GetObjectItem(root, "trans_pack_size")->valueint;
     DB_UART_PIN_TX = cJSON_GetObjectItem(root, "tx_pin")->valueint;
     DB_UART_PIN_RX = cJSON_GetObjectItem(root, "rx_pin")->valueint;
     DB_UART_BAUD_RATE = cJSON_GetObjectItem(root, "baud")->valueint;
-    SERIAL_PROTOCOL = cJSON_GetObjectItem(root, "telem_proto")->valueint;
+    if (cJSON_GetObjectItem(root, "telem_proto")->valueint == 1 ||
+        cJSON_GetObjectItem(root, "telem_proto")->valueint == 4) {
+        SERIAL_PROTOCOL = cJSON_GetObjectItem(root, "telem_proto")->valueint;
+    } else {
+        ESP_LOGW(REST_TAG, "telem_proto is not 1 (LTM/MSP) or 4 (MAVLink/Transparent). Changing to transparent");
+        SERIAL_PROTOCOL = 4;
+    }
     LTM_FRAME_NUM_BUFFER = cJSON_GetObjectItem(root, "ltm_pp")->valueint;
-    MSP_LTM_SAMEPORT = cJSON_GetObjectItem(root, "msp_ltm_port")->valueint;
-    strncpy(DEFAULT_AP_IP, cJSON_GetObjectItem(root, "ap_ip")->valuestring, sizeof (DEFAULT_AP_IP));
 
+    if (cJSON_GetObjectItem(root, "msp_ltm_port")->valueint == 0 ||
+        cJSON_GetObjectItem(root, "msp_ltm_port")->valueint == 1) {
+        MSP_LTM_SAMEPORT = cJSON_GetObjectItem(root, "msp_ltm_port")->valueint;
+    } else {
+        ESP_LOGE(REST_TAG, "Only option 0 or 1 are allowed for msp_ltm_port parameter! You sent %i",
+                 cJSON_GetObjectItem(root, "msp_ltm_port")->valueint);
+    }
+//
+//    if (is_valid_ip4(cJSON_GetObjectItem(root, "ap_ip")->valuestring)) {
+//        strncpy(DEFAULT_AP_IP, cJSON_GetObjectItem(root, "ap_ip")->valuestring, sizeof(DEFAULT_AP_IP));
+//    } else {
+//        ESP_LOGE(REST_TAG, "New IP \"%s\" is not a valid IP address! Not changing!",
+//                 cJSON_GetObjectItem(root, "ap_ip")->valuestring);
+//    }
+    write_settings_to_nvs();
     ESP_LOGI(REST_TAG, "Settings changed!");
     cJSON_Delete(root);
-    httpd_resp_sendstr(req, "Settings changed!");
+    httpd_resp_sendstr(req, "{\n"
+                            "    \"status\": \"success\"\n"
+                            "  }");
     return ESP_OK;
 }
 
@@ -166,9 +215,11 @@ static esp_err_t system_info_get_handler(httpd_req_t *req) {
     esp_chip_info(&chip_info);
     cJSON_AddStringToObject(root, "idf_version", IDF_VER);
     cJSON_AddNumberToObject(root, "db_build_version", BUILDVERSION);
+    cJSON_AddNumberToObject(root, "major_version", MAJOR_VERSION);
+    cJSON_AddNumberToObject(root, "minor_version", MINOR_VERSION);
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
-    free((void *)sys_info);
+    free((void *) sys_info);
     cJSON_Delete(root);
     return ESP_OK;
 }
@@ -177,12 +228,12 @@ static esp_err_t system_info_get_handler(httpd_req_t *req) {
 static esp_err_t system_stats_get_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "application/json");
     cJSON *root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "read_bytes", 14986);
-    cJSON_AddNumberToObject(root, "tcp_connected", 1);
-    cJSON_AddNumberToObject(root, "udp_connected", 2);
+    cJSON_AddNumberToObject(root, "read_bytes", uart_byte_count);
+    cJSON_AddNumberToObject(root, "tcp_connected", num_connected_tcp_clients);
+    cJSON_AddNumberToObject(root, "udp_connected", num_connected_udp_clients);
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
-    free((void *)sys_info);
+    free((void *) sys_info);
     cJSON_Delete(root);
     return ESP_OK;
 }
@@ -204,7 +255,7 @@ static esp_err_t settings_data_get_handler(httpd_req_t *req) {
     cJSON_AddStringToObject(root, "ap_ip", DEFAULT_AP_IP);
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
-    free((void *)sys_info);
+    free((void *) sys_info);
     cJSON_Delete(root);
     return ESP_OK;
 }

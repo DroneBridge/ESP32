@@ -93,11 +93,22 @@ Most options require a restart/reset of ESP32 module
 -   The ESP will auto broadcast messages to all connected devices via UDP to port 14550. QGroundControl should auto connect
 -   Connect via **TCP on port 5760** or **UDP on port 14550** to the ESP32 to send & receive data with a GCS of your choice. **In case of a UDP connection the GCS must send at least one packet (e.g. MAVLink heart beat etc.) to the UDP port of the ESP32 to register as an end point.**
 
-## Compile yourself (developers)
+## Developers
 
- You will need the Espressif SDK: esp-idf + toolchain (compile it yourself). Check out their website for more info and on how to set it up.
+### Compile
+ You will need the Espressif SDK: esp-idf + toolchain. Check out their website for more info and on how to set it up.
  The code is written in pure C using the esp-idf (no arduino libs).
 
- **This project uses the v4.0 branch of ESP-IDF**
+ **This project uses the v4.3 branch of ESP-IDF**
 
  Compile and flash by running: `idf.py build`, `idf.py flash`
+
+ ### Testing
+ To test the frontend without the ESP32 run 
+
+ ```sh
+ npm install -g json-server
+ json-server db.json --routes routes.json
+ ```
+
+Change 

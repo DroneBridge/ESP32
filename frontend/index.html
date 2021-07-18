@@ -8,8 +8,27 @@
     <title>DB for ESP32 Settings</title>
     <link rel="stylesheet" href="normalize.css">
     <link rel="stylesheet" href="skeleton.css">
+
+    <link rel="icon" type="image/png" sizes="192x192"  href="android-icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+    <meta name="theme-color" content="#ffffff">
+
     <script src="db_settings.js"></script>
     <style>
+        html {
+            min-height: 100%;
+        }
+        body {
+            height: 100%;
+            margin: 0;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            color: white;
+            background: rgb(0, 49, 102);
+            background: linear-gradient(180deg, rgba(0, 49, 102, 1) 0%, rgba(20, 83, 150, 1) 100%);
+        }
         form {
             margin-bottom: 0.5rem;
         }
@@ -29,16 +48,6 @@
             color: #FF7900;
             border-color: #FF7900;
         }
-
-        body {
-            color: white;
-            background: rgb(0, 49, 102);
-            background: -moz-linear-gradient(180deg, rgba(0, 49, 102, 1) 0%, rgba(20, 83, 150, 1) 100%);
-            background: -webkit-linear-gradient(180deg, rgba(0, 49, 102, 1) 0%, rgba(20, 83, 150, 1) 100%);
-            background: linear-gradient(180deg, rgba(0, 49, 102, 1) 0%, rgba(20, 83, 150, 1) 100%);
-            filter: progid:DXImageTransform.Microsoft.gradient(startColorstr="#003166", endColorstr="#145396", GradientType=1);
-        }
-
         input, select {
             color: black;
         }
@@ -48,7 +57,7 @@
 <div class="container">
     <br>
     <div class="twelve columns">
-        <img src="DroneBridgeLogo.svg" alt="SVG mit img Tag laden" width="250">
+        <img src="DroneBridgeLogo.png" alt="DB Logo">
     </div>
 </div>
 <div class="container">

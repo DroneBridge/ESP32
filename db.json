@@ -1,0 +1,39 @@
+{
+  "stats": {
+    "read_bytes": 14986,
+    "tcp_connected": 1,
+    "udp_connected": 2
+  },
+  "settings": {
+    "wifi_ssid": "DroneBridge ESP32 Test",
+    "wifi_pass": "dronebridge Test",
+    "ap_channel": 12,
+    "trans_pack_size": 32,
+    "tx_pin": 22,
+    "rx_pin": 22,
+    "baud": 115200,
+    "telem_proto": 4,
+    "ltm_pp": 2,
+    "msp_ltm_port": 1,
+    "ap_ip": "192.168.2.1"
+  },
+  "info": {
+    "idf_version": "v4.3-194-g5b5e46971a",
+    "db_build_version": 7,
+    "major_version": 2,
+    "minor_version": 1
+  },
+  "change": {
+    "wifi_ssid": "DroneBridge ESP32 Test",
+    "wifi_pass": "dronebridge Test",
+    "ap_channel": 12,
+    "tx_pin": 22,
+    "rx_pin": 22,
+    "telem_proto": 4,
+    "baud": 115200,
+    "msp_ltm_same": 1,
+    "ltm_pp": 2,
+    "trans_pack_size": 32,
+    "ap_ip": "192.168.2.1"
+  }
+}

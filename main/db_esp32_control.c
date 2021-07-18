@@ -50,6 +50,10 @@ uint8_t ltm_frame_buffer[MAX_LTM_FRAMES_IN_BUFFER * LTM_MAX_FRAME_SIZE];
 uint ltm_frames_in_buffer = 0;
 uint ltm_frames_in_buffer_pnt = 0;
 
+uint32_t uart_byte_count = 0;
+int8_t num_connected_tcp_clients = 0;
+int8_t num_connected_udp_clients = 0;
+
 int open_serial_socket() {
     int serial_socket;
     uart_config_t uart_config = {
@@ -137,8 +141,9 @@ void parse_msp_ltm(int tcp_clients[], struct db_udp_connection_t *udp_conn, uint
                    uint *serial_read_bytes,
                    msp_ltm_port_t *db_msp_ltm_port) {
     uint8_t serial_bytes[TRANS_RD_BYTES_NUM];
-    uint read = 0;
+    uint read;
     if ((read = uart_read_bytes(UART_NUM_2, serial_bytes, TRANS_RD_BYTES_NUM, 200 / portTICK_RATE_MS)) > 0) {
+        uart_byte_count += read;
         for (uint j = 0; j < read; j++) {
             (*serial_read_bytes)++;
             uint8_t serial_byte = serial_bytes[j];
@@ -179,6 +184,7 @@ void parse_transparent(int tcp_clients[], struct db_udp_connection_t *udp_conn, 
     uint read = 0;
     if ((read = uart_read_bytes(UART_NUM_2, serial_bytes, TRANS_RD_BYTES_NUM, 200 / portTICK_RATE_MS)) > 0) {
         memcpy(&serial_buffer[*serial_read_bytes], serial_bytes, read);
+        uart_byte_count += read;
         *serial_read_bytes += read;
         if (*serial_read_bytes >= TRANSPARENT_BUF_SIZE) {
             send_to_all_clients(tcp_clients, udp_conn, serial_buffer, *serial_read_bytes);
@@ -237,6 +243,7 @@ add_udp_to_known_clients(struct db_udp_connection_t *connections, struct sockadd
             return;
         }
     }
+    num_connected_udp_clients += 1;
 }
 
 /**
@@ -248,6 +255,7 @@ void update_udp_broadcast(int64_t *last_update, struct db_udp_connection_t *conn
     if (*wifi_mode == WIFI_MODE_AP && (esp_timer_get_time() - *last_update) >= 1000000) {
         *last_update = esp_timer_get_time();
         // clear all entries
+        num_connected_udp_clients = 0;
         for (int i = 0; i < MAX_UDP_CLIENTS; i++) {
             if (connections->is_broadcast[i]) {
                 memset(&connections->udp_clients[i], 0, sizeof(connections->udp_clients[i]));
@@ -311,7 +319,8 @@ void control_module_tcp() {
     ESP_LOGI(TAG, "Started control module");
     while (1) {
         handle_tcp_master(tcp_master_socket, tcp_clients);
-        for (int i = 0; i < CONFIG_LWIP_MAX_ACTIVE_TCP; i++) {  // handle TCP clients
+        int i = 0;
+        for (; i < CONFIG_LWIP_MAX_ACTIVE_TCP; i++) {  // handle TCP clients
             if (tcp_clients[i] > 0) {
                 ssize_t recv_length = recv(tcp_clients[i], tcp_client_buffer, TCP_BUFF_SIZ, 0);
                 if (recv_length > 0) {
@@ -330,6 +339,7 @@ void control_module_tcp() {
                 }
             }
         }
+        num_connected_tcp_clients = i;
         // handle incoming UDP data
         ssize_t recv_length = recvfrom(udp_conn.udp_socket, udp_buffer, UDP_BUF_SIZE, 0,
                                        (struct sockaddr *) &udp_source_addr, &udp_socklen);
