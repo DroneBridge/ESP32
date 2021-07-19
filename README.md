@@ -59,9 +59,9 @@ For flashing there are many ways of doing this. To easy ones are shown below.
 
 #### Windows only: Use flash download tools
 
-1.  [Get it here](https://www.espressif.com/en/support/download/other-tools?5)
-2. Erase the flash of the ESP32 befor flashing a new release
-   ![](wiki/ESP32Flasher_Erase.PNG)
+1. [Get it here](https://www.espressif.com/en/support/download/other-tools?5)
+2. Erase the flash of the ESP32 befor flashing a new release\
+   ![ESP32 erase flash with flash download tools](wiki/ESP32Flasher_Erase.PNG)
 3. Select the firmware, bootloader & partition table and set everything as below
    ```shell
     0x8000 partition_table/partition-table.bin
@@ -69,7 +69,7 @@ For flashing there are many ways of doing this. To easy ones are shown below.
     0x10000 db_esp32.bin
     0x110000 www.bin
    ```
-   ![ESP download tool configuration](wiki/ESP32Flasher.PNG)
+   ![ESP download tool configuration](wiki/ESP32Flasher.png)
 3.  Hit Start and power cycle your ESP32 after flashing
 
 ### Wiring
