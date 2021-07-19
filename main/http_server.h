@@ -1,7 +1,7 @@
 /*
- *   This file is part of DroneBridge: https://github.com/seeul8er/DroneBridge
+ *   This file is part of DroneBridge: https://github.com/DroneBridge/ESP32
  *
- *   Copyright 2018 Wolfgang Christl
+ *   Copyright 2021 Wolfgang Christl
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -17,10 +17,11 @@
  *
  */
 
-#ifndef DB_ESP32_HTTP_SERVER_H
-#define DB_ESP32_HTTP_SERVER_H
+#include <esp_err.h>
 
-void start_tcp_server();
-void write_settings_to_nvs();
+#ifndef DB_ESP32_HTTP_SERVER_NEW_H
+#define DB_ESP32_HTTP_SERVER_NEW_H
 
-#endif //DB_ESP32_HTTP_SERVER_H
+esp_err_t start_rest_server(const char *base_path);
+
+#endif //DB_ESP32_HTTP_SERVER_NEW_H
