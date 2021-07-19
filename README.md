@@ -1,4 +1,4 @@
-![DroneBridge logo](https://raw.githubusercontent.com/DroneBridge/ESP32/master/wiki/DroneBridgeLogo_text.png)
+![DroneBridge logo](wiki/DroneBridgeLogo_text.png)
 
 # DroneBridge for ESP32
 DroneBridge enabled firmware for the popular ESP32 modules from Espressif Systems. Probably the cheapest way to
@@ -9,7 +9,7 @@ Also allows for a fully transparent serial to wifi pass through with variable pa
 
 DroneBridge for ESP32 is a telemetry/low data rate only solution. There is no support for cameras connected to the ESP32 since it does not support video encoding.
 
-![DroneBridge for ESP32 concept](https://raw.githubusercontent.com/DroneBridge/ESP32/master/wiki/db_ESP32_setup.png)
+![DroneBridge for ESP32 concept](wiki/db_ESP32_setup.png)
 
 ## Features
 -   Bi-directional link: MAVLink, MSP & LTM
@@ -28,7 +28,7 @@ DroneBridge for ESP32 is a telemetry/low data rate only solution. There is no su
 
 Tested with: DOIT ESP32 module
 
-![DroneBridge for ESP32 block diagram blackbox](https://raw.githubusercontent.com/DroneBridge/ESP32/master/wiki/DroneBridgeForESP32Blackbox.png)
+![DroneBridge for ESP32 block diagram blackbox](wiki/DroneBridgeForESP32Blackbox.png)
 
 Blackbox concept. UDP & TCP connections possible. Automatic UDP uni-cast of messages to port 14550 to all 
 connected devices/stations. Allows additional clients to register for UDP. Client must send a packet with length > 0 to UDP port of ESP32.
@@ -46,20 +46,30 @@ For flashing there are many ways of doing this. To easy ones are shown below.
 
 #### Recommended
 
-1.  `pip install esptool`
+1.  [Download the esp-idf for windows](https://docs.espressif.com/projects/esp-idf/en/release-v4.3/esp32/get-started/windows-setup.html#get-started-windows-tools-installer) or [linux](https://docs.espressif.com/projects/esp-idf/en/release-v4.3/esp32/get-started/linux-setup.html) or install via `pip install esptool`
 2.  Connect via USB/Serial. Find out the serial port via `dmesg` on linux or device manager on windows.
-  In this example the serial connection to the ESP32 is on COM4 (in Linux e.g. `/dev/ttyUSB0`).
-3.  `esptool.py -p COM4 erase_flash`
-4. `esptool.py -p COM4 -b 460800 --after hard_reset write_flash 0x1000 bootloader.bin 0x8000 partition-table.bin 0x10000 db_esp32.bin`. You might need to press the boot button on your ESP to start the upload/flash process. On Windows `esptool [...]` (with out `.py`) seems to work
+  In this example the serial connection to the ESP32 is on `COM4` (in Linux e.g. `/dev/ttyUSB0`).
+3. `esptool.py -p COM4 erase_flash`
+4. ```shell
+   esptool.py -p COM4 -b 460800 --before default_reset --after hard_reset --chip esp32  write_flash --flash_mode dio --flash_size detect --flash_freq 40m 0x1000 bootloader.bin 0x8000 partition-table.bin 0x10000 db_esp32.bin 0x110000 www.bin
+   ```
+   You might need to press the boot button on your ESP to start the upload/flash process.
 
 [Look here for more detailed information](https://github.com/espressif/esptool)
 
 #### Windows only: Use flash download tools
 
-1.  [Get it here](https://www.espressif.com/en/support/download/other-tools)
+1.  [Get it here](https://www.espressif.com/en/support/download/other-tools?5)
 2. Erase the flash of the ESP32 befor flashing a new release
+   ![](wiki/ESP32Flasher_Erase.PNG)
 3. Select the firmware, bootloader & partition table and set everything as below
-   ![ESP download tool configuration](https://raw.githubusercontent.com/DroneBridge/ESP32/master/wiki/ESP32Flasher.PNG)
+   ```shell
+    0x8000 partition_table/partition-table.bin
+    0x1000 bootloader/bootloader.bin
+    0x10000 db_esp32.bin
+    0x110000 www.bin
+   ```
+   ![ESP download tool configuration](wiki/ESP32Flasher.png)
 3.  Hit Start and power cycle your ESP32 after flashing
 
 ### Wiring
@@ -93,7 +103,7 @@ Defaults: UART2 (RX2, TX2 on GPIO 16, 17)
 Most options require a restart/reset of ESP32 module
 
 ## Use with DroneBridge for Android or QGroundControl
-![DroneBridge for Android app screenshot](https://raw.githubusercontent.com/DroneBridge/ESP32/master/wiki/dp_app-map-2017-10-29-kleiner.png)
+![DroneBridge for Android app screenshot](wiki/dp_app-map-2017-10-29-kleiner.png)
 
 -   Use the Android app to display live telemetry data. Mission planning capabilities for MAVLink will follow.
 -   The ESP will auto broadcast messages to all connected devices via UDP to port 14550. QGroundControl should auto connect
@@ -150,7 +160,6 @@ to
 http://dronebridge.local/api/settings/change
 ```
 
-
  ### Testing
  To test the frontend without the ESP32 run 
 
@@ -158,3 +167,4 @@ http://dronebridge.local/api/settings/change
  npm install -g json-server
  json-server db.json --routes routes.json
  ```
+Set `const ROOT_URL = "http://localhost:3000/"` inside `frontend/db_settings.js`

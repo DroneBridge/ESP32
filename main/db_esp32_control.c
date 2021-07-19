@@ -16,7 +16,7 @@
  *   limitations under the License.
  *
  */
-
+#include <sys/cdefs.h>
 #include <sys/fcntl.h>
 #include <sys/param.h>
 #include <string.h>
@@ -113,7 +113,6 @@ int open_udp_socket() {
  */
 void send_to_all_clients(int tcp_clients[], struct db_udp_connection_t *udp_conn, uint8_t data[], uint data_length) {
     send_to_all_tcp_clients(tcp_clients, data, data_length);
-
     for (int i = 0; i < MAX_UDP_CLIENTS; i++) {  // send to all UDP clients
         if (udp_conn->udp_clients[i].sin_len > 0) {
             int sent = sendto(udp_conn->udp_socket, data, data_length, 0, (struct sockaddr *) &udp_conn->udp_clients[i],
@@ -181,7 +180,7 @@ void parse_msp_ltm(int tcp_clients[], struct db_udp_connection_t *udp_conn, uint
 void parse_transparent(int tcp_clients[], struct db_udp_connection_t *udp_conn, uint8_t serial_buffer[],
                        uint *serial_read_bytes) {
     uint8_t serial_bytes[TRANS_RD_BYTES_NUM];
-    uint read = 0;
+    uint read;
     if ((read = uart_read_bytes(UART_NUM_2, serial_bytes, TRANS_RD_BYTES_NUM, 200 / portTICK_RATE_MS)) > 0) {
         memcpy(&serial_buffer[*serial_read_bytes], serial_bytes, read);
         uart_byte_count += read;
@@ -239,12 +238,12 @@ add_udp_to_known_clients(struct db_udp_connection_t *connections, struct sockadd
                 inet_ntoa_r(((struct sockaddr_in *) &new_client_addr)->sin_addr.s_addr, addr_str, sizeof(addr_str) - 1);
             }
             connections->is_broadcast[i] = is_brdcst;
-            if (!is_brdcst)
+            if (!is_brdcst) {
                 ESP_LOGI(TAG, "UDP: New client connected: %s:%i", addr_str, new_client_addr.sin_port);
+            }
             return;
         }
     }
-    num_connected_udp_clients += 1;
 }
 
 /**
@@ -255,8 +254,6 @@ add_udp_to_known_clients(struct db_udp_connection_t *connections, struct sockadd
 void update_udp_broadcast(int64_t *last_update, struct db_udp_connection_t *connections, const wifi_mode_t *wifi_mode) {
     if (*wifi_mode == WIFI_MODE_AP && (esp_timer_get_time() - *last_update) >= 1000000) {
         *last_update = esp_timer_get_time();
-        // clear all entries
-        num_connected_udp_clients = 0;
         for (int i = 0; i < MAX_UDP_CLIENTS; i++) {
             if (connections->is_broadcast[i]) {
                 memset(&connections->udp_clients[i], 0, sizeof(connections->udp_clients[i]));
@@ -269,6 +266,7 @@ void update_udp_broadcast(int64_t *last_update, struct db_udp_connection_t *conn
         memset(&netif_sta_list, 0, sizeof(esp_netif_sta_list_t));
         ESP_ERROR_CHECK(esp_wifi_ap_get_sta_list(&sta_list));
         ESP_ERROR_CHECK(esp_netif_get_sta_list(&sta_list, &netif_sta_list));
+        num_connected_udp_clients = 0;
         for (int i = 0; i < netif_sta_list.num; i++) {
             esp_netif_sta_info_t station = netif_sta_list.sta[i];
 
@@ -278,13 +276,15 @@ void update_udp_broadcast(int64_t *last_update, struct db_udp_connection_t *conn
             new_client_addr.sin_len = 16;
             new_client_addr.sin_addr.s_addr = station.ip.addr;
             ESP_LOGD(TAG, "%i " IPSTR " " MACSTR "", netif_sta_list.num, IP2STR(&station.ip), MAC2STR(station.mac));
-            if (station.ip.addr != 0)  // DHCP bug. Assigns 0.0.0.0 to station when directly connected on startup
+            if (station.ip.addr != 0) {  // DHCP bug. Assigns 0.0.0.0 to station when directly connected on startup
+                num_connected_udp_clients += 1;
                 add_udp_to_known_clients(connections, new_client_addr, true);
+            }
         }
     }
 }
 
-void control_module_tcp() {
+_Noreturn void control_module_tcp() {
     int uart_socket = open_serial_socket();
     int tcp_master_socket = open_tcp_server(app_port_proxy);
 
