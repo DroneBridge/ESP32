@@ -69,7 +69,7 @@ For flashing there are many ways of doing this. To easy ones are shown below.
     0x10000 db_esp32.bin
     0x110000 www.bin
    ```
-   ![ESP download tool configuration](wiki/ESP32Flasher.png)
+   ![ESP download tool configuration](wiki/ESP32Flasher.PNG)
 3.  Hit Start and power cycle your ESP32 after flashing
 
 ### Wiring
