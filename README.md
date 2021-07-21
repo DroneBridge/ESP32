@@ -120,7 +120,7 @@ Most options require a restart/reset of ESP32 module
  Compile and flash by running: `idf.py build`, `idf.py flash`
 
  ### API
-The webinterface communicates with a REST:API on the ESP32. You can use that API to set configurations not slectable 
+The webinterface communicates with a REST:API on the ESP32. You can use that API to set configurations not selectable 
 via the web-interface (e.g. baud rate). It also allows you to easily integrate DroneBridge for ESP32.
 
 
