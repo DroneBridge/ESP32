@@ -26,12 +26,24 @@ DroneBridge for ESP32 is a telemetry/low data rate only solution. There is no su
 
 ![ESP32 module with VCP](https://upload.wikimedia.org/wikipedia/commons/thumb/2/20/ESP32_Espressif_ESP-WROOM-32_Dev_Board.jpg/313px-ESP32_Espressif_ESP-WROOM-32_Dev_Board.jpg)
 
-Tested with: DOIT ESP32 module
-
 ![DroneBridge for ESP32 block diagram blackbox](wiki/DroneBridgeForESP32Blackbox.png)
 
 Blackbox concept. UDP & TCP connections possible. Automatic UDP uni-cast of messages to port 14550 to all 
 connected devices/stations. Allows additional clients to register for UDP. Client must send a packet with length > 0 to UDP port of ESP32.
+
+## Hardware
+
+All ESP32 development boards will work. No additional PSRAM required. You will need a USB to serial adapter if for flashing the firmware, if your ESP32 board does not come with one. Follow the instructions of the board manufacturer when it comes to wiring the power supply lines. Some modules do not like an external 5V power input additionally to a connected USB at the same time.
+
+Examples for boards that will work:
+* AZDelivery DevKit C
+* [TinyPICO - ESP32 Development Board - V2](https://www.adafruit.com/product/4335)
+* [Adafruit HUZZAH32 – ESP32 Feather Board](https://www.adafruit.com/product/3405)
+* [Adafruit AirLift – ESP32 WiFi Co-Processor Breakout Board](https://www.adafruit.com/product/4201) (requires FTDI adapter for flashing firmware)
+* [Adafruit HUZZAH32](https://www.adafruit.com/product/4172) (requires FTDI adapter for flashing firmware)
+
+DroneBridge for ESP32 is tested with an DOIT ESP32 development board.
+
 
 ## Installation/Flashing using precompiled binaries
 
@@ -77,10 +89,12 @@ For flashing there are many ways of doing this. To easy ones are shown below.
 1.  Connect UART of ESP32 to a 3.3V UART of your flight controller.
 2.  Set the flight controller port to the desired protocol.
 
-(Power the ESP32 module with a stable 5-12V power source) **Check out manufacturer datasheet! Only some modules can
-take more than 3.3V/5V on VIN PIN**
+(Power the ESP32 module with a stable 3.3-5V power source) 
+**Check out manufacturer datasheet! Only some modules can take more than 3.3V. Follow the recommendations by the ESP32 boards manufacturer for powering the device**
 
 Defaults: UART2 (RX2, TX2 on GPIO 16, 17)
+
+![Example wiring adafruit ESP32 DevBoard](wiki/Pixhawk_wiring.png)
 
 ### Configuration
 1.  Connect to the wifi `DroneBridge ESP32` with password `dronebridge`
