@@ -2,7 +2,7 @@ menu "DB Webserver Configuration"
 
     choice WEB_DEPLOY_MODE
         prompt "Website deploy mode"
-        default WEB_DEPLOY_SEMIHOST
+        default WEB_DEPLOY_SF
         help
             Select website deploy mode.
             You can deploy website to host, and ESP32 will retrieve them in a semihost way (JTAG is needed).
@@ -17,7 +17,7 @@ menu "DB Webserver Configuration"
             bool "Deploy website to SPI Nor Flash"
             help
                 Deploy website to SPI Nor Flash.
-                Choose this production mode if the size of website is small (less than 2MB).
+                Choose this in production mode or if the size of website is small (less than 2MB).
     endchoice
 
     if WEB_DEPLOY_SEMIHOST
