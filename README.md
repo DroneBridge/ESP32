@@ -1,10 +1,10 @@
 ![DroneBridge logo](wiki/DroneBridgeLogo_text.png)
 
 # DroneBridge for ESP32
-DroneBridge enabled firmware for the popular ESP32 modules from Espressif Systems. Probably the cheapest way to
+A DroneBridge enabled firmware for the popular ESP32 modules from Espressif Systems. Probably the cheapest way to
 communicate with your drone, UAV, UAS, ground based vehicle or whatever you may call them.
 
-Also allows for a fully transparent serial to wifi pass through with variable packet size
+It also allows for a fully transparent serial to wifi pass through link with variable packet size
 (Continuous stream of data required).
 
 DroneBridge for ESP32 is a telemetry/low data rate only solution. There is no support for cameras connected to the ESP32 since it does not support video encoding.
@@ -33,7 +33,7 @@ connected devices/stations. Allows additional clients to register for UDP. Clien
 
 ## Hardware
 
-All ESP32 development boards will work. No additional PSRAM required. You will need a USB to serial adapter if for flashing the firmware, if your ESP32 board does not come with one. Follow the instructions of the board manufacturer when it comes to wiring the power supply lines. Some modules do not like an external 5V power input additionally to a connected USB at the same time.
+All ESP32 development boards will work. No additional PSRAM required. You will need a USB to serial adapter if for flashing the firmware, if your ESP32 board does not come with one. Follow the instructions of the board manufacturer when it comes to wiring the power supply lines. Some modules do not like an external 5V power input connected in addition to an USB at the same time.
 
 Examples for boards that will work:
 * AZDelivery DevKit C
@@ -50,7 +50,7 @@ DroneBridge for ESP32 is tested with an DOIT ESP32 development board.
 First download the latest release from this repository.
 [You can find them here](https://github.com/DroneBridge/ESP32/releases).
 
-For flashing there are many ways of doing this. To easy ones are shown below.
+There are many multiple ways on how to flash the firmware. The easy ones are explained below.
 
 **Erase the flash before flashing a new release!**
 
@@ -59,7 +59,7 @@ For flashing there are many ways of doing this. To easy ones are shown below.
 #### Recommended
 
 1.  [Download the esp-idf for windows](https://docs.espressif.com/projects/esp-idf/en/release-v4.3/esp32/get-started/windows-setup.html#get-started-windows-tools-installer) or [linux](https://docs.espressif.com/projects/esp-idf/en/release-v4.3/esp32/get-started/linux-setup.html) or install via `pip install esptool`
-2.  Connect via USB/Serial. Find out the serial port via `dmesg` on linux or device manager on windows.
+2.  Connect via USB/Serial. Find out the serial port via `dmesg` on linux or using the device manager on windows.
   In this example the serial connection to the ESP32 is on `COM4` (in Linux e.g. `/dev/ttyUSB0`).
 3. `esptool.py -p COM4 erase_flash`
 4. ```shell
@@ -86,7 +86,7 @@ For flashing there are many ways of doing this. To easy ones are shown below.
 
 ### Wiring
 
-1.  Connect UART of ESP32 to a 3.3V UART of your flight controller.
+1.  Connect the UART of the ESP32 to a 3.3V UART of your flight controller.
 2.  Set the flight controller port to the desired protocol.
 
 (Power the ESP32 module with a stable 3.3-5V power source) 
