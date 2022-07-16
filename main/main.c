@@ -38,6 +38,7 @@
 #include "main.h"
 
 #define NVS_NAMESPACE "settings"
+#define USE_ALT_UART_CONFIG // for boards that have flash connected to GPIO 17/16 - will crash otherwise
 
 static const char *TAG = "DB_ESP32";
 
@@ -46,8 +47,13 @@ uint8_t DEFAULT_PWD[64] = "dronebridge";
 char DEFAULT_AP_IP[32] = "192.168.2.1";
 uint8_t DEFAULT_CHANNEL = 6;
 uint8_t SERIAL_PROTOCOL = 4;  // 1=MSP, 4=MAVLink/transparent
+# ifdef USE_ALT_UART_CONFIG
+uint8_t DB_UART_PIN_TX = GPIO_NUM_33;
+uint8_t DB_UART_PIN_RX = GPIO_NUM_32;
+# else
 uint8_t DB_UART_PIN_TX = GPIO_NUM_17;
 uint8_t DB_UART_PIN_RX = GPIO_NUM_16;
+#endif
 int DB_UART_BAUD_RATE = 115200;
 uint16_t TRANSPARENT_BUF_SIZE = 64;
 uint8_t LTM_FRAME_NUM_BUFFER = 1;
