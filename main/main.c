@@ -37,14 +37,18 @@
 #include "http_server.h"
 #include "main.h"
 
+#define DEFAULT_SCAN_LIST_SIZE 10
+#define STA_MAXIMUM_RETRY  2
+
 #define NVS_NAMESPACE "settings"
+//#define USE_ALT_UART_CONFIG // for boards that have flash connected to GPIO 17/16 - will crash otherwise
 
 static const char *TAG = "DB_ESP32";
 
 uint8_t DEFAULT_SSID[32] = "DroneBridge ESP32";
 uint8_t DEFAULT_PWD[64] = "dronebridge";
 char DEFAULT_AP_IP[32] = "192.168.2.1";
-uint8_t DEFAULT_CHANNEL = 6;
+uint8_t DEFAULT_CHANNEL = 1;
 uint8_t SERIAL_PROTOCOL = 4;  // 1=MSP, 4=MAVLink/transparent
 uint8_t DB_UART_PIN_TX = GPIO_NUM_17;
 uint8_t DB_UART_PIN_RX = GPIO_NUM_16;
@@ -53,18 +57,38 @@ uint16_t TRANSPARENT_BUF_SIZE = 64;
 uint8_t LTM_FRAME_NUM_BUFFER = 1;
 uint8_t MSP_LTM_SAMEPORT = 0;
 
+
+static int s_retry_num = 0;
+
+
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data) {
-    if (event_id == WIFI_EVENT_AP_STACONNECTED) {
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_STACONNECTED) {
         wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *) event_data;
         ESP_LOGI(TAG, "Client connected - station:"MACSTR", AID=%d", MAC2STR(event->mac), event->aid);
-    } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_STADISCONNECTED) {
         wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *) event_data;
         ESP_LOGI(TAG, "Client disconnected - station:"MACSTR", AID=%d", MAC2STR(event->mac), event->aid);
-    } else if (event_id == WIFI_EVENT_AP_START) {
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_START) {
         ESP_LOGI(TAG, "AP started!");
-    } else if (event_id == WIFI_EVENT_AP_STOP) {
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_STOP) {
         ESP_LOGI(TAG, "AP stopped!");
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
+        ESP_LOGI(TAG, "STA started!");
+        //esp_wifi_connect();
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        if (s_retry_num < STA_MAXIMUM_RETRY) {
+            esp_wifi_connect();
+            s_retry_num++;
+            ESP_LOGI(TAG, "retry to connect to the AP");
+        } else {
+            ESP_LOGI(TAG,"connect to the AP fail");
+        }
+    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
+        ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
+        ESP_LOGI(TAG, "got gateway:" IPSTR, IP2STR(&event->ip_info.gw));
+        s_retry_num = 0;
     }
 }
 
@@ -130,10 +154,118 @@ esp_err_t init_fs(void) {
 
 #endif
 
+static void print_auth_mode(int authmode)
+{
+    switch (authmode) {
+    case WIFI_AUTH_OPEN:
+        ESP_LOGI(TAG, "Authmode \tWIFI_AUTH_OPEN");
+        break;
+    case WIFI_AUTH_WEP:
+        ESP_LOGI(TAG, "Authmode \tWIFI_AUTH_WEP");
+        break;
+    case WIFI_AUTH_WPA_PSK:
+        ESP_LOGI(TAG, "Authmode \tWIFI_AUTH_WPA_PSK");
+        break;
+    case WIFI_AUTH_WPA2_PSK:
+        ESP_LOGI(TAG, "Authmode \tWIFI_AUTH_WPA2_PSK");
+        break;
+    case WIFI_AUTH_WPA_WPA2_PSK:
+        ESP_LOGI(TAG, "Authmode \tWIFI_AUTH_WPA_WPA2_PSK");
+        break;
+    case WIFI_AUTH_WPA2_ENTERPRISE:
+        ESP_LOGI(TAG, "Authmode \tWIFI_AUTH_WPA2_ENTERPRISE");
+        break;
+    case WIFI_AUTH_WPA3_PSK:
+        ESP_LOGI(TAG, "Authmode \tWIFI_AUTH_WPA3_PSK");
+        break;
+    case WIFI_AUTH_WPA2_WPA3_PSK:
+        ESP_LOGI(TAG, "Authmode \tWIFI_AUTH_WPA2_WPA3_PSK");
+        break;
+    default:
+        ESP_LOGI(TAG, "Authmode \tWIFI_AUTH_UNKNOWN");
+        break;
+    }
+}
+
+static void print_cipher_type(int pairwise_cipher, int group_cipher)
+{
+    switch (pairwise_cipher) {
+    case WIFI_CIPHER_TYPE_NONE:
+        ESP_LOGI(TAG, "Pairwise Cipher \tWIFI_CIPHER_TYPE_NONE");
+        break;
+    case WIFI_CIPHER_TYPE_WEP40:
+        ESP_LOGI(TAG, "Pairwise Cipher \tWIFI_CIPHER_TYPE_WEP40");
+        break;
+    case WIFI_CIPHER_TYPE_WEP104:
+        ESP_LOGI(TAG, "Pairwise Cipher \tWIFI_CIPHER_TYPE_WEP104");
+        break;
+    case WIFI_CIPHER_TYPE_TKIP:
+        ESP_LOGI(TAG, "Pairwise Cipher \tWIFI_CIPHER_TYPE_TKIP");
+        break;
+    case WIFI_CIPHER_TYPE_CCMP:
+        ESP_LOGI(TAG, "Pairwise Cipher \tWIFI_CIPHER_TYPE_CCMP");
+        break;
+    case WIFI_CIPHER_TYPE_TKIP_CCMP:
+        ESP_LOGI(TAG, "Pairwise Cipher \tWIFI_CIPHER_TYPE_TKIP_CCMP");
+        break;
+    default:
+        ESP_LOGI(TAG, "Pairwise Cipher \tWIFI_CIPHER_TYPE_UNKNOWN");
+        break;
+    }
+
+    switch (group_cipher) {
+    case WIFI_CIPHER_TYPE_NONE:
+        ESP_LOGI(TAG, "Group Cipher \tWIFI_CIPHER_TYPE_NONE");
+        break;
+    case WIFI_CIPHER_TYPE_WEP40:
+        ESP_LOGI(TAG, "Group Cipher \tWIFI_CIPHER_TYPE_WEP40");
+        break;
+    case WIFI_CIPHER_TYPE_WEP104:
+        ESP_LOGI(TAG, "Group Cipher \tWIFI_CIPHER_TYPE_WEP104");
+        break;
+    case WIFI_CIPHER_TYPE_TKIP:
+        ESP_LOGI(TAG, "Group Cipher \tWIFI_CIPHER_TYPE_TKIP");
+        break;
+    case WIFI_CIPHER_TYPE_CCMP:
+        ESP_LOGI(TAG, "Group Cipher \tWIFI_CIPHER_TYPE_CCMP");
+        break;
+    case WIFI_CIPHER_TYPE_TKIP_CCMP:
+        ESP_LOGI(TAG, "Group Cipher \tWIFI_CIPHER_TYPE_TKIP_CCMP");
+        break;
+    default:
+        ESP_LOGI(TAG, "Group Cipher \tWIFI_CIPHER_TYPE_UNKNOWN");
+        break;
+    }
+}
+
+static void wifi_scan(void)
+{
+    uint16_t number = DEFAULT_SCAN_LIST_SIZE;
+    wifi_ap_record_t ap_info[DEFAULT_SCAN_LIST_SIZE];
+    uint16_t ap_count = 0;
+    memset(ap_info, 0, sizeof(ap_info));
+
+    esp_wifi_scan_start(NULL, true);
+    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&number, ap_info));
+    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));
+    ESP_LOGI(TAG, "Total APs scanned = %u", ap_count);
+    for (int i = 0; (i < DEFAULT_SCAN_LIST_SIZE) && (i < ap_count); i++) {
+        ESP_LOGI(TAG, "SSID \t\t%s", ap_info[i].ssid);
+        ESP_LOGI(TAG, "RSSI \t\t%d", ap_info[i].rssi);
+        print_auth_mode(ap_info[i].authmode);
+        if (ap_info[i].authmode != WIFI_AUTH_WEP) {
+            print_cipher_type(ap_info[i].pairwise_cipher, ap_info[i].group_cipher);
+        }
+        ESP_LOGI(TAG, "Channel \t\t%d\n", ap_info[i].primary);
+    }
+
+}
+
 void init_wifi(void) {
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     esp_netif_t *esp_net = esp_netif_create_default_wifi_ap();
+    esp_netif_t *esp_net_sta = esp_netif_create_default_wifi_sta();
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
@@ -143,25 +275,39 @@ void init_wifi(void) {
                                                         &wifi_event_handler,
                                                         NULL,
                                                         NULL));
+    
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
+                                                        IP_EVENT_STA_GOT_IP,
+                                                        &wifi_event_handler,
+                                                        NULL,
+                                                        NULL));
+
 
     wifi_config_t wifi_config = {
             .ap = {
                     .ssid = "DroneBridge_ESP32_Init",
                     .ssid_len = 0,
                     .authmode = WIFI_AUTH_WPA_PSK,
-                    .channel = DEFAULT_CHANNEL,
+//                    .channel = DEFAULT_CHANNEL,
                     .ssid_hidden = 0,
                     .beacon_interval = 100,
                     .max_connection = 10
             },
     };
+    wifi_config_t wifi_config_sta = {
+            .sta = {
+                    .ssid = "BlackMeshTest",
+                    .password = "SomeWPA2PskKey"
+            },
+    };
     xthal_memcpy(wifi_config.ap.ssid, DEFAULT_SSID, 32);
     xthal_memcpy(wifi_config.ap.password, DEFAULT_PWD, 64);
 
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
-    ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B));
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+    //ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B));
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config_sta));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
-    wifi_country_t wifi_country = {.cc = "XX", .schan = 1, .nchan = 13, .policy = WIFI_COUNTRY_POLICY_MANUAL};
+    wifi_country_t wifi_country = {.cc = "DE", .schan = 1, .nchan = 13, .policy = WIFI_COUNTRY_POLICY_MANUAL};
     ESP_ERROR_CHECK(esp_wifi_set_country(&wifi_country));
     ESP_ERROR_CHECK(esp_wifi_start());
 
@@ -251,8 +397,12 @@ void app_main() {
     }
     ESP_ERROR_CHECK(ret);
     read_settings_nvs();
-    esp_log_level_set("*", ESP_LOG_INFO);
+    esp_log_level_set("*", ESP_LOG_DEBUG);
     init_wifi();
+    
+    wifi_scan();
+    esp_wifi_connect();
+    
     start_mdns_service();
     netbiosns_init();
     netbiosns_set_name("dronebridge");
