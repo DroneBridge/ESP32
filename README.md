@@ -1,10 +1,10 @@
 ![DroneBridge logo](wiki/DroneBridgeLogo_text.png)
 
 # DroneBridge for ESP32
-DroneBridge enabled firmware for the popular ESP32 modules from Espressif Systems. Probably the cheapest way to
+A DroneBridge enabled firmware for the popular ESP32 modules from Espressif Systems. Probably the cheapest way to
 communicate with your drone, UAV, UAS, ground based vehicle or whatever you may call them.
 
-Also allows for a fully transparent serial to wifi pass through with variable packet size
+It also allows for a fully transparent serial to wifi pass through link with variable packet size
 (Continuous stream of data required).
 
 DroneBridge for ESP32 is a telemetry/low data rate only solution. There is no support for cameras connected to the ESP32 since it does not support video encoding.
@@ -26,19 +26,31 @@ DroneBridge for ESP32 is a telemetry/low data rate only solution. There is no su
 
 ![ESP32 module with VCP](https://upload.wikimedia.org/wikipedia/commons/thumb/2/20/ESP32_Espressif_ESP-WROOM-32_Dev_Board.jpg/313px-ESP32_Espressif_ESP-WROOM-32_Dev_Board.jpg)
 
-Tested with: DOIT ESP32 module
-
 ![DroneBridge for ESP32 block diagram blackbox](wiki/DroneBridgeForESP32Blackbox.png)
 
 Blackbox concept. UDP & TCP connections possible. Automatic UDP uni-cast of messages to port 14550 to all 
 connected devices/stations. Allows additional clients to register for UDP. Client must send a packet with length > 0 to UDP port of ESP32.
+
+## Hardware
+
+All ESP32 development boards will work. No additional PSRAM required. You will need a USB to serial adapter if for flashing the firmware, if your ESP32 board does not come with one. Follow the instructions of the board manufacturer when it comes to wiring the power supply lines. Some modules do not like an external 5V power input connected in addition to an USB at the same time.
+
+Examples for boards that will work:
+* AZDelivery DevKit C
+* [TinyPICO - ESP32 Development Board - V2](https://www.adafruit.com/product/4335)
+* [Adafruit HUZZAH32 – ESP32 Feather Board](https://www.adafruit.com/product/3405)
+* [Adafruit AirLift – ESP32 WiFi Co-Processor Breakout Board](https://www.adafruit.com/product/4201) (requires FTDI adapter for flashing firmware)
+* [Adafruit HUZZAH32](https://www.adafruit.com/product/4172) (requires FTDI adapter for flashing firmware)
+
+DroneBridge for ESP32 is tested with an DOIT ESP32 development board.
+
 
 ## Installation/Flashing using precompiled binaries
 
 First download the latest release from this repository.
 [You can find them here](https://github.com/DroneBridge/ESP32/releases).
 
-For flashing there are many ways of doing this. To easy ones are shown below.
+There are many multiple ways on how to flash the firmware. The easy ones are explained below.
 
 **Erase the flash before flashing a new release!**
 
@@ -47,7 +59,7 @@ For flashing there are many ways of doing this. To easy ones are shown below.
 #### Recommended
 
 1.  [Download the esp-idf for windows](https://docs.espressif.com/projects/esp-idf/en/release-v4.3/esp32/get-started/windows-setup.html#get-started-windows-tools-installer) or [linux](https://docs.espressif.com/projects/esp-idf/en/release-v4.3/esp32/get-started/linux-setup.html) or install via `pip install esptool`
-2.  Connect via USB/Serial. Find out the serial port via `dmesg` on linux or device manager on windows.
+2.  Connect via USB/Serial. Find out the serial port via `dmesg` on linux or using the device manager on windows.
   In this example the serial connection to the ESP32 is on `COM4` (in Linux e.g. `/dev/ttyUSB0`).
 3. `esptool.py -p COM4 erase_flash`
 4. ```shell
@@ -74,13 +86,15 @@ For flashing there are many ways of doing this. To easy ones are shown below.
 
 ### Wiring
 
-1.  Connect UART of ESP32 to a 3.3V UART of your flight controller.
+1.  Connect the UART of the ESP32 to a 3.3V UART of your flight controller.
 2.  Set the flight controller port to the desired protocol.
 
-(Power the ESP32 module with a stable 5-12V power source) **Check out manufacturer datasheet! Only some modules can
-take more than 3.3V/5V on VIN PIN**
+(Power the ESP32 module with a stable 3.3-5V power source) 
+**Check out manufacturer datasheet! Only some modules can take more than 3.3V. Follow the recommendations by the ESP32 boards manufacturer for powering the device**
 
 Defaults: UART2 (RX2, TX2 on GPIO 16, 17)
+
+![Example wiring adafruit ESP32 DevBoard](wiki/Pixhawk_wiring.png)
 
 ### Configuration
 1.  Connect to the wifi `DroneBridge ESP32` with password `dronebridge`
@@ -120,7 +134,7 @@ Most options require a restart/reset of ESP32 module
  Compile and flash by running: `idf.py build`, `idf.py flash`
 
  ### API
-The webinterface communicates with a REST:API on the ESP32. You can use that API to set configurations not slectable 
+The webinterface communicates with a REST:API on the ESP32. You can use that API to set configurations not selectable 
 via the web-interface (e.g. baud rate). It also allows you to easily integrate DroneBridge for ESP32.
 
 

@@ -33,6 +33,8 @@
 #include "db_protocol.h"
 #include "tcp_server.h"
 
+#define UART_NUM UART_NUM_1
+
 #define TAG "DB_CONTROL"
 #define TRANS_RD_BYTES_NUM  8   // amount of bytes read form serial port at once when transparent is selected
 #define UDP_BUF_SIZE    2048
@@ -63,13 +65,13 @@ int open_serial_socket() {
             .stop_bits = UART_STOP_BITS_1,
             .flow_ctrl = UART_HW_FLOWCTRL_DISABLE
     };
-    ESP_ERROR_CHECK(uart_param_config(UART_NUM_2, &uart_config));
-    ESP_ERROR_CHECK(uart_set_pin(UART_NUM_2, DB_UART_PIN_TX, DB_UART_PIN_RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
-    ESP_ERROR_CHECK(uart_driver_install(UART_NUM_2, 1024, 0, 0, NULL, 0));
+    ESP_ERROR_CHECK(uart_param_config(UART_NUM, &uart_config));
+    ESP_ERROR_CHECK(uart_set_pin(UART_NUM, DB_UART_PIN_TX, DB_UART_PIN_RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+    ESP_ERROR_CHECK(uart_driver_install(UART_NUM, 1024, 0, 0, NULL, 0));
     if ((serial_socket = open("/dev/uart/2", O_RDWR)) == -1) {
         ESP_LOGE(TAG, "Cannot open UART2");
         close(serial_socket);
-        uart_driver_delete(UART_NUM_2);
+        uart_driver_delete(UART_NUM);
         return ESP_FAIL;
     }
     esp_vfs_dev_uart_use_driver(2);
@@ -126,7 +128,7 @@ void send_to_all_clients(int tcp_clients[], struct db_udp_connection_t *udp_conn
 }
 
 void write_to_uart(const char tcp_client_buffer[], const size_t data_length) {
-    int written = uart_write_bytes(UART_NUM_2, tcp_client_buffer, data_length);
+    int written = uart_write_bytes(UART_NUM, tcp_client_buffer, data_length);
     if (written > 0)
         ESP_LOGD(TAG, "Wrote %i bytes", written);
     else
@@ -141,7 +143,7 @@ void parse_msp_ltm(int tcp_clients[], struct db_udp_connection_t *udp_conn, uint
                    msp_ltm_port_t *db_msp_ltm_port) {
     uint8_t serial_bytes[TRANS_RD_BYTES_NUM];
     uint read;
-    if ((read = uart_read_bytes(UART_NUM_2, serial_bytes, TRANS_RD_BYTES_NUM, 200 / portTICK_RATE_MS)) > 0) {
+    if ((read = uart_read_bytes(UART_NUM, serial_bytes, TRANS_RD_BYTES_NUM, 200 / portTICK_RATE_MS)) > 0) {
         uart_byte_count += read;
         for (uint j = 0; j < read; j++) {
             (*serial_read_bytes)++;
@@ -181,7 +183,7 @@ void parse_transparent(int tcp_clients[], struct db_udp_connection_t *udp_conn, 
                        uint *serial_read_bytes) {
     uint8_t serial_bytes[TRANS_RD_BYTES_NUM];
     uint read;
-    if ((read = uart_read_bytes(UART_NUM_2, serial_bytes, TRANS_RD_BYTES_NUM, 200 / portTICK_RATE_MS)) > 0) {
+    if ((read = uart_read_bytes(UART_NUM, serial_bytes, TRANS_RD_BYTES_NUM, 200 / portTICK_RATE_MS)) > 0) {
         memcpy(&serial_buffer[*serial_read_bytes], serial_bytes, read);
         uart_byte_count += read;
         *serial_read_bytes += read;
