@@ -15,5 +15,5 @@ CMakeListsPrivate.txt
 build/
 
 cmake-build-debug/
-
-cmake-build-release/
+cmake-build-debug-43/
+cmake-build-debug-44/

@@ -42,8 +42,8 @@ Examples for boards that will work:
 * [Adafruit AirLift – ESP32 WiFi Co-Processor Breakout Board](https://www.adafruit.com/product/4201) (requires FTDI adapter for flashing firmware)
 * [Adafruit HUZZAH32](https://www.adafruit.com/product/4172) (requires FTDI adapter for flashing firmware)
 
-DroneBridge for ESP32 is tested with an DOIT ESP32 development board.
-
+DroneBridge for ESP32 is tested with an DOIT ESP32 development board.  
+**Other ESP boards like the ESP32-C3 etc. are very likely to work as well. I will be necessary to re-compile the code for the target.**
 
 ## Installation/Flashing using precompiled binaries
 
@@ -105,6 +105,7 @@ Defaults: UART2 (RX2, TX2 on GPIO 16, 17)
 ![DroneBridge for ESP32 web interface](wiki/dbesp32_webinterface.png)
 
 **Configuration Options:**
+-   `ESP32 Mode`: ESP32 creates an access point or connects to an existing access point. Beware that the ESP32 will indefinitely search for the specified access point. You will need to re-flash the ESP32 to reset the settings!
 -   `Wifi SSID`: Up to 31 character long
 -   `Wifi password`: Up to 63 character long
 -   `UART baud rate`: Same as you configured on your flight controller
@@ -129,7 +130,7 @@ Most options require a restart/reset of ESP32 module
  You will need the Espressif SDK: esp-idf + toolchain. Check out their website for more info and on how to set it up.
  The code is written in pure C using the esp-idf (no arduino libs).
 
- **This project uses the v4.3 branch of ESP-IDF**
+ **This project supports the v4.3 & v4.4 of ESP-IDF**
 
  Compile and flash by running: `idf.py build`, `idf.py flash`
 
@@ -156,6 +157,7 @@ http://dronebridge.local/api/system/reboot
 **Trigger a settings change:** Send a valid JSON
 ```json
 {
+  "esp32_mode": 1,
   "wifi_ssid": "DroneBridge ESP32",
   "wifi_pass": "dronebridge",
   "ap_channel": 6,

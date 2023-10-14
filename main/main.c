@@ -24,8 +24,10 @@
 #include <string.h>
 #include <driver/gpio.h>
 #include <lwip/apps/netbiosns.h>
+
 #include "freertos/event_groups.h"
 #include "esp_wifi.h"
+#include "esp_wifi_types.h"
 #include "esp_log.h"
 #include "esp_event.h"
 #include "db_esp32_control.h"
@@ -38,13 +40,15 @@
 #include "main.h"
 
 #define NVS_NAMESPACE "settings"
-#define USE_ALT_UART_CONFIG // for boards that have flash connected to GPIO 17/16 - will crash otherwise
+// #define USE_ALT_UART_CONFIG // for boards that have flash connected to GPIO 17/16 - will crash otherwise
 
 static const char *TAG = "DB_ESP32";
 
+uint8_t DB_WIFI_MODE = 1; // 1=Wifi AP mode, 2=Wifi client mode
 uint8_t DEFAULT_SSID[32] = "DroneBridge ESP32";
 uint8_t DEFAULT_PWD[64] = "dronebridge";
 char DEFAULT_AP_IP[32] = "192.168.2.1";
+char CURRENT_CLIENT_IP[32] = "192.168.2.1";
 uint8_t DEFAULT_CHANNEL = 6;
 uint8_t SERIAL_PROTOCOL = 4;  // 1=MSP, 4=MAVLink/transparent
 # ifdef USE_ALT_UART_CONFIG
@@ -59,8 +63,14 @@ uint16_t TRANSPARENT_BUF_SIZE = 64;
 uint8_t LTM_FRAME_NUM_BUFFER = 1;
 uint8_t MSP_LTM_SAMEPORT = 0;
 
-static void wifi_event_handler(void *arg, esp_event_base_t event_base,
-                               int32_t event_id, void *event_data) {
+// Wifi client mode vars
+int WIFI_ESP_MAXIMUM_RETRY = 100;
+static int s_retry_num = 0;
+static EventGroupHandle_t s_wifi_event_group;
+#define WIFI_CONNECTED_BIT BIT0
+#define WIFI_FAIL_BIT      BIT1
+
+static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
     if (event_id == WIFI_EVENT_AP_STACONNECTED) {
         wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *) event_data;
         ESP_LOGI(TAG, "Client connected - station:"MACSTR", AID=%d", MAC2STR(event->mac), event->aid);
@@ -71,6 +81,25 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         ESP_LOGI(TAG, "AP started!");
     } else if (event_id == WIFI_EVENT_AP_STOP) {
         ESP_LOGI(TAG, "AP stopped!");
+    }
+    // Wifi client mode events
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
+        esp_wifi_connect();
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        if (s_retry_num < WIFI_ESP_MAXIMUM_RETRY) {
+            esp_wifi_connect();
+            s_retry_num++;
+            ESP_LOGI(TAG, "Retry to connect to the AP");
+        } else {
+            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
+        }
+        ESP_LOGI(TAG,"Connecting to the AP failed");
+    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
+        ESP_LOGI(TAG, "Got IP:" IPSTR, IP2STR(&event->ip_info.ip));
+        sprintf(CURRENT_CLIENT_IP, IPSTR, IP2STR(&event->ip_info.ip));
+        s_retry_num = 0;
+        xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
     }
 }
 
@@ -136,7 +165,10 @@ esp_err_t init_fs(void) {
 
 #endif
 
-void init_wifi(void) {
+/**
+ * Launches a access point where ground stations can connect to
+ */
+void init_wifi_apmode() {
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     esp_netif_t *esp_net = esp_netif_create_default_wifi_ap();
@@ -167,7 +199,7 @@ void init_wifi(void) {
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
     ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
-    wifi_country_t wifi_country = {.cc = "XX", .schan = 1, .nchan = 13, .policy = WIFI_COUNTRY_POLICY_MANUAL};
+    wifi_country_t wifi_country = {.cc = "US", .schan = 1, .nchan = 13, .policy = WIFI_COUNTRY_POLICY_MANUAL};
     ESP_ERROR_CHECK(esp_wifi_set_country(&wifi_country));
     ESP_ERROR_CHECK(esp_wifi_start());
 
@@ -181,6 +213,69 @@ void init_wifi(void) {
     ESP_ERROR_CHECK(esp_netif_dhcps_start(esp_net));
 
     ESP_ERROR_CHECK(esp_netif_set_hostname(esp_net, "DBESP32"));
+    strncpy(CURRENT_CLIENT_IP, DEFAULT_AP_IP, sizeof(CURRENT_CLIENT_IP));
+}
+
+/**
+ * Initializes the ESP Wifi client mode where we can connect to a known access point
+ */
+void init_wifi_clientmode() {
+    s_wifi_event_group = xEventGroupCreate();
+    ESP_ERROR_CHECK(esp_netif_init());
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    esp_netif_create_default_wifi_sta();
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    esp_event_handler_instance_t instance_any_id;
+    esp_event_handler_instance_t instance_got_ip;
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
+                                                        ESP_EVENT_ANY_ID,
+                                                        &wifi_event_handler,
+                                                        NULL,
+                                                        &instance_any_id));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
+                                                        IP_EVENT_STA_GOT_IP,
+                                                        &wifi_event_handler,
+                                                        NULL,
+                                                        &instance_got_ip));
+
+    wifi_config_t wifi_config = {
+            .sta = {
+                    .ssid = "DroneBridge_ESP32_Init",
+                    .password = "dronebridge"
+            },
+    };
+    xthal_memcpy(wifi_config.sta.ssid, DEFAULT_SSID, 32);
+    xthal_memcpy(wifi_config.sta.password, DEFAULT_PWD, 64);
+
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
+    ESP_ERROR_CHECK(esp_wifi_start() );
+
+    ESP_LOGI(TAG, "init_wifi_clientmode finished.");
+
+    /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
+     * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
+    EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
+                                           WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+                                           pdFALSE,
+                                           pdFALSE,
+                                           portMAX_DELAY);
+
+    /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
+     * happened. */
+    if (bits & WIFI_CONNECTED_BIT) {
+        ESP_LOGI(TAG, "Connected to ap SSID:%s password:%s", DEFAULT_SSID, DEFAULT_PWD);
+    } else if (bits & WIFI_FAIL_BIT) {
+        ESP_LOGI(TAG, "Failed to connect to SSID:%s, password:%s", DEFAULT_SSID, DEFAULT_PWD);
+    } else {
+        ESP_LOGE(TAG, "UNEXPECTED EVENT");
+    }
+
+    /* The event will not be processed after unregister */
+    ESP_ERROR_CHECK(esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, instance_got_ip));
+    ESP_ERROR_CHECK(esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, instance_any_id));
+    vEventGroupDelete(s_wifi_event_group);
 }
 
 void write_settings_to_nvs() {
@@ -192,6 +287,7 @@ void write_settings_to_nvs() {
     ESP_LOGI(TAG, "Saving to NVS %s", NVS_NAMESPACE);
     nvs_handle my_handle;
     ESP_ERROR_CHECK(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &my_handle));
+    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "esp32_mode", DB_WIFI_MODE));
     ESP_ERROR_CHECK(nvs_set_str(my_handle, "ssid", (char *) DEFAULT_SSID));
     ESP_ERROR_CHECK(nvs_set_str(my_handle, "wifi_pass", (char *) DEFAULT_PWD));
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "wifi_chan", DEFAULT_CHANNEL));
@@ -219,6 +315,8 @@ void read_settings_nvs() {
     } else {
         ESP_LOGI(TAG, "Reading settings from NVS");
         size_t required_size = 0;
+        ESP_ERROR_CHECK(nvs_get_u8(my_handle, "esp32_mode", &DB_WIFI_MODE));
+
         ESP_ERROR_CHECK(nvs_get_str(my_handle, "ssid", NULL, &required_size));
         char *ssid = malloc(required_size);
         ESP_ERROR_CHECK(nvs_get_str(my_handle, "ssid", ssid, &required_size));
@@ -258,7 +356,11 @@ void app_main() {
     ESP_ERROR_CHECK(ret);
     read_settings_nvs();
     esp_log_level_set("*", ESP_LOG_INFO);
-    init_wifi();
+    if (DB_WIFI_MODE == 1)
+        init_wifi_apmode();
+    else
+        init_wifi_clientmode();
+
     start_mdns_service();
     netbiosns_init();
     netbiosns_set_name("dronebridge");

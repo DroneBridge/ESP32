@@ -2,6 +2,35 @@
 const ROOT_URL = window.location.href       // for production code
 let conn_status = 0;
 
+function change_ap_ip_visibility(){
+    var ap_ip_div = document.getElementById("ap_ip_div");
+    var ap_channel_div = document.getElementById("ap_channel_div");
+    if (document.getElementById("esp32_mode").value < 2) {
+        ap_ip_div.style.display = "block";
+        ap_channel_div.style.display = "block";
+    } else {
+        ap_ip_div.style.display = "none";
+        ap_channel_div.style.display = "none";
+    }
+}
+
+function change_msp_ltm_visibility(){
+    var msp_ltm_div = document.getElementById("msp_ltm_div");
+    var trans_pack_size_div = document.getElementById("trans_pack_size_div");
+    if (document.getElementById("telem_proto").value === "1") {
+        msp_ltm_div.style.display = "block";
+        trans_pack_size_div.style.display = "none";
+    } else {
+        msp_ltm_div.style.display = "none";
+        trans_pack_size_div.style.display = "block";
+    }
+}
+
+/**
+ * Convert a form into a JSON string
+ * @param form The HTML form to convert
+ * @returns {string} JSON formatted string
+ */
 function toJSONString(form) {
     let obj = {}
     let elements = form.querySelectorAll("input, select")
@@ -9,10 +38,9 @@ function toJSONString(form) {
         let element = elements[i]
         let name = element.name
         let value = element.value;
-        let parsed = parseInt(value)
-        if (!isNaN(parsed) && name.localeCompare("ap_ip")) {
+        if (!isNaN(Number(value))) {
             if (name) {
-                obj[name] = parsed
+                obj[name] = parseInt(value)
             }
         } else {
             if (name) {
@@ -23,6 +51,11 @@ function toJSONString(form) {
     return JSON.stringify(obj)
 }
 
+/**
+ * Request data from the ESP to display in the GUI
+ * @param api_path API path/request path
+ * @returns {Promise<any>}
+ */
 async function get_json(api_path) {
     let req_url = ROOT_URL + api_path;
 
@@ -45,6 +78,12 @@ async function get_json(api_path) {
     return await response.json();
 }
 
+/**
+ * Create a response with JSON data attached
+ * @param api_path API URL path
+ * @param json_data JSON body data to send
+ * @returns {Promise<any>}
+ */
 async function send_json(api_path, json_data) {
     let post_url = ROOT_URL + api_path;
     const response = await fetch(post_url, {
@@ -77,10 +116,15 @@ function get_system_info() {
 function update_conn_status() {
     if (conn_status)
         document.getElementById("web_conn_status").innerHTML = "<span class=\"dot_green\"></span> connected to ESP32"
-    else
+    else {
         document.getElementById("web_conn_status").innerHTML = "<span class=\"dot_red\"></span> disconnected from ESP32"
+        document.getElementById("current_client_ip").innerHTML = ""
+    }
 }
 
+/**
+ * Get connection status information and display it in the GUI
+ */
 function get_stats() {
     get_json("api/system/stats").then(json_data => {
         conn_status = 1
@@ -104,12 +148,17 @@ function get_stats() {
         } else if (!isNaN(udp_clients)) {
             document.getElementById("udp_connected").innerHTML = udp_clients + " client"
         }
+
+        document.getElementById("current_client_ip").innerHTML = "IP Address: " + json_data["current_client_ip"]
     }).catch(error => {
         conn_status = 0
         error.message;
     });
 }
 
+/**
+ * Get settings from ESP and display them in the GUI. JSON objects have to match the element ids
+ */
 function get_settings() {
     get_json("api/settings/request").then(json_data => {
         console.log("Received settings: " + json_data)
@@ -124,6 +173,8 @@ function get_settings() {
         conn_status = 0
         error.message;
     });
+    change_ap_ip_visibility();
+    change_msp_ltm_visibility();
 }
 
 function show_toast(msg) {

@@ -96,6 +96,10 @@
                 </div>
             </div>
             <div class="row">
+                <div style="font-size: 1.3rem" id="current_client_ip" class="six columns">
+                </div>
+            </div>
+            <div class="row">
                 <div class="four columns">
                     <label for="read_bytes">UART received bytes</label>
                     <div id="read_bytes">-</div>
@@ -113,6 +117,15 @@
         <div>
             <h2>Settings</h2>
             <div class="row">
+                <div class="twelve columns">
+                    <label for="esp32_mode">ESP32 Mode (requires save & reboot)</label>
+                    <select id="esp32_mode" name="esp32_mode" form="settings_form" onchange="change_ap_ip_visibility()">
+                        <option value="1">Access Point Mode</option>
+                        <option value="2">WiFi Client Mode</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row">
                 <div class="six columns">
                     <label for="wifi_ssid">Wifi SSID</label>
                     <input type="text" name="wifi_ssid" value="" id="wifi_ssid">
@@ -123,7 +136,7 @@
                 </div>
             </div>
             <div class="row">
-                <div class="twelve columns">
+                <div id="ap_channel_div" class="twelve columns">
                     <label for="ap_channel">Wifi Channel</label>
                     <input type="text" name="ap_channel" value="" id="ap_channel">
                 </div>
@@ -141,7 +154,7 @@
             <div class="row">
                 <div class="six columns">
                     <label for="telem_proto">UART serial protocol</label>
-                    <select id="telem_proto" name="telem_proto" form="settings_form">
+                    <select id="telem_proto" name="telem_proto" form="settings_form" onchange="change_msp_ltm_visibility()">
                         <option value="1">MSP/LTM</option>
                         <option value="4">Transparent/MAVLink</option>
                     </select>
@@ -153,17 +166,23 @@
                         <option value="1500000">1500000</option>
                         <option value="1000000">1000000</option>
                         <option value="500000">500000</option>
+                        <option value="921600">921600</option>
+                        <option value="576000">576000</option>
+                        <option value="460800">460800</option>
+                        <option value="230400">230400</option>
                         <option value="115200">115200</option>
+                        <option value="76800">76800</option>
                         <option value="57600">57600</option>
                         <option value="38400">38400</option>
                         <option value="19200">19200</option>
                         <option value="9600">9600</option>
                         <option value="4800">4800</option>
                         <option value="2400">2400</option>
+                        <option value="1200">1200</option>
                     </select>
                 </div>
             </div>
-            <div class="row">
+            <div id="msp_ltm_div" class="row">
                 <div class="six columns">
                     <label for="msp_ltm_port">MSP & LTM to same port</label>
                     <select id="msp_ltm_port" name="msp_ltm_port" form="settings_form">
@@ -182,7 +201,7 @@
                     </select>
                 </div>
             </div>
-            <div class="row">
+            <div id="trans_pack_size_div" class="row">
                 <div class="twelve columns">
                     <label for="trans_pack_size">Transparent packet size</label>
                     <select id="trans_pack_size" name="trans_pack_size" form="settings_form">
@@ -194,7 +213,7 @@
                     </select>
                 </div>
             </div>
-            <div class="row">
+            <div id="ap_ip_div" class="row">
                 <div class="six columns">
                     <label for="ap_ip">Gateway IP address</label>
                     <input type="text" name="ap_ip" value="" id="ap_ip">
@@ -212,7 +231,7 @@
     </div>
 </div>
 <div class="container">
-    <div id="about" style="margin-top: 1rem" class="row">DroneBridge for ESP32 - waiting for response from the ESP32
+    <div id="about" style="margin-top: 1rem" class="row">DroneBridge for ESP32 - waiting for a response from the ESP32
     </div>
     <div style="margin-bottom: 2rem" class="row">&copy; Wolfgang Christl 2018 - Apache 2.0 License</div>
 </div>
@@ -220,6 +239,8 @@
     // get settings once upon page load
     get_system_info()
     get_settings()
+    change_msp_ltm_visibility()
+    change_ap_ip_visibility()
     // get stats every half a second
     setInterval(get_stats, 500)
     setInterval(update_conn_status, 500)

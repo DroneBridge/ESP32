@@ -124,7 +124,11 @@ static esp_err_t rest_common_get_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-/* Simple handler for settings change */
+/**
+ * Process incoming settings change and reply with HTTP success message
+ * @param req
+ * @return ESP error code
+ */
 static esp_err_t settings_change_post_handler(httpd_req_t *req) {
     int total_len = req->content_len;
     int cur_len = 0;
@@ -147,7 +151,11 @@ static esp_err_t settings_change_post_handler(httpd_req_t *req) {
     buf[total_len] = '\0';
 
     cJSON *root = cJSON_Parse(buf);
-    cJSON *json = cJSON_GetObjectItem(root, "wifi_ssid");
+
+    cJSON *json = cJSON_GetObjectItem(root, "esp32_mode");
+    if (json) DB_WIFI_MODE = json->valueint;
+
+    json = cJSON_GetObjectItem(root, "wifi_ssid");
     if (json && strlen(json->valuestring) < 32 && strlen(json->valuestring) > 0)
         strncpy((char *) DEFAULT_SSID, json->valuestring, sizeof(DEFAULT_SSID) - 1);
     else if (json)
@@ -233,6 +241,7 @@ static esp_err_t system_stats_get_handler(httpd_req_t *req) {
     cJSON_AddNumberToObject(root, "read_bytes", uart_byte_count);
     cJSON_AddNumberToObject(root, "tcp_connected", num_connected_tcp_clients);
     cJSON_AddNumberToObject(root, "udp_connected", num_connected_udp_clients);
+    cJSON_AddStringToObject(root, "current_client_ip", CURRENT_CLIENT_IP);
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
     free((void *) sys_info);
@@ -252,10 +261,15 @@ static esp_err_t system_reboot_get_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-/* Simple handler for getting temperature data */
+/**
+ * Respond with all internally known settings
+ * @param req
+ * @return ESP error code
+ */
 static esp_err_t settings_data_get_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "application/json");
     cJSON *root = cJSON_CreateObject();
+    cJSON_AddNumberToObject(root, "esp32_mode", DB_WIFI_MODE);
     cJSON_AddStringToObject(root, "wifi_ssid", (char *) DEFAULT_SSID);
     cJSON_AddStringToObject(root, "wifi_pass", (char *) DEFAULT_PWD);
     cJSON_AddNumberToObject(root, "ap_channel", DEFAULT_CHANNEL);
@@ -323,7 +337,6 @@ esp_err_t start_rest_server(const char *base_path) {
     };
     httpd_register_uri_handler(server, &temperature_data_get_uri);
 
-    /* URI handler for light brightness control */
     httpd_uri_t settings_change_post_uri = {
             .uri = "/api/settings/change",
             .method = HTTP_POST,

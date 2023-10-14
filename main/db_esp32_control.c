@@ -221,19 +221,24 @@ void handle_tcp_master(const int tcp_master_socket, int tcp_clients[]) {
 }
 
 /**
- * Add a new client to the list of known UDP clients. Check if client is already known
+ * Add a new client to the list of known UDP clients. Checks if client is already known.
  *
  * @param connections Structure containing all UDP connection information
  * @param new_client_addr Address of new client
+ * @param is_brdcst True if the client is to be added because he is connected to the local access point. He will receive
+ * telemetry even if he did not request it (broadcast)
  */
 void
 add_udp_to_known_clients(struct db_udp_connection_t *connections, struct sockaddr_in new_client_addr, bool is_brdcst) {
     for (int i = 0; i < MAX_UDP_CLIENTS; i++) {
+        // Check if client is already listed
         if (connections->udp_clients[i].sin_port == new_client_addr.sin_port && new_client_addr.sin_family == PF_INET &&
             ((struct sockaddr_in *) &connections->udp_clients[i])->sin_addr.s_addr ==
             ((struct sockaddr_in *) &new_client_addr)->sin_addr.s_addr) {
             return;
-        } else if (connections->udp_clients[i].sin_len == 0) {
+        } else if (connections->udp_clients[i].sin_len == 0) { // check if we found an empty spot in the list
+            // (must be the end of the list then - kind of shady check I know but list gets cleared via
+            // update_udp_broadcast first)
             connections->udp_clients[i] = new_client_addr;
             char addr_str[128];
             if (new_client_addr.sin_family == PF_INET) {
@@ -241,17 +246,19 @@ add_udp_to_known_clients(struct db_udp_connection_t *connections, struct sockadd
             }
             connections->is_broadcast[i] = is_brdcst;
             if (!is_brdcst) {
+                // Only console out the clients that are not broadcast clients
                 ESP_LOGI(TAG, "UDP: New client connected: %s:%i", addr_str, new_client_addr.sin_port);
             }
+            num_connected_udp_clients += 1;
             return;
         }
     }
 }
 
 /**
- * Get all connected clients to local AP and add to UDP connection list. List is updated every second
- *
- * @param pInt
+ * Get all connected clients to local AP and add to UDP connection list. These clients will receive telementry no
+ * matter if they requested. List is updated every second
+ * Only works in access point mode
  */
 void update_udp_broadcast(int64_t *last_update, struct db_udp_connection_t *connections, const wifi_mode_t *wifi_mode) {
     if (*wifi_mode == WIFI_MODE_AP && (esp_timer_get_time() - *last_update) >= 1000000) {
@@ -279,7 +286,6 @@ void update_udp_broadcast(int64_t *last_update, struct db_udp_connection_t *conn
             new_client_addr.sin_addr.s_addr = station.ip.addr;
             ESP_LOGD(TAG, "%i " IPSTR " " MACSTR "", netif_sta_list.num, IP2STR(&station.ip), MAC2STR(station.mac));
             if (station.ip.addr != 0) {  // DHCP bug. Assigns 0.0.0.0 to station when directly connected on startup
-                num_connected_udp_clients += 1;
                 add_udp_to_known_clients(connections, new_client_addr, true);
             }
         }
@@ -304,7 +310,7 @@ _Noreturn void control_module_tcp() {
         tcp_clients[i] = -1;
     }
     if (tcp_master_socket == ESP_FAIL || uart_socket == ESP_FAIL) {
-        ESP_LOGE(TAG, "Can not start control module");
+        ESP_LOGE(TAG, "Can not start control module: tcp socket: %i UART socket: %i", tcp_master_socket, uart_socket);
     }
     fcntl(tcp_master_socket, F_SETFL, O_NONBLOCK);
     uint read_transparent = 0;
@@ -343,7 +349,8 @@ _Noreturn void control_module_tcp() {
                 }
             }
         }
-        // handle incoming UDP data
+        // handle incoming UDP data - Read UDP and forward to flight controller
+        // all devices that send us UDP data will be added to the list of MAVLink UDP receivers
         ssize_t recv_length = recvfrom(udp_conn.udp_socket, udp_buffer, UDP_BUF_SIZE, 0,
                                        (struct sockaddr *) &udp_source_addr, &udp_socklen);
         if (recv_length > 0) {
