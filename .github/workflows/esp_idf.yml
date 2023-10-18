@@ -12,7 +12,8 @@ jobs:
     - name: ESP-IDF v4.4 build esp32
       uses: espressif/esp-idf-ci-action@v1.1.0
       with:
-        submodules: 'recursive'
+        # submodules: 'recursive'
         esp_idf_version: v4.4
         target: esp32
         command: idf.py build
+        path: '/'
