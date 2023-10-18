@@ -1,0 +1,18 @@
+name: ESP-IDF build
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build_esp32_v4_4:
+    runs-on: ubuntu-latest
+    steps:
+    - name: ESP-IDF v4.4 build esp32
+      uses: espressif/esp-idf-ci-action@v1.1.0
+      with:
+        submodules: 'recursive'
+        esp_idf_version: v4.4
+        target: esp32
+        command: idf.py build
