@@ -20,7 +20,7 @@ DroneBridge for ESP32 is a telemetry/low data rate only solution. There is no su
 -   Easy to set up: Power connection + UART connection to flight controller
 -   Fully configurable through easy to use web interface
 -   Parsing of LTM & MSPv2 for more reliable connection and less packet loss
--   Fully transparent telemetry downlink option for continuous streams like MAVLink or and other protocol
+-   Fully transparent telemetry downlink option for continuous streams like MAVLink or any other protocol
 -   Reliable, low latency, light weight
 -   Upload mission etc.
 
