@@ -18,3 +18,18 @@ jobs:
       with:
         esp_idf_version: v4.4
         target: esp32
+    - name: ESP-IDF v4.4 build esp32s2
+      uses: espressif/esp-idf-ci-action@v1
+      with:
+        esp_idf_version: v4.4
+        target: esp32s2
+    - name: ESP-IDF v4.4 build esp32c3
+      uses: espressif/esp-idf-ci-action@v1
+      with:
+        esp_idf_version: v4.4
+        target: esp32c3
+    - name: ESP-IDF v4.4 build esp32s3
+      uses: espressif/esp-idf-ci-action@v1
+      with:
+        esp_idf_version: v4.4
+        target: esp32s3
