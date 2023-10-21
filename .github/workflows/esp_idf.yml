@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: ESP-IDF v4.4 build esp32
-      uses: espressif/esp-idf-ci-action@v1.1.0
+      uses: espressif/esp-idf-ci-action@v1
       with:
         # submodules: 'recursive'
         esp_idf_version: v4.4
