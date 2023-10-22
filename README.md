@@ -31,6 +31,14 @@ DroneBridge for ESP32 is a telemetry/low data rate only solution. There is no su
 Blackbox concept. UDP & TCP connections possible. Automatic UDP uni-cast of messages to port 14550 to all 
 connected devices/stations. Allows additional clients to register for UDP. Client must send a packet with length > 0 to UDP port of ESP32.
 
+## Download or Compile
+
+Ready to use binaries for ESP32 via [GitHub releases](https://github.com/DroneBridge/ESP32/releases).  
+Or compile for ESP32S2 & ESP32S3 using esp-idf 4.4:
+-   ESP32   ``idf.py set-target esp32 build``
+-   ESP32S2 ``idf.py set-target esp32s2 build``
+-   ESP32S3 ``idf.py set-target esp32s3 build``
+
 ## Hardware
 
 All ESP32 development boards will work. No additional PSRAM required. You will need a USB to serial adapter if for flashing the firmware, if your ESP32 board does not come with one. Follow the instructions of the board manufacturer when it comes to wiring the power supply lines. Some modules do not like an external 5V power input connected in addition to an USB at the same time.
