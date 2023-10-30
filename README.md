@@ -184,8 +184,8 @@ to
 http://dronebridge.local/api/settings/change
 ```
 
- ### Testing
- To test the frontend without the ESP32 run 
+ ### Testing the Frontend
+ To test without the ESP32 run 
 
  ```sh
  npm install -g json-server
