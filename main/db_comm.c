@@ -112,7 +112,7 @@ int gen_db_comm_ping_resp(uint8_t *message_buffer, int id) {
  * @param error_message The error message
  * @return Length of response
  */
-int gen_db_comm_err_resp(uint8_t *message_buffer, int id, char error_message[MAX_ERR_MSG_LENGTH]) {
+int gen_db_comm_err_resp(uint8_t *message_buffer, int id, char *error_message) {
     cJSON *root;
     root = cJSON_CreateObject();
     cJSON_AddNumberToObject(root, DB_COMM_KEY_DEST, DB_COMM_DST_GCS);

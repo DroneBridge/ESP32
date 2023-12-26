@@ -24,7 +24,7 @@
 #include <esp_vfs_dev.h>
 #include <esp_wifi.h>
 #include <lwip/inet.h>
-#include <esp_netif_sta_list.h>
+#include <esp_timer.h>
 #include "esp_log.h"
 #include "lwip/sockets.h"
 #include "driver/uart.h"
@@ -32,20 +32,11 @@
 #include "msp_ltm_serial.h"
 #include "db_protocol.h"
 #include "tcp_server.h"
+#include "db_esp32_control.h"
 
 #define UART_NUM UART_NUM_1
 
 #define TAG "DB_CONTROL"
-#define TRANS_RD_BYTES_NUM  8   // amount of bytes read form serial port at once when transparent is selected
-#define UDP_BUF_SIZE    2048
-#define UART_BUF_SIZE   (1024)
-#define MAX_UDP_CLIENTS 8
-
-struct db_udp_connection_t {
-    int udp_socket;
-    struct sockaddr_in udp_clients[MAX_UDP_CLIENTS];
-    bool is_broadcast[MAX_UDP_CLIENTS];  // sockaddr_in at index is added because of station that connected
-};
 
 uint16_t app_port_proxy = APP_PORT_PROXY;
 uint8_t ltm_frame_buffer[MAX_LTM_FRAMES_IN_BUFFER * LTM_MAX_FRAME_SIZE];
@@ -116,12 +107,12 @@ int open_udp_socket() {
 void send_to_all_clients(int tcp_clients[], struct db_udp_connection_t *udp_conn, uint8_t data[], uint data_length) {
     send_to_all_tcp_clients(tcp_clients, data, data_length);
     for (int i = 0; i < MAX_UDP_CLIENTS; i++) {  // send to all UDP clients
-        if (udp_conn->udp_clients[i].sin_len > 0) {
-            int sent = sendto(udp_conn->udp_socket, data, data_length, 0, (struct sockaddr *) &udp_conn->udp_clients[i],
-                              sizeof(udp_conn->udp_clients[i]));
+        if (udp_conn->db_udp_clients[i].udp_client.sin_len > 0) {
+            int sent = sendto(udp_conn->udp_socket, data, data_length, 0, (struct sockaddr *) &udp_conn->db_udp_clients[i].udp_client,
+                              sizeof(udp_conn->db_udp_clients[i].udp_client));
             if (sent != data_length) {
                 ESP_LOGE(TAG, "UDP - Error sending (%i/%i) because of %d", sent, data_length, errno);
-                udp_conn->udp_clients[i].sin_len = 0;
+                udp_conn->db_udp_clients[i].udp_client.sin_len = 0;
             }
         }
     }
@@ -143,7 +134,7 @@ void parse_msp_ltm(int tcp_clients[], struct db_udp_connection_t *udp_conn, uint
                    msp_ltm_port_t *db_msp_ltm_port) {
     uint8_t serial_bytes[TRANS_RD_BYTES_NUM];
     uint read;
-    if ((read = uart_read_bytes(UART_NUM, serial_bytes, TRANS_RD_BYTES_NUM, 200 / portTICK_RATE_MS)) > 0) {
+    if ((read = uart_read_bytes(UART_NUM, serial_bytes, TRANS_RD_BYTES_NUM, 200 / portTICK_PERIOD_MS)) > 0) {
         uart_byte_count += read;
         for (uint j = 0; j < read; j++) {
             (*serial_read_bytes)++;
@@ -183,7 +174,7 @@ void parse_transparent(int tcp_clients[], struct db_udp_connection_t *udp_conn, 
                        uint *serial_read_bytes) {
     uint8_t serial_bytes[TRANS_RD_BYTES_NUM];
     uint read;
-    if ((read = uart_read_bytes(UART_NUM, serial_bytes, TRANS_RD_BYTES_NUM, 200 / portTICK_RATE_MS)) > 0) {
+    if ((read = uart_read_bytes(UART_NUM, serial_bytes, TRANS_RD_BYTES_NUM, 200 / portTICK_PERIOD_MS)) > 0) {
         memcpy(&serial_buffer[*serial_read_bytes], serial_bytes, read);
         uart_byte_count += read;
         *serial_read_bytes += read;
@@ -197,12 +188,12 @@ void parse_transparent(int tcp_clients[], struct db_udp_connection_t *udp_conn, 
 /**
  * Check for incoming connections on TCP server
  *
- * @param tcp_master_socket
- * @param tcp_clients
+ * @param tcp_master_socket Main open TCP socket to accept TCP connections/clients
+ * @param tcp_clients List of active TCP client connections (socket IDs)
  */
 void handle_tcp_master(const int tcp_master_socket, int tcp_clients[]) {
     struct sockaddr_in6 source_addr; // Large enough for both IPv4 or IPv6
-    uint addr_len = sizeof(source_addr);
+    uint32_t addr_len = sizeof(source_addr);
     int new_tcp_client = accept(tcp_master_socket, (struct sockaddr *) &source_addr, &addr_len);
     if (new_tcp_client > 0) {
         for (int i = 0; i < CONFIG_LWIP_MAX_ACTIVE_TCP; i++) {
@@ -221,34 +212,31 @@ void handle_tcp_master(const int tcp_master_socket, int tcp_clients[]) {
 }
 
 /**
- * Add a new client to the list of known UDP clients. Checks if client is already known.
+ * Add a new UDP client to the list of known UDP clients. Checks if client is already known. Added client will receive
+ * UDP packets with serial info and will be able to send UDP packets to the serial interface of the ESP32.
+ * PORT, MAC & IP must be set inside new_db_udp_client
  *
  * @param connections Structure containing all UDP connection information
- * @param new_client_addr Address of new client
- * @param is_brdcst True if the client is to be added because he is connected to the local access point. He will receive
- * telemetry even if he did not request it (broadcast)
+ * @param new_db_udp_client New client to add to the UDP list. PORT, MAC & IP must be
  */
-void
-add_udp_to_known_clients(struct db_udp_connection_t *connections, struct sockaddr_in new_client_addr, bool is_brdcst) {
+void add_udp_to_known_clients(struct db_udp_connection_t *connections, struct db_udp_client_t new_db_udp_client) {
+    // Check if client is already listed based on PORT and MAC
     for (int i = 0; i < MAX_UDP_CLIENTS; i++) {
-        // Check if client is already listed
-        if (connections->udp_clients[i].sin_port == new_client_addr.sin_port && new_client_addr.sin_family == PF_INET &&
-            ((struct sockaddr_in *) &connections->udp_clients[i])->sin_addr.s_addr ==
-            ((struct sockaddr_in *) &new_client_addr)->sin_addr.s_addr) {
-            return;
-        } else if (connections->udp_clients[i].sin_len == 0) { // check if we found an empty spot in the list
-            // (must be the end of the list then - kind of shady check I know but list gets cleared via
-            // update_udp_broadcast first)
-            connections->udp_clients[i] = new_client_addr;
+        if (connections->db_udp_clients[i].udp_client.sin_port == new_db_udp_client.udp_client.sin_port &&
+        memcmp(connections->db_udp_clients[i].mac, new_db_udp_client.mac, sizeof(connections->db_udp_clients[i].mac)) == 0) {
+            return; // client existing - do not add
+        }
+    }
+    // Add new client to a free spot in the list
+    for (int i = 0; i < MAX_UDP_CLIENTS; i++) {
+        if (connections->db_udp_clients[i].udp_client.sin_len == 0) { // check if we found an empty spot in the list
+            connections->db_udp_clients[i].udp_client = new_db_udp_client.udp_client;
             char addr_str[128];
-            if (new_client_addr.sin_family == PF_INET) {
-                inet_ntoa_r(((struct sockaddr_in *) &new_client_addr)->sin_addr.s_addr, addr_str, sizeof(addr_str) - 1);
+            if (new_db_udp_client.udp_client.sin_family == PF_INET) {
+                inet_ntoa_r(((struct sockaddr_in *) &new_db_udp_client.udp_client)->sin_addr.s_addr, addr_str,
+                            sizeof(addr_str) - 1);
             }
-            connections->is_broadcast[i] = is_brdcst;
-            if (!is_brdcst) {
-                // Only console out the clients that are not broadcast clients
-                ESP_LOGI(TAG, "UDP: New client connected: %s:%i", addr_str, new_client_addr.sin_port);
-            }
+            ESP_LOGI(TAG, "UDP: New client added to list: %s:%d", addr_str, ntohs(new_db_udp_client.udp_client.sin_port));
             num_connected_udp_clients += 1;
             return;
         }
@@ -256,54 +244,42 @@ add_udp_to_known_clients(struct db_udp_connection_t *connections, struct sockadd
 }
 
 /**
- * Get all connected clients to local AP and add to UDP connection list. These clients will receive telementry no
- * matter if they requested. List is updated every second
- * Only works in access point mode
+ * Remove a client from the sending list. Client will no longer receive UDP packets. Port & MAC address must be given.
+ *
+ * @param connections The list of open UDP connections
+ * @param db_udp_client The UDP client to remove based on its PORT & MAC address
  */
-void update_udp_broadcast(int64_t *last_update, struct db_udp_connection_t *connections, const wifi_mode_t *wifi_mode) {
-    if (*wifi_mode == WIFI_MODE_AP && (esp_timer_get_time() - *last_update) >= 1000000) {
-        *last_update = esp_timer_get_time();
-        for (int i = 0; i < MAX_UDP_CLIENTS; i++) {
-            if (connections->is_broadcast[i]) {
-                memset(&connections->udp_clients[i], 0, sizeof(connections->udp_clients[i]));
-            }
-        }
-        // add based on connected stations
-        wifi_sta_list_t sta_list;
-        esp_netif_sta_list_t netif_sta_list;
-        memset(&sta_list, 0, sizeof(sta_list));
-        memset(&netif_sta_list, 0, sizeof(esp_netif_sta_list_t));
-        ESP_ERROR_CHECK(esp_wifi_ap_get_sta_list(&sta_list));
-        ESP_ERROR_CHECK(esp_netif_get_sta_list(&sta_list, &netif_sta_list));
-        num_connected_udp_clients = 0;
-        for (int i = 0; i < netif_sta_list.num; i++) {
-            esp_netif_sta_info_t station = netif_sta_list.sta[i];
-
-            struct sockaddr_in new_client_addr;
-            new_client_addr.sin_family = PF_INET;
-            new_client_addr.sin_port = htons(APP_PORT_PROXY_UDP);
-            new_client_addr.sin_len = 16;
-            new_client_addr.sin_addr.s_addr = station.ip.addr;
-            ESP_LOGD(TAG, "%i " IPSTR " " MACSTR "", netif_sta_list.num, IP2STR(&station.ip), MAC2STR(station.mac));
-            if (station.ip.addr != 0) {  // DHCP bug. Assigns 0.0.0.0 to station when directly connected on startup
-                add_udp_to_known_clients(connections, new_client_addr, true);
-            }
+void remove_udp_from_known_clients(struct db_udp_connection_t *connections, struct db_udp_client_t db_udp_client) {
+    for (int i = 0; i < MAX_UDP_CLIENTS; i++) {
+        if (connections->db_udp_clients[i].udp_client.sin_port == db_udp_client.udp_client.sin_port &&
+            memcmp(connections->db_udp_clients[i].mac, db_udp_client.mac, sizeof(connections->db_udp_clients[i].mac)) == 0) {
+            connections->db_udp_clients[i] = (const struct db_udp_client_t){ 0 };
+            num_connected_udp_clients -= 1;
+            return; // client existing
         }
     }
 }
 
-_Noreturn void control_module_tcp() {
-    int uart_socket = open_serial_socket();
+/**
+ * Thread that manages all incoming and outgoing TCP, UDP and serial (UART) connections
+ */
+void control_module_udp_tcp() {
+    // only open serial socket/UART if PINs are not matching - matching PIN nums mean they still need to be defined by
+    // the user no pre-defined pins as of this release since ESP32 boards have wildly different pin configurations
+    int uart_socket = ESP_FAIL;
+    if (DB_UART_PIN_RX != DB_UART_PIN_TX) {
+        uart_socket = open_serial_socket();
+    } else {
+        // do no long continue setting up the system and kill task
+        vTaskDelete(NULL);
+    }
     int tcp_master_socket = open_tcp_server(app_port_proxy);
 
-    struct db_udp_connection_t udp_conn;
     udp_conn.udp_socket = open_udp_socket();
     fcntl(udp_conn.udp_socket, F_SETFL, O_NONBLOCK);
     char udp_buffer[UDP_BUF_SIZE];
-    struct sockaddr_in udp_source_addr;
-    socklen_t udp_socklen = sizeof(udp_source_addr);
-    for (int i = 0; i < MAX_UDP_CLIENTS; i++)
-        memset(&(udp_conn.udp_clients[i]), 0, sizeof(struct sockaddr_in));
+    struct db_udp_client_t new_db_udp_client = {0};
+    socklen_t udp_socklen = sizeof(new_db_udp_client.udp_client);
 
     int tcp_clients[CONFIG_LWIP_MAX_ACTIVE_TCP];
     for (int i = 0; i < CONFIG_LWIP_MAX_ACTIVE_TCP; i++) {
@@ -321,7 +297,6 @@ _Noreturn void control_module_tcp() {
     uint8_t serial_buffer[TRANSPARENT_BUF_SIZE];
     msp_ltm_port_t db_msp_ltm_port;
 
-    int64_t last_udp_brdc_update = esp_timer_get_time();  // time since boot for UDP broadcast update
     wifi_mode_t wifi_mode;
     esp_wifi_get_mode(&wifi_mode);
 
@@ -352,13 +327,16 @@ _Noreturn void control_module_tcp() {
         // handle incoming UDP data - Read UDP and forward to flight controller
         // all devices that send us UDP data will be added to the list of MAVLink UDP receivers
         ssize_t recv_length = recvfrom(udp_conn.udp_socket, udp_buffer, UDP_BUF_SIZE, 0,
-                                       (struct sockaddr *) &udp_source_addr, &udp_socklen);
+                                       (struct sockaddr *) &new_db_udp_client.udp_client, &udp_socklen);
         if (recv_length > 0) {
             ESP_LOGD(TAG, "UDP: Received %i bytes", recv_length);
             write_to_uart(udp_buffer, recv_length);
-            add_udp_to_known_clients(&udp_conn, udp_source_addr, false);
+            // Allows to register new app on different port
+            // TODO: Determine MAC address of UDP client otherwise it cannot be removed from the list later on
+            add_udp_to_known_clients(&udp_conn, new_db_udp_client);
+
         }
-        update_udp_broadcast(&last_udp_brdc_update, &udp_conn, &wifi_mode);
+//        update_udp_broadcast(&last_udp_brdc_update, &udp_conn, &wifi_mode);
         switch (SERIAL_PROTOCOL) {
             case 1:
             case 2:
@@ -382,5 +360,5 @@ _Noreturn void control_module_tcp() {
  * MAVLink is passed through (fully transparent). Can be used with any protocol.
  */
 void control_module() {
-    xTaskCreate(&control_module_tcp, "control_tcp", 40960, NULL, 5, NULL);
+    xTaskCreate(&control_module_udp_tcp, "control_tcp", 40960, NULL, 5, NULL);
 }

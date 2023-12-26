@@ -21,6 +21,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <lwip/sockets.h>
+#include <esp_chip_info.h>
 #include "esp_http_server.h"
 #include "esp_system.h"
 #include "esp_log.h"

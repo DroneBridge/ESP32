@@ -1,0 +1,6 @@
+dependencies:
+  idf:
+    version: '>=5.0'
+description: mDNS
+url: https://github.com/espressif/esp-protocols/tree/master/components/mdns
+version: 1.2.2

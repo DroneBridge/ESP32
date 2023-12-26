@@ -138,8 +138,9 @@ Most options require a restart/reset of ESP32 module
  You will need the Espressif SDK: esp-idf + toolchain. Check out their website for more info and on how to set it up.
  The code is written in pure C using the esp-idf (no arduino libs).
 
- **This project supports the v4.3 & v4.4 of ESP-IDF**
+ **This project supports the v5.1.2 of ESP-IDF**
 
+Added mDNS via `idf.py add-dependency "espressif/mdns^1.2.2"`
  Compile and flash by running: `idf.py build`, `idf.py flash`
 
  ### API
@@ -191,4 +192,4 @@ http://dronebridge.local/api/settings/change
  npm install -g json-server
  json-server db.json --routes routes.json
  ```
-Set `const ROOT_URL = "http://localhost:3000/"` inside `frontend/db_settings.js`
+Set `const ROOT_URL = "http://localhost:3000/"` inside `index.html` and the `<script>` block

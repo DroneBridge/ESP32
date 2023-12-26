@@ -71,7 +71,7 @@ void communication_module_server(void *parameters) {
         vTaskDelay(10 / portTICK_PERIOD_MS);
         memset(tcp_comm_buffer, 0, TCP_COMM_BUF_SIZE);
         struct sockaddr_in6 source_addr; // Large enough for both IPv4 or IPv6
-        uint addr_len = sizeof(source_addr);
+        uint32_t addr_len = sizeof(source_addr);
         int new_tcp_client = accept(tcp_master_socket, (struct sockaddr *) &source_addr, &addr_len);
         if (new_tcp_client < 0) {
             ESP_LOGE(TAG, "Unable to accept connection: %s", esp_err_to_name(errno));

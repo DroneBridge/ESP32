@@ -20,12 +20,12 @@
 #include <stdio.h>
 #include <nvs_flash.h>
 #include <esp_wifi_types.h>
-#include <mdns.h>
 #include <string.h>
 #include <driver/gpio.h>
 #include <lwip/apps/netbiosns.h>
 
 #include "freertos/event_groups.h"
+#include "esp_mac.h"
 #include "esp_wifi.h"
 #include "esp_wifi_types.h"
 #include "esp_log.h"
@@ -38,9 +38,9 @@
 #include "esp_spiffs.h"
 #include "http_server.h"
 #include "main.h"
+#include "mdns.h"
 
 #define NVS_NAMESPACE "settings"
-// #define USE_ALT_UART_CONFIG // for boards that have flash connected to GPIO 17/16 - will crash otherwise
 
 static const char *TAG = "DB_ESP32";
 
@@ -51,17 +51,17 @@ char DEFAULT_AP_IP[32] = "192.168.2.1";
 char CURRENT_CLIENT_IP[32] = "192.168.2.1";
 uint8_t DEFAULT_CHANNEL = 6;
 uint8_t SERIAL_PROTOCOL = 4;  // 1=MSP, 4=MAVLink/transparent
-# ifdef USE_ALT_UART_CONFIG
-uint8_t DB_UART_PIN_TX = GPIO_NUM_33;
-uint8_t DB_UART_PIN_RX = GPIO_NUM_32;
-# else
-uint8_t DB_UART_PIN_TX = GPIO_NUM_17;
-uint8_t DB_UART_PIN_RX = GPIO_NUM_16;
-#endif
-int DB_UART_BAUD_RATE = 115200;
+
+// initially set both pins to 0 to allow the start of the system on all boards. User has to set the correct pins
+uint8_t DB_UART_PIN_TX = GPIO_NUM_0;
+uint8_t DB_UART_PIN_RX = GPIO_NUM_0;
+
+int32_t DB_UART_BAUD_RATE = 115200;
 uint16_t TRANSPARENT_BUF_SIZE = 64;
 uint8_t LTM_FRAME_NUM_BUFFER = 1;
 uint8_t MSP_LTM_SAMEPORT = 0;
+
+struct db_udp_connection_t udp_conn = {};
 
 // Wifi client mode vars
 int WIFI_ESP_MAXIMUM_RETRY = 100;
@@ -71,16 +71,31 @@ static EventGroupHandle_t s_wifi_event_group;
 #define WIFI_FAIL_BIT      BIT1
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
+    // Wifi access point mode events
     if (event_id == WIFI_EVENT_AP_STACONNECTED) {
         wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *) event_data;
         ESP_LOGI(TAG, "Client connected - station:"MACSTR", AID=%d", MAC2STR(event->mac), event->aid);
     } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
         wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *) event_data;
         ESP_LOGI(TAG, "Client disconnected - station:"MACSTR", AID=%d", MAC2STR(event->mac), event->aid);
+        struct db_udp_client_t db_udp_client;
+        memcpy(db_udp_client.mac, event->mac, sizeof(db_udp_client.mac));
+        remove_udp_from_known_clients(&udp_conn, db_udp_client);
     } else if (event_id == WIFI_EVENT_AP_START) {
         ESP_LOGI(TAG, "AP started!");
     } else if (event_id == WIFI_EVENT_AP_STOP) {
         ESP_LOGI(TAG, "AP stopped!");
+    } else if(event_base == IP_EVENT && event_id == IP_EVENT_AP_STAIPASSIGNED){
+        ip_event_ap_staipassigned_t* event = (ip_event_ap_staipassigned_t*) event_data;
+        ESP_LOGI(TAG, "New station IP:" IPSTR, IP2STR(&event->ip));
+        ESP_LOGI(TAG, "MAC: " MACSTR, MAC2STR(event->mac));
+        struct db_udp_client_t db_udp_client;
+        db_udp_client.udp_client.sin_family = PF_INET;
+        db_udp_client.udp_client.sin_port = htons(APP_PORT_PROXY_UDP);
+        db_udp_client.udp_client.sin_len = 16;
+        db_udp_client.udp_client.sin_addr.s_addr = event->ip.addr;
+        memcpy(db_udp_client.mac, event->mac, sizeof(db_udp_client.mac));
+        add_udp_to_known_clients(&udp_conn, db_udp_client);
     }
     // Wifi client mode events
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
@@ -182,6 +197,13 @@ void init_wifi_apmode() {
                                                         NULL,
                                                         NULL));
 
+    esp_event_handler_instance_t ap_staipassigned_ip;
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
+                                                        IP_EVENT_AP_STAIPASSIGNED,
+                                                        &wifi_event_handler,
+                                                        NULL,
+                                                        &ap_staipassigned_ip));
+
     wifi_config_t wifi_config = {
             .ap = {
                     .ssid = "DroneBridge_ESP32_Init",
@@ -280,7 +302,7 @@ void init_wifi_clientmode() {
 
 void write_settings_to_nvs() {
     ESP_LOGI(TAG,
-             "Trying to save: ssid %s\nwifi_pass %s\nwifi_chan %i\nbaud %i\ngpio_tx %i\ngpio_rx %i\nproto %i\n"
+             "Trying to save: ssid %s\nwifi_pass %s\nwifi_chan %i\nbaud %liu\ngpio_tx %i\ngpio_rx %i\nproto %i\n"
              "trans_pack_size %i\nltm_per_packet %i\nmsp_ltm %i\nap_ip %s",
              DEFAULT_SSID, DEFAULT_PWD, DEFAULT_CHANNEL, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
              SERIAL_PROTOCOL, TRANSPARENT_BUF_SIZE, LTM_FRAME_NUM_BUFFER, MSP_LTM_SAMEPORT, DEFAULT_AP_IP);
@@ -366,7 +388,6 @@ void app_main() {
     netbiosns_set_name("dronebridge");
 
     ESP_ERROR_CHECK(init_fs());
-
     control_module();
     ESP_ERROR_CHECK(start_rest_server(CONFIG_WEB_MOUNT_POINT));
     communication_module();
