@@ -70,6 +70,15 @@ static EventGroupHandle_t s_wifi_event_group;
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT      BIT1
 
+/**
+ * Devices get added based on IP (check if IP & PORT are already listed) and removed from the UDP broadcast connection
+ * based on MAC address
+ *
+ * @param arg
+ * @param event_base
+ * @param event_id
+ * @param event_data
+ */
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
     // Wifi access point mode events
     if (event_id == WIFI_EVENT_AP_STACONNECTED) {
@@ -215,8 +224,8 @@ void init_wifi_apmode() {
                     .max_connection = 10
             },
     };
-    xthal_memcpy(wifi_config.ap.ssid, DEFAULT_SSID, 32);
-    xthal_memcpy(wifi_config.ap.password, DEFAULT_PWD, 64);
+    strncpy((char *)wifi_config.ap.ssid, (char *)DEFAULT_SSID, 32);
+    strncpy((char *)wifi_config.ap.password, (char *)DEFAULT_PWD, 64);
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
     ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B));
@@ -267,8 +276,8 @@ void init_wifi_clientmode() {
                     .password = "dronebridge"
             },
     };
-    xthal_memcpy(wifi_config.sta.ssid, DEFAULT_SSID, 32);
-    xthal_memcpy(wifi_config.sta.password, DEFAULT_PWD, 64);
+    strncpy((char *)wifi_config.sta.ssid, (char *)DEFAULT_SSID, 32);
+    strncpy((char *)wifi_config.sta.password, (char *)DEFAULT_PWD, 64);
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );

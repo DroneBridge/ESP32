@@ -212,18 +212,22 @@ void handle_tcp_master(const int tcp_master_socket, int tcp_clients[]) {
 }
 
 /**
- * Add a new UDP client to the list of known UDP clients. Checks if client is already known. Added client will receive
- * UDP packets with serial info and will be able to send UDP packets to the serial interface of the ESP32.
- * PORT, MAC & IP must be set inside new_db_udp_client
+ * Add a new UDP client to the list of known UDP clients. Checks if client is already known based on IP and port.
+ * Added client will receive UDP packets with serial info and will be able to send UDP packets to the serial interface
+ * of the ESP32.
+ * PORT, MAC & IP should be set inside new_db_udp_client. If MAC is not set then the device cannot be removed later on.
  *
  * @param connections Structure containing all UDP connection information
- * @param new_db_udp_client New client to add to the UDP list. PORT, MAC & IP must be
+ * @param new_db_udp_client New client to add to the UDP list. PORT, MAC & IP must be set. If MAC is not set then the
+ *                          device cannot be removed later on.
  */
 void add_udp_to_known_clients(struct db_udp_connection_t *connections, struct db_udp_client_t new_db_udp_client) {
-    // Check if client is already listed based on PORT and MAC
+    // Check if client is already listed based on PORT and IP
     for (int i = 0; i < MAX_UDP_CLIENTS; i++) {
-        if (connections->db_udp_clients[i].udp_client.sin_port == new_db_udp_client.udp_client.sin_port &&
-        memcmp(connections->db_udp_clients[i].mac, new_db_udp_client.mac, sizeof(connections->db_udp_clients[i].mac)) == 0) {
+        if ((connections->db_udp_clients[i].udp_client.sin_port == new_db_udp_client.udp_client.sin_port
+        && new_db_udp_client.udp_client.sin_family == PF_INET &&
+             ((struct sockaddr_in *) &connections->db_udp_clients[i])->sin_addr.s_addr ==
+             ((struct sockaddr_in *) &new_db_udp_client)->sin_addr.s_addr)) {
             return; // client existing - do not add
         }
     }
@@ -244,18 +248,18 @@ void add_udp_to_known_clients(struct db_udp_connection_t *connections, struct db
 }
 
 /**
- * Remove a client from the sending list. Client will no longer receive UDP packets. Port & MAC address must be given.
+ * Remove a client from the sending list. Client will no longer receive UDP packets. MAC address must be given.
+ * Usually called in AP-Mode when a station disconnects. In any other case we will not know since UDP is a connection-less
+ * protocol
  *
  * @param connections The list of open UDP connections
- * @param db_udp_client The UDP client to remove based on its PORT & MAC address
+ * @param db_udp_client The UDP client to remove based on its MAC address
  */
 void remove_udp_from_known_clients(struct db_udp_connection_t *connections, struct db_udp_client_t db_udp_client) {
     for (int i = 0; i < MAX_UDP_CLIENTS; i++) {
-        if (connections->db_udp_clients[i].udp_client.sin_port == db_udp_client.udp_client.sin_port &&
-            memcmp(connections->db_udp_clients[i].mac, db_udp_client.mac, sizeof(connections->db_udp_clients[i].mac)) == 0) {
+        if (memcmp(connections->db_udp_clients[i].mac, db_udp_client.mac, sizeof(connections->db_udp_clients[i].mac)) == 0) {
             connections->db_udp_clients[i] = (const struct db_udp_client_t){ 0 };
             num_connected_udp_clients -= 1;
-            return; // client existing
         }
     }
 }
@@ -331,8 +335,10 @@ void control_module_udp_tcp() {
         if (recv_length > 0) {
             ESP_LOGD(TAG, "UDP: Received %i bytes", recv_length);
             write_to_uart(udp_buffer, recv_length);
-            // Allows to register new app on different port
-            // TODO: Determine MAC address of UDP client otherwise it cannot be removed from the list later on
+            // Allows to register new app on different port. Used e.g. for UDP conn setup in sta-mode.
+            // Devices/Ports added this way cannot be removed in sta-mode since UDP is connectionless, and we cannot
+            // determine if the client is still existing. This will blow up the list connected devices.
+            // In AP-Mode the devices can be removed based on the IP/MAC address
             add_udp_to_known_clients(&udp_conn, new_db_udp_client);
 
         }

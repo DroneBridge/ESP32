@@ -38,7 +38,8 @@ function toJSONString(form) {
 		let element = elements[i]
 		let name = element.name
 		let value = element.value;
-		if (!isNaN(Number(value))) {
+		// parse numbers as numbers except for the SSID and the password fields
+		if (!isNaN(Number(value)) && (name.localeCompare("wifi_ssid") !== 0) && (name.localeCompare("wifi_pass") !== 0)) {
 			if (name) {
 				obj[name] = parseInt(value)
 			}
