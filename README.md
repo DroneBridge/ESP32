@@ -34,10 +34,11 @@ connected devices/stations. Allows additional clients to register for UDP. Clien
 ## Download or Compile
 
 Ready to use binaries for ESP32 via [GitHub releases](https://github.com/DroneBridge/ESP32/releases).  
-Or compile for ESP32S2 & ESP32S3 using esp-idf 4.4:
+Or compile for ESP32S2, ESP32S3 & ESP32C3 using esp-idf v5.1:
 -   ESP32   ``idf.py set-target esp32 build``
 -   ESP32S2 ``idf.py set-target esp32s2 build``
 -   ESP32S3 ``idf.py set-target esp32s3 build``
+-   ESP32C3 ``idf.py set-target esp32c3 build``
 
 ## Hardware
 
@@ -51,7 +52,7 @@ Examples for boards that will work:
 * [Adafruit HUZZAH32](https://www.adafruit.com/product/4172) (requires FTDI adapter for flashing firmware)
 
 DroneBridge for ESP32 is tested with an DOIT ESP32 development board.  
-**Other ESP boards like the ESP32-C3 etc. are very likely to work as well. I will be necessary to re-compile the code for the target.**
+**Other ESP boards are very likely to work as well.**
 
 ## Installation/Flashing using precompiled binaries
 
@@ -71,7 +72,7 @@ There are many multiple ways on how to flash the firmware. The easy ones are exp
   In this example the serial connection to the ESP32 is on `COM4` (in Linux e.g. `/dev/ttyUSB0`).
 3. `esptool.py -p COM4 erase_flash`
 4. ```shell
-   esptool.py -p COM4 -b 460800 --before default_reset --after hard_reset --chip esp32  write_flash --flash_mode dio --flash_size detect --flash_freq 40m 0x1000 bootloader.bin 0x8000 partition-table.bin 0x10000 db_esp32.bin 0x110000 www.bin
+   esptool.py -p COM4 -b 460800 --before default_reset --after hard_reset  write_flash --flash_mode dio --flash_size detect --flash_freq 40m 0x1000 bootloader.bin 0x8000 partition-table.bin 0x10000 db_esp32.bin 0x110000 www.bin
    ```
    You might need to press the boot button on your ESP to start the upload/flash process.
 
