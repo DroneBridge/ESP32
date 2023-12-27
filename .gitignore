@@ -10,3 +10,4 @@ CMakeListsPrivate.txt
 build/
 cmake-build-debug*
 cmake-build-release*
+managed_components/espressif__mdns/.component_hash
