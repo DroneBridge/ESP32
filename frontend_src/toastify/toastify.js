@@ -1,5 +1,5 @@
 /*!
- * Toastify js 1.11.1
+ * Toastify js 1.12.0
  * https://github.com/apvarun/toastify-js
  * @license MIT licensed
  *
@@ -14,11 +14,11 @@
 })(this, function(global) {
   // Object initialization
   var Toastify = function(options) {
-      // Returning a new init object
-      return new Toastify.lib.init(options);
-    },
-    // Library version
-    version = "1.11.1";
+        // Returning a new init object
+        return new Toastify.lib.init(options);
+      },
+      // Library version
+      version = "1.12.0";
 
   // Set the default global options
   Toastify.defaults = {
@@ -43,6 +43,7 @@
     },
     offset: {x: 0, y: 0},
     escapeMarkup: true,
+    ariaLive: 'polite',
     style: {background: ''}
   };
 
@@ -83,8 +84,11 @@
       this.options.onClick = options.onClick || Toastify.defaults.onClick; // Callback after click
       this.options.offset = options.offset || Toastify.defaults.offset; // toast offset
       this.options.escapeMarkup = options.escapeMarkup !== undefined ? options.escapeMarkup : Toastify.defaults.escapeMarkup;
+      this.options.ariaLive = options.ariaLive || Toastify.defaults.ariaLive;
       this.options.style = options.style || Toastify.defaults.style;
-      this.options.style.background = Toastify.defaults.backgroundColor || options.backgroundColor;
+      if(options.backgroundColor) {
+        this.options.style.background = options.backgroundColor;
+      }
 
       // Returning the current object for chaining functions
       return this;
@@ -128,6 +132,11 @@
         divElement.style[property] = this.options.style[property];
       }
 
+      // Announce the toast to screen readers
+      if (this.options.ariaLive) {
+        divElement.setAttribute('aria-live', this.options.ariaLive)
+      }
+
       // Adding the toast message/node
       if (this.options.node && this.options.node.nodeType === Node.ELEMENT_NODE) {
         // If we have a valid node, we insert it
@@ -158,19 +167,20 @@
       // Adding a close icon to the toast
       if (this.options.close === true) {
         // Create a span for close element
-        var closeElement = document.createElement("span");
-        closeElement.innerHTML = "&#10006;";
-
+        var closeElement = document.createElement("button");
+        closeElement.type = "button";
+        closeElement.setAttribute("aria-label", "Close");
         closeElement.className = "toast-close";
+        closeElement.innerHTML = "&#10006;";
 
         // Triggering the removal of toast from DOM on close click
         closeElement.addEventListener(
-          "click",
-          function(event) {
-            event.stopPropagation();
-            this.removeElement(this.toastElement);
-            window.clearTimeout(this.toastElement.timeOutValue);
-          }.bind(this)
+            "click",
+            function(event) {
+              event.stopPropagation();
+              this.removeElement(this.toastElement);
+              window.clearTimeout(this.toastElement.timeOutValue);
+            }.bind(this)
         );
 
         //Calculating screen width
@@ -192,48 +202,48 @@
         var self = this;
         // stop countdown
         divElement.addEventListener(
-          "mouseover",
-          function(event) {
-            window.clearTimeout(divElement.timeOutValue);
-          }
+            "mouseover",
+            function(event) {
+              window.clearTimeout(divElement.timeOutValue);
+            }
         )
         // add back the timeout
         divElement.addEventListener(
-          "mouseleave",
-          function() {
-            divElement.timeOutValue = window.setTimeout(
-              function() {
-                // Remove the toast from DOM
-                self.removeElement(divElement);
-              },
-              self.options.duration
-            )
-          }
+            "mouseleave",
+            function() {
+              divElement.timeOutValue = window.setTimeout(
+                  function() {
+                    // Remove the toast from DOM
+                    self.removeElement(divElement);
+                  },
+                  self.options.duration
+              )
+            }
         )
       }
 
       // Adding an on-click destination path
       if (typeof this.options.destination !== "undefined") {
         divElement.addEventListener(
-          "click",
-          function(event) {
-            event.stopPropagation();
-            if (this.options.newWindow === true) {
-              window.open(this.options.destination, "_blank");
-            } else {
-              window.location = this.options.destination;
-            }
-          }.bind(this)
+            "click",
+            function(event) {
+              event.stopPropagation();
+              if (this.options.newWindow === true) {
+                window.open(this.options.destination, "_blank");
+              } else {
+                window.location = this.options.destination;
+              }
+            }.bind(this)
         );
       }
 
       if (typeof this.options.onClick === "function" && typeof this.options.destination === "undefined") {
         divElement.addEventListener(
-          "click",
-          function(event) {
-            event.stopPropagation();
-            this.options.onClick();
-          }.bind(this)
+            "click",
+            function(event) {
+              event.stopPropagation();
+              this.options.onClick();
+            }.bind(this)
         );
       }
 
@@ -263,7 +273,7 @@
       var rootElement;
       if (typeof this.options.selector === "string") {
         rootElement = document.getElementById(this.options.selector);
-      } else if (this.options.selector instanceof HTMLElement || this.options.selector instanceof ShadowRoot) {
+      } else if (this.options.selector instanceof HTMLElement || (typeof ShadowRoot !== 'undefined' && this.options.selector instanceof ShadowRoot)) {
         rootElement = this.options.selector;
       } else {
         rootElement = document.body;
@@ -283,11 +293,11 @@
 
       if (this.options.duration > 0) {
         this.toastElement.timeOutValue = window.setTimeout(
-          function() {
-            // Remove the toast from DOM
-            this.removeElement(this.toastElement);
-          }.bind(this),
-          this.options.duration
+            function() {
+              // Remove the toast from DOM
+              this.removeElement(this.toastElement);
+            }.bind(this),
+            this.options.duration
         ); // Binding `this` for function invocation
       }
 
@@ -310,24 +320,24 @@
 
       // Removing the element from DOM after transition end
       window.setTimeout(
-        function() {
-          // remove options node if any
-          if (this.options.node && this.options.node.parentNode) {
-            this.options.node.parentNode.removeChild(this.options.node);
-          }
+          function() {
+            // remove options node if any
+            if (this.options.node && this.options.node.parentNode) {
+              this.options.node.parentNode.removeChild(this.options.node);
+            }
 
-          // Remove the element from the DOM, only when the parent node was not removed before.
-          if (toastElement.parentNode) {
-            toastElement.parentNode.removeChild(toastElement);
-          }
+            // Remove the element from the DOM, only when the parent node was not removed before.
+            if (toastElement.parentNode) {
+              toastElement.parentNode.removeChild(toastElement);
+            }
 
-          // Calling the callback function
-          this.options.callback.call(toastElement);
+            // Calling the callback function
+            this.options.callback.call(toastElement);
 
-          // Repositioning the toasts again
-          Toastify.reposition();
-        }.bind(this),
-        400
+            // Repositioning the toasts again
+            Toastify.reposition();
+          }.bind(this),
+          400
       ); // Binding `this` for function invocation
     },
   };
@@ -415,11 +425,11 @@
     if (!elem || typeof yourClass !== "string") {
       return false;
     } else if (
-      elem.className &&
-      elem.className
-        .trim()
-        .split(/\s+/gi)
-        .indexOf(yourClass) > -1
+        elem.className &&
+        elem.className
+            .trim()
+            .split(/\s+/gi)
+            .indexOf(yourClass) > -1
     ) {
       return true;
     } else {

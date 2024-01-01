@@ -22,7 +22,6 @@
 #include <string.h>
 #include <esp_task_wdt.h>
 #include <esp_vfs_dev.h>
-#include <esp_wifi.h>
 #include <lwip/inet.h>
 #include <esp_timer.h>
 #include "esp_log.h"
@@ -301,9 +300,6 @@ void control_module_udp_tcp() {
     uint8_t serial_buffer[TRANSPARENT_BUF_SIZE];
     msp_ltm_port_t db_msp_ltm_port;
 
-    wifi_mode_t wifi_mode;
-    esp_wifi_get_mode(&wifi_mode);
-
     ESP_LOGI(TAG, "Started control module");
     while (1) {
         handle_tcp_master(tcp_master_socket, tcp_clients);
@@ -342,7 +338,6 @@ void control_module_udp_tcp() {
             add_udp_to_known_clients(&udp_conn, new_db_udp_client);
 
         }
-//        update_udp_broadcast(&last_udp_brdc_update, &udp_conn, &wifi_mode);
         switch (SERIAL_PROTOCOL) {
             case 1:
             case 2:

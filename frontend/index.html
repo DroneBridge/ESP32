@@ -1,17 +1,16 @@
 <!DOCTYPE html>
-<html lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<html lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns="http://www.w3.org/1999/html">
 <head>
-    <meta charset="utf-8">
+    <meta http-equiv="content-type" content="text/javascript">
     <meta name="description" content="Settings for DB for ESP32">
     <meta name="author" content="Wolfgang Christl">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>DB for ESP32 Settings</title>
-    <link rel="stylesheet" href="normalize.css">
     <link rel="icon" type="image/png" sizes="192x192" href="android-icon-192x192.png">
     <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
     <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
-    <meta name="theme-color" content="#ffffff">
+    <meta name="theme-color" content="#3166FF">
     <style>
         /*
         * Skeleton V2.0.4
@@ -31,10 +30,10 @@
          *
          * Copyright (C) 2018 Varun A P
          */
-		 .toastify{padding:12px 20px;color:#fff;display:inline-block;box-shadow:0 3px 6px -1px rgba(0,0,0,.12),0 10px 36px -4px rgba(77,96,232,.3);background:-webkit-linear-gradient(315deg,#73a5ff,#5477f5);background:linear-gradient(135deg,#73a5ff,#5477f5);position:fixed;opacity:0;transition:.4s cubic-bezier(.215, .61, .355, 1);border-radius:2px;cursor:pointer;text-decoration:none;max-width:calc(50% - 20px);z-index:2147483647}.toastify.on{opacity:1}@media only screen and (max-width:360px){.toastify-left,.toastify-right{margin-left:auto;margin-right:auto;left:0;right:0;max-width:fit-content}}
+        .toast-close,.toastify{color:#fff;cursor:pointer}.toastify{padding:12px 20px;display:inline-block;box-shadow:0 3px 6px -1px rgba(0,0,0,.12),0 10px 36px -4px rgba(77,96,232,.3);background:-webkit-linear-gradient(315deg,#73a5ff,#5477f5);background:linear-gradient(135deg,#73a5ff,#5477f5);position:fixed;opacity:0;transition:.4s cubic-bezier(.215, .61, .355, 1);border-radius:2px;text-decoration:none;max-width:calc(50% - 20px);z-index:2147483647}.toastify.on{opacity:1}.toast-close{background:0 0;border:0;font-family:inherit;font-size:1em;opacity:.4;padding:0 5px}.toastify-right{right:15px}.toastify-left{left:15px}.toastify-top{top:-150px}.toastify-bottom{bottom:-150px}.toastify-rounded{border-radius:25px}.toastify-avatar{width:1.5em;height:1.5em;margin:-7px 5px;border-radius:2px}.toastify-center{margin-left:auto;margin-right:auto;left:0;right:0;max-width:fit-content;}@media only screen and (max-width:360px){.toastify-left,.toastify-right{margin-left:auto;margin-right:auto;left:0;right:0;max-width:fit-content}}
     </style>
     <style>
-	.dot_green,.dot_red{height:.8rem;width:.8rem;border-radius:50%;display:inline-block}html{min-height:100%}body{height:100%;margin:0;color:#fff;background:#003166;background:linear-gradient(180deg,#003166 0,#135ba8 100%)}form{margin-bottom:.5rem}h2{font-size:x-large;padding-top:2rem;margin-bottom:.8rem}button.button-primary{background-color:#ff7900;border-color:grey}button.button-primary:hover{background-color:#003166;color:#ff7900;border-color:#ff7900}button.button-primary:focus{background-color:#ff7900;border-color:#003166}input,select{color:#000}.dot_green{background-color:#68b838}.dot_red{background-color:#f63e3e}
+        form,h3{margin-bottom:.5rem}.dot_green,.dot_red{height:.8rem;width:.8rem;border-radius:50%;display:inline-block}html{min-height:100%}body{height:100%;margin:0;color:#fff;background:#003166;background:linear-gradient(180deg,#003166 0,#135ba8 100%)}h2{font-size:x-large;padding-top:2rem;margin-bottom:.8rem}h3{font-family:Arial,sans-serif;font-size:large}button.button-primary{background-color:#ff881a;border-color:grey}button.button-primary:hover{background-color:#003166;color:#ff881a;border-color:#ff881a}button.button-primary:focus{background-color:#003166;color:#9a4e0b;border-color:#9a4e0b}input,select{color:#000}.dot_green{background-color:#68b838}.dot_red{background-color:#f63e3e}
     </style>
     <script type="text/javascript">
         /*!
@@ -48,7 +47,7 @@
     </script>
     <!--Minified version of dronebridge.js-->
     <script type="text/javascript">
-        const ROOT_URL=window.location.href;let conn_status=0;function change_ap_ip_visibility(){var e=document.getElementById("ap_ip_div"),t=document.getElementById("ap_channel_div");document.getElementById("esp32_mode").value<2?(e.style.display="block",t.style.display="block"):(e.style.display="none",t.style.display="none")}function change_msp_ltm_visibility(){var e=document.getElementById("msp_ltm_div"),t=document.getElementById("trans_pack_size_div");"1"===document.getElementById("telem_proto").value?(e.style.display="block",t.style.display="none"):(e.style.display="none",t.style.display="block")}function toJSONString(e){let t={},n=e.querySelectorAll("input, select");for(let s=0;s<n.length;++s){let o=n[s],i=o.name,a=o.value;isNaN(Number(a))||0===i.localeCompare("wifi_ssid")||0===i.localeCompare("wifi_pass")?i&&(t[i]=a):i&&(t[i]=parseInt(a))}return JSON.stringify(t)}async function get_json(e){let t=new AbortController;setTimeout(()=>{t.abort()},1e3);let n=await fetch(ROOT_URL+e,{signal:t.signal});if(!n.ok){let s=`An error has occured: ${n.status}`;throw conn_status=0,Error(s)}return await n.json()}async function send_json(e,t){let n=await fetch(ROOT_URL+e,{method:"POST",headers:{Accept:"application/json","Content-Type":"application/json"},body:t});if(!n.ok){conn_status=0;let s=`An error has occured: ${n.status}`;throw Error(s)}return await n.json()}function get_system_info(){return get_json("api/system/info").then(e=>{console.log("Received settings: "+e),document.getElementById("about").innerHTML="DroneBridge for ESP32 - v"+e.major_version+"."+e.minor_version+" - esp-idf "+e.idf_version}).catch(e=>(conn_status=0,e.message,-1)),0}function update_conn_status(){conn_status?document.getElementById("web_conn_status").innerHTML='<span class="dot_green"></span> connected to ESP32':(document.getElementById("web_conn_status").innerHTML='<span class="dot_red"></span> disconnected from ESP32',document.getElementById("current_client_ip").innerHTML="")}function get_stats(){get_json("api/system/stats").then(e=>{conn_status=1;let t=parseInt(e.read_bytes);!isNaN(t)&&t>1e3?document.getElementById("read_bytes").innerHTML=t/1e3+" kb":isNaN(t)||(document.getElementById("read_bytes").innerHTML=t+" bytes");let n=parseInt(e.tcp_connected);!isNaN(n)&&n>1?document.getElementById("tcp_connected").innerHTML=n+" clients":isNaN(n)||(document.getElementById("tcp_connected").innerHTML=n+" client");let s=parseInt(e.udp_connected);!isNaN(s)&&s>1?document.getElementById("udp_connected").innerHTML=s+" clients":isNaN(s)||(document.getElementById("udp_connected").innerHTML=s+" client"),document.getElementById("current_client_ip").innerHTML="IP Address: "+e.current_client_ip}).catch(e=>{conn_status=0,e.message})}function get_settings(){return get_json("api/settings/request").then(e=>{for(let t in console.log("Received settings: "+e),conn_status=1,e)e.hasOwnProperty(t)&&(document.getElementById(t).value=e[t]+"")}).catch(e=>(conn_status=0,e.message,show_toast(e.message),-1)),change_ap_ip_visibility(),change_msp_ltm_visibility(),0}function show_toast(e){Toastify({text:e,duration:5e3,newWindow:!0,close:!0,gravity:"top",position:"center",backgroundColor:"linear-gradient(to right, #b6e026, #abdc28)",stopOnFocus:!0}).showToast()}function save_settings(){send_json("api/settings/change",toJSONString(document.getElementById("settings_form"))).then(e=>{console.log(e),conn_status=1,show_toast(e.msg),get_settings()}).catch(e=>{show_toast(e.message)})}function trigger_reboot(){get_json("api/system/reboot").then(e=>{show_toast(e.msg)}).catch(e=>{e.message,show_toast(e.message)})}
+        const ROOT_URL=window.location.href;let conn_status=0;function change_ap_ip_visibility(){var e=document.getElementById("ap_ip_div"),t=document.getElementById("ap_channel_div"),n=document.getElementById("esp-now-ap-disclaimer");"2"===document.getElementById("esp32_mode").value?(e.style.display="none",t.style.display="none"):(e.style.display="block",t.style.display="block"),"3"===document.getElementById("esp32_mode").value?n.style.display="block":n.style.display="none"}function change_msp_ltm_visibility(){var e=document.getElementById("msp_ltm_div"),t=document.getElementById("trans_pack_size_div");"1"===document.getElementById("telem_proto").value?(e.style.display="block",t.style.display="none"):(e.style.display="none",t.style.display="block")}function toJSONString(e){let t={},n=e.querySelectorAll("input, select");for(let e=0;e<n.length;++e){let s=n[e],o=s.name,i=s.value;isNaN(Number(i))||0===o.localeCompare("wifi_ssid")||0===o.localeCompare("wifi_pass")?o&&(t[o]=i):o&&(t[o]=parseInt(i))}return JSON.stringify(t)}async function get_json(e){let t=ROOT_URL+e;const n=new AbortController,s=(setTimeout((()=>{n.abort()}),1e3),await fetch(t,{signal:n.signal}));if(!s.ok){const e=`An error has occured: ${s.status}`;throw conn_status=0,new Error(e)}return await s.json()}async function send_json(e,t){let n=ROOT_URL+e;const s=await fetch(n,{method:"POST",headers:{Accept:"application/json","Content-Type":"application/json"},body:t});if(!s.ok){conn_status=0;const e=`An error has occured: ${s.status}`;throw new Error(e)}return await s.json()}function get_system_info(){return get_json("api/system/info").then((e=>{console.log("Received settings: "+e),document.getElementById("about").innerHTML="DroneBridge for ESP32 - v"+e.major_version+"."+e.minor_version+" - esp-idf "+e.idf_version})).catch((e=>(conn_status=0,e.message,-1))),0}function update_conn_status(){conn_status?document.getElementById("web_conn_status").innerHTML='<span class="dot_green"></span> connected to ESP32':(document.getElementById("web_conn_status").innerHTML='<span class="dot_red"></span> disconnected from ESP32',document.getElementById("current_client_ip").innerHTML="")}function get_stats(){get_json("api/system/stats").then((e=>{conn_status=1;let t=parseInt(e.read_bytes);!isNaN(t)&&t>1e3?document.getElementById("read_bytes").innerHTML=t/1e3+" kb":isNaN(t)||(document.getElementById("read_bytes").innerHTML=t+" bytes");let n=parseInt(e.tcp_connected);!isNaN(n)&&n>1?document.getElementById("tcp_connected").innerHTML=n+" clients":isNaN(n)||(document.getElementById("tcp_connected").innerHTML=n+" client");let s=parseInt(e.udp_connected);!isNaN(s)&&s>1?document.getElementById("udp_connected").innerHTML=s+" clients":isNaN(s)||(document.getElementById("udp_connected").innerHTML=s+" client"),document.getElementById("current_client_ip").innerHTML="IP Address: "+e.current_client_ip})).catch((e=>{conn_status=0,e.message}))}function get_settings(){return get_json("api/settings/request").then((e=>{console.log("Received settings: "+e),conn_status=1;for(const t in e)if(e.hasOwnProperty(t)){document.getElementById(t).value=e[t]+""}})).catch((e=>(conn_status=0,e.message,show_toast(e.message),-1))),change_ap_ip_visibility(),change_msp_ltm_visibility(),0}function show_toast(e){Toastify({text:e,duration:5e3,newWindow:!0,close:!0,gravity:"top",position:"center",backgroundColor:"linear-gradient(to right, #b6e026, #abdc28)",stopOnFocus:!0}).showToast()}function save_settings(){send_json("api/settings/change",toJSONString(document.getElementById("settings_form"))).then((e=>{console.log(e),conn_status=1,show_toast(e.msg),get_settings()})).catch((e=>{show_toast(e.message)}))}function trigger_reboot(){get_json("api/system/reboot").then((e=>{show_toast(e.msg)})).catch((e=>{e.message,show_toast(e.message)}))}
     </script>
 </head>
 <body>
@@ -72,46 +71,50 @@
             </div>
             <div class="row">
                 <div class="four columns">
-                    <label for="read_bytes">UART received bytes</label>
+                    <label>UART received bytes</label>
                     <div id="read_bytes">-</div>
                 </div>
                 <div class="four columns">
-                    <label for="tcp_connected">Connected TCP clients</label>
+                    <label>Connected TCP clients</label>
                     <div id="tcp_connected">-</div>
                 </div>
                 <div class="four columns">
-                    <label for="udp_connected">Connected UDP clients</label>
+                    <label>Connected UDP clients</label>
                     <div id="udp_connected">-</div>
                 </div>
             </div>
         </div>
         <div>
             <h2>Settings</h2>
+            <h3>Wi-Fi</h3>
             <div class="row">
                 <div class="twelve columns">
                     <label for="esp32_mode">ESP32 Mode (requires save & reboot)</label>
                     <select id="esp32_mode" name="esp32_mode" form="settings_form" onchange="change_ap_ip_visibility()">
-                        <option value="1">Access Point Mode</option>
+                        <option value="1">WiFi Access Point Mode</option>
                         <option value="2">WiFi Client Mode</option>
+                        <option value="3">ESP-NOW Access Point Mode</option>
                     </select>
+                    <div id="esp-now-ap-disclaimer" style="color: #ff0f0f; margin-bottom: 0.8rem">ESP-NOW Access Point Mode makes the device invisible for non-ESP-NOW enabled devices!</br>You will not be able to change the config!</br>You will have to manually erase the flash memory of the ESP32 and re-flash DroneBridge for ESP32 to get back into normal Wi-Fi Mode!</div>
                 </div>
             </div>
             <div class="row">
                 <div class="six columns">
-                    <label for="wifi_ssid">Wifi SSID</label>
+                    <label for="wifi_ssid">SSID</label>
                     <input type="text" name="wifi_ssid" value="" id="wifi_ssid">
                 </div>
                 <div class="six columns">
-                    <label for="wifi_pass">Wifi Password</label>
+                    <label for="wifi_pass">Password</label>
                     <input type="text" name="wifi_pass" value="" id="wifi_pass">
                 </div>
             </div>
             <div class="row">
                 <div id="ap_channel_div" class="twelve columns">
-                    <label for="ap_channel">Wifi Channel</label>
+                    <label for="ap_channel">Channel</label>
                     <input type="text" name="ap_channel" value="" id="ap_channel">
                 </div>
             </div>
+            <h3>Serial</h3>
             <div class="row">
                 <div class="six columns">
                     <label for="tx_pin">UART TX Pin</label>
@@ -215,8 +218,8 @@
     // get stats every half a second
     setInterval(get_stats, 500)
     setInterval(update_conn_status, 500)
-    change_msp_ltm_visibility()
-    change_ap_ip_visibility()
+    setTimeout(change_msp_ltm_visibility, 500)
+    setTimeout(change_ap_ip_visibility, 500)
 </script>
 </body>
 </html>

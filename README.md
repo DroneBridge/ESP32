@@ -4,7 +4,7 @@
 A DroneBridge enabled firmware for the popular ESP32 modules from Espressif Systems. Probably the cheapest way to
 communicate with your drone, UAV, UAS, ground based vehicle or whatever you may call them.
 
-It also allows for a fully transparent serial to wifi pass through link with variable packet size
+It also allows for a fully transparent serial to WiFi pass through link with variable packet size
 (Continuous stream of data required).
 
 DroneBridge for ESP32 is a telemetry/low data rate only solution. There is no support for cameras connected to the ESP32 since it does not support video encoding.
@@ -12,11 +12,12 @@ DroneBridge for ESP32 is a telemetry/low data rate only solution. There is no su
 ![DroneBridge for ESP32 concept](wiki/db_ESP32_setup.png)
 
 ## Features
--   Bi-directional link: MAVLink, MSP & LTM
+-   Bi-directional transparent serial to WiFi & ESP-NOW link
+-   Support for MAVLink, MSP, LTM or any other payload
 -   Affordable: ~7€
--   Up to 150m range
+-   Up to 150m range using WiFi & up to 1km of range using ESP-NOW (sender & receiver must be ESP32 with LR-Mode enabled [(ESP32 C2 is not supported)](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#lr-compatibility))
 -   Weight: <10 g
--   Supported by: DroneBridge for Android (app), mwptools, QGroundControl, impload etc.
+-   Supported by: QGroundControl, DroneBridge for Android (app), mwptools, impload etc.
 -   Easy to set up: Power connection + UART connection to flight controller
 -   Fully configurable through easy to use web interface
 -   Parsing of LTM & MSPv2 for more reliable connection and less packet loss
@@ -35,10 +36,10 @@ connected devices/stations. Allows additional clients to register for UDP. Clien
 
 Ready to use binaries for ESP32 via [GitHub releases](https://github.com/DroneBridge/ESP32/releases).  
 Or compile for ESP32S2, ESP32S3 & ESP32C3 using esp-idf v5.1:
--   ESP32   ``idf.py set-target esp32 build``
--   ESP32S2 ``idf.py set-target esp32s2 build``
--   ESP32S3 ``idf.py set-target esp32s3 build``
--   ESP32C3 ``idf.py set-target esp32c3 build``
+-   ESP32   `idf.py set-target esp32 build`
+-   ESP32S2 `idf.py set-target esp32s2 build`
+-   ESP32S3 `idf.py set-target esp32s3 build`
+-   ESP32C3 `idf.py set-target esp32c3 build`
 
 ## Hardware
 
@@ -46,12 +47,13 @@ All ESP32 development boards will work. No additional PSRAM required. You will n
 
 Examples for boards that will work:
 * AZDelivery DevKit C
+* ESP32-C3-DevKitM-1
 * [TinyPICO - ESP32 Development Board - V2](https://www.adafruit.com/product/4335)
 * [Adafruit HUZZAH32 – ESP32 Feather Board](https://www.adafruit.com/product/3405)
 * [Adafruit AirLift – ESP32 WiFi Co-Processor Breakout Board](https://www.adafruit.com/product/4201) (requires FTDI adapter for flashing firmware)
 * [Adafruit HUZZAH32](https://www.adafruit.com/product/4172) (requires FTDI adapter for flashing firmware)
 
-DroneBridge for ESP32 is tested with an DOIT ESP32 development board.  
+DroneBridge for ESP32 is tested with an DOIT ESP32 and ESP32-C3-DevKitM-1 development board.  
 **Other ESP boards are very likely to work as well.**
 
 ## Installation/Flashing using precompiled binaries
@@ -108,19 +110,27 @@ Defaults: UART2 (RX2, TX2 on GPIO 16, 17)
 ### Configuration
 1.  Connect to the wifi `DroneBridge ESP32` with password `dronebridge`
 2.  In your browser type: `dronebridge.local` (Chrome: `http://dronebridge.local`) or `192.168.2.1` into the address bar.
- **You might need to disable the cellular connection to force the browser to use the wifi connection**
+ **You might need to disable the cellular connection to force the browser to use the WiFi connection**
 3.  Configure as you please and hit `save`
 
 ![DroneBridge for ESP32 web interface](wiki/dbesp32_webinterface.png)
 
 **Configuration Options:**
--   `ESP32 Mode`: ESP32 creates an access point or connects to an existing access point. Beware that the ESP32 will indefinitely search for the specified access point. You will need to re-flash the ESP32 to reset the settings!
+-   `ESP32 Mode`
+    -   `Access Point Mode`  
+    ESP32 will create a Wi-Fi Access Point to which other ground control stations can connect to
+    -   `WiFi Client Mode`  
+    ESP32 will connect to the specified WiFi Access Point. After 50 failed connection retries (~60 seconds) the ESP32 will temporarily switch to WiFi Access Point Mode with SSID `Failsafe DroneBridge ESP32` and password `dronebridge`. This mode allows you to check and change the configuration. On reboot the stored configuration will be loaded.  
+                            In this mode the ESP32 can connect to WiFi and ESP-NOW (LR-Mode) devices.
+    -   `ESP-NOW Access Point Mode`   
+    Launches an access point that is ESP-NOW enabled. ESP-NOW Access Point Mode makes the device invisible for non-ESP-NOW enabled devices. You will not be able to change the config!  
+        You will have to manually erase the flash memory of the ESP32 and re-flash DroneBridge for ESP32 to get back into normal Wi-Fi Mode!
 -   `Wifi SSID`: Up to 31 character long
 -   `Wifi password`: Up to 63 character long
 -   `UART baud rate`: Same as you configured on your flight controller
--   `GPIO TX PIN Number` & `GPIO RX PIN Number`: The pins you want to use for TX & RX (UART). See pin out of manufacturer of your ESP32 device **Flight controller UART must be 3.3V or use an inverter.**
+-   `GPIO TX PIN Number` & `GPIO RX PIN Number`: The pins you want to use for TX & RX (UART). See pin out of manufacturer of your ESP32 device **Flight controller UART must be 3.3V or use an inverter.** If pins are the same for TX & RX the UART will not be opened.
 -   `UART serial protocol`: MultiWii based or MAVLink based - configures the parser
--   `Transparent packet size`: Only used with 'serial protocol' set to transparent. Length of UDP packets
+-   `Transparent packet size`: Only used with 'serial protocol' set to transparent. Length of UDP packets in transparent mode
 -   `LTM frames per packet`: Buffer the specified number of packets and send them at once in one packet
 -   `Gateway IP address`: IPv4 address you want the ESP32 access point to have
 

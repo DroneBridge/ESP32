@@ -17,11 +17,11 @@
  *
  */
 
-#include <esp_log.h>
 #include <string.h>
 #include <cJSON.h>
-#include "lwip/sockets.h"
-#include "globals.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include "esp_log.h"
 #include "db_protocol.h"
 #include "db_comm_protocol.h"
 #include "db_comm.h"
@@ -64,6 +64,9 @@ void parse_comm_protocol(int client_socket, char *new_json_bytes) {
     cJSON_Delete(json_pointer);
 }
 
+/** Implements some basic calls from the DroneBridge Communication Protocol
+ *
+ */
 void communication_module_server(void *parameters) {
     int tcp_master_socket = open_tcp_server(APP_PORT_COMM);
     ESP_LOGI(TAG, "Started communication module");
