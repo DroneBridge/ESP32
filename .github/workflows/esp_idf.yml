@@ -18,6 +18,7 @@ jobs:
       with:
         esp_idf_version: release-v5.1
         target: esp32
+        command: 'idf.py set-target esp32 build'
     - name: ESP-IDF v5.1 build esp32s2
       uses: espressif/esp-idf-ci-action@v1
       with:
