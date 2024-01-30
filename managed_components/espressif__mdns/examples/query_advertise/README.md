@@ -1,6 +1,6 @@
 # mDNS example
 
-Shows how to use mDNS to advertise lookup services and hosts
+Shows how to use mDNS to advertise and query services and hosts
 
 ## Example workflow
 

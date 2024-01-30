@@ -26,8 +26,7 @@
 #endif
 
 #if ESP_IDF_VERSION <= ESP_IDF_VERSION_VAL(5, 1, 0)
-// IDF <= v5.1 does not support enabling/disabling esp-wifi
-#define MDNS_ESP_WIFI_ENABLED 1
+#define MDNS_ESP_WIFI_ENABLED CONFIG_SOC_WIFI_SUPPORTED
 #else
 #define MDNS_ESP_WIFI_ENABLED CONFIG_ESP_WIFI_ENABLED
 #endif
@@ -5883,6 +5882,7 @@ static mdns_ip_addr_t *_copy_delegated_host_address_list(char *hostname)
         if (strcasecmp(host->hostname, hostname) == 0) {
             return copy_address_list(host->address_list);
         }
+        host = host->next;
     }
     return NULL;
 }

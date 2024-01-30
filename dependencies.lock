@@ -1,10 +1,10 @@
 dependencies:
   espressif/mdns:
-    component_hash: 810ec139689ae93bf42520d05de4855fbb68f7140ef67797d91d8d61829589cb
+    component_hash: 090826401d30f756037f91d91068f470ba8d0ef04fe507d3aa8761305cecd7ca
     source:
       service_url: https://api.components.espressif.com/
       type: service
-    version: 1.2.2
+    version: 1.2.3
   idf:
     component_hash: null
     source:

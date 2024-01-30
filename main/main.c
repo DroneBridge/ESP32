@@ -84,21 +84,21 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
     // Wifi access point mode events
     if (event_id == WIFI_EVENT_AP_STACONNECTED) {
         wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *) event_data;
-        ESP_LOGI(TAG, "Client connected - station:"MACSTR", AID=%d", MAC2STR(event->mac), event->aid);
+        ESP_LOGI(TAG, "WIFI_EVENT - Client connected - station:"MACSTR", AID=%d", MAC2STR(event->mac), event->aid);
     } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
         wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *) event_data;
-        ESP_LOGI(TAG, "Client disconnected - station:"MACSTR", AID=%d", MAC2STR(event->mac), event->aid);
+        ESP_LOGI(TAG, "WIFI_EVENT - Client disconnected - station:"MACSTR", AID=%d", MAC2STR(event->mac), event->aid);
         struct db_udp_client_t db_udp_client;
         memcpy(db_udp_client.mac, event->mac, sizeof(db_udp_client.mac));
         remove_udp_from_known_clients(&udp_conn, db_udp_client);
     } else if (event_id == WIFI_EVENT_AP_START) {
-        ESP_LOGI(TAG, "AP started! (SSID: %s PASS: %s)", DEFAULT_SSID, DEFAULT_PWD);
+        ESP_LOGI(TAG, "WIFI_EVENT - AP started! (SSID: %s PASS: %s)", DEFAULT_SSID, DEFAULT_PWD);
     } else if (event_id == WIFI_EVENT_AP_STOP) {
-        ESP_LOGI(TAG, "AP stopped!");
+        ESP_LOGI(TAG, "WIFI_EVENT - AP stopped!");
     } else if(event_base == IP_EVENT && event_id == IP_EVENT_AP_STAIPASSIGNED){
         ip_event_ap_staipassigned_t* event = (ip_event_ap_staipassigned_t*) event_data;
-        ESP_LOGI(TAG, "New station IP:" IPSTR, IP2STR(&event->ip));
-        ESP_LOGI(TAG, "MAC: " MACSTR, MAC2STR(event->mac));
+        ESP_LOGI(TAG, "WIFI_EVENT - New station IP:" IPSTR, IP2STR(&event->ip));
+        ESP_LOGI(TAG, "WIFI_EVENT - MAC: " MACSTR, MAC2STR(event->mac));
         struct db_udp_client_t db_udp_client;
         db_udp_client.udp_client.sin_family = PF_INET;
         db_udp_client.udp_client.sin_port = htons(APP_PORT_PROXY_UDP);
@@ -109,19 +109,21 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
     }
     // Wifi client mode events
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
-        esp_wifi_connect();
+        ESP_LOGI(TAG, "WIFI_EVENT - Wifi Started");
+        ESP_ERROR_CHECK(esp_wifi_connect());
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        ESP_LOGI(TAG, "WIFI_EVENT - Lost connection to access point");
         if (s_retry_num < WIFI_ESP_MAXIMUM_RETRY) {
-            esp_wifi_connect();
+            ESP_ERROR_CHECK(esp_wifi_connect());
             s_retry_num++;
             ESP_LOGI(TAG, "Retry to connect to the AP (%i/%i)", s_retry_num, WIFI_ESP_MAXIMUM_RETRY);
         } else {
+            ESP_LOGI(TAG,"Connecting to the AP failed");
             xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
         }
-        ESP_LOGI(TAG,"Connecting to the AP failed");
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-        ESP_LOGI(TAG, "Got IP:" IPSTR, IP2STR(&event->ip_info.ip));
+        ESP_LOGI(TAG, "WIFI_EVENT - Got IP:" IPSTR, IP2STR(&event->ip_info.ip));
         sprintf(CURRENT_CLIENT_IP, IPSTR, IP2STR(&event->ip_info.ip));
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
@@ -142,6 +144,7 @@ void start_mdns_service() {
     ESP_ERROR_CHECK(mdns_service_add(NULL, "_db_proxy", "_tcp", APP_PORT_PROXY, NULL, 0));
     ESP_ERROR_CHECK(mdns_service_add(NULL, "_db_comm", "_tcp", APP_PORT_COMM, NULL, 0));
     ESP_ERROR_CHECK(mdns_service_instance_name_set("_http", "_tcp", "DroneBridge for ESP32"));
+    ESP_LOGI(TAG, "MDNS Service started!");
 }
 
 #if CONFIG_WEB_DEPLOY_SEMIHOST
@@ -183,9 +186,9 @@ esp_err_t init_fs(void) {
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to get SPIFFS partition information (%s)", esp_err_to_name(ret));
     } else {
-        ESP_LOGI(TAG, "Partition size: total: %d, used: %d", total, used);
+        ESP_LOGI(TAG, "Filesystem init finished! Partition size: total: %d bytes, used: %d bytes (%i%%)", total, used, (used*100)/total);
     }
-    return ESP_OK;
+    return ret;
 }
 
 #endif
@@ -218,7 +221,7 @@ void init_wifi_apmode(int wifi_mode) {
             .ap = {
                     .ssid = "DroneBridge_ESP32_Init",
                     .ssid_len = 0,
-                    .authmode = WIFI_AUTH_WPA_PSK,
+                    .authmode = WIFI_AUTH_WPA2_PSK,
                     .channel = DEFAULT_CHANNEL,
                     .ssid_hidden = 0,
                     .beacon_interval = 100,
@@ -254,7 +257,7 @@ void init_wifi_apmode(int wifi_mode) {
 }
 
 /**
- * Initializes the ESP Wifi client mode where we  connect to a known access point.
+ * Initializes the ESP Wifi client mode where we connect to a known access point.
  */
 int init_wifi_clientmode() {
     s_wifi_event_group = xEventGroupCreate();
@@ -279,7 +282,8 @@ int init_wifi_clientmode() {
     wifi_config_t wifi_config = {
             .sta = {
                     .ssid = "DroneBridge_ESP32_Init",
-                    .password = "dronebridge"
+                    .password = "dronebridge",
+                    .threshold.authmode = WIFI_AUTH_WPA_PSK
             },
     };
     strncpy((char *)wifi_config.sta.ssid, (char *)DEFAULT_SSID, 32);
@@ -311,14 +315,16 @@ int init_wifi_clientmode() {
     } else {
         ESP_LOGE(TAG, "UNEXPECTED WIFI EVENT");
     }
-    /* The event will not be processed after unregister */
-    ESP_ERROR_CHECK(esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, instance_got_ip));
-    ESP_ERROR_CHECK(esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, instance_any_id));
-    vEventGroupDelete(s_wifi_event_group);
+//    /* The event will not be processed after unregister */
+//    ESP_ERROR_CHECK(esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, instance_got_ip));
+//    ESP_ERROR_CHECK(esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, instance_any_id));
+//    vEventGroupDelete(s_wifi_event_group);
 
     if (enable_temp_ap_mode) {
+        ESP_LOGW(TAG, "WiFi client mode was not able to connect to the specified access point");
         return -1;
     }
+    ESP_LOGI(TAG, "WiFi client mode enabled and connected!");
     return 0;
 }
 

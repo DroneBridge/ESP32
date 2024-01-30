@@ -1,5 +1,0 @@
-dependencies:
-  ## Required IDF version
-  idf: ">=5.0"
-  espressif/mdns:
-    version: "^1.0.0"

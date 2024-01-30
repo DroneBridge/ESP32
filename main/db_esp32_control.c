@@ -46,8 +46,7 @@ uint32_t uart_byte_count = 0;
 int8_t num_connected_tcp_clients = 0;
 int8_t num_connected_udp_clients = 0;
 
-int open_serial_socket() {
-    int serial_socket;
+esp_err_t open_serial_socket() {
     uart_config_t uart_config = {
             .baud_rate = DB_UART_BAUD_RATE,
             .data_bits = UART_DATA_8_BITS,
@@ -57,15 +56,14 @@ int open_serial_socket() {
     };
     ESP_ERROR_CHECK(uart_param_config(UART_NUM, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(UART_NUM, DB_UART_PIN_TX, DB_UART_PIN_RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
-    ESP_ERROR_CHECK(uart_driver_install(UART_NUM, 1024, 0, 0, NULL, 0));
-    if ((serial_socket = open("/dev/uart/2", O_RDWR)) == -1) {
-        ESP_LOGE(TAG, "Cannot open UART2");
-        close(serial_socket);
-        uart_driver_delete(UART_NUM);
-        return ESP_FAIL;
-    }
-    esp_vfs_dev_uart_use_driver(2);
-    return serial_socket;
+//    if ((serial_socket = open("/dev/uart/1", O_RDWR)) == -1) {
+//        ESP_LOGE(TAG, "Cannot open UART1");
+//        close(serial_socket);
+//        uart_driver_delete(UART_NUM);
+//        return ESP_FAIL;
+//    }
+//    esp_vfs_dev_uart_use_driver(UART_NUM);
+    return uart_driver_install(UART_NUM, 1024, 0, 0, NULL, 0);
 }
 
 int open_udp_socket() {
@@ -164,7 +162,7 @@ void parse_msp_ltm(int tcp_clients[], struct db_udp_connection_t *udp_conn, uint
 
 
 /**
- * Reads one byte from UART and checks if we already got enough bytes to send them out
+ * Reads TRANS_RD_BYTES_NUM bytes from UART and checks if we already got enough bytes to send them out
  *
  * @param tcp_clients Array of connected TCP clients
  * @param serial_read_bytes Number of bytes already read for the current packet
@@ -267,6 +265,7 @@ void remove_udp_from_known_clients(struct db_udp_connection_t *connections, stru
  * Thread that manages all incoming and outgoing TCP, UDP and serial (UART) connections
  */
 void control_module_udp_tcp() {
+    ESP_LOGI(TAG, "Starting control module");
     // only open serial socket/UART if PINs are not matching - matching PIN nums mean they still need to be defined by
     // the user no pre-defined pins as of this release since ESP32 boards have wildly different pin configurations
     int uart_socket = ESP_FAIL;
@@ -274,6 +273,7 @@ void control_module_udp_tcp() {
         uart_socket = open_serial_socket();
     } else {
         // do no long continue setting up the system and kill task
+        ESP_LOGW(TAG, "Init of control module aborted. TX GPIO == RX GPIO - Configure first!");
         vTaskDelete(NULL);
     }
     int tcp_master_socket = open_tcp_server(app_port_proxy);
