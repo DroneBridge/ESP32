@@ -15,7 +15,7 @@ DroneBridge for ESP32 is a telemetry/low data rate only solution. There is no su
 -   Bi-directional transparent serial to WiFi & ESP-NOW link
 -   Support for MAVLink, MSP, LTM or any other payload
 -   Affordable: ~7€
--   Up to 150m range using WiFi & up to 1km of range using ESP-NOW (sender & receiver must be ESP32 with LR-Mode enabled [(ESP32 C2 is not supported)](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#lr-compatibility))
+-   Up to 150m range using WiFi & (coming up!) up to 1km of range using ESP-NOW (sender & receiver must be ESP32 with LR-Mode enabled [(ESP32 C2 is not supported)](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#lr-compatibility))
 -   Weight: <10 g
 -   Supported by: QGroundControl, DroneBridge for Android (app), mwptools, impload etc.
 -   Easy to set up: Power connection + UART connection to flight controller
@@ -167,6 +167,11 @@ http://dronebridge.local/api/settings/request
 **To request stats**
 ```http request
 http://dronebridge.local/api/system/stats
+```
+
+**To request IP and port of active UDP connections**
+```http request
+http://dronebridge.local/api/system/conns
 ```
 
 **Trigger a reboot**

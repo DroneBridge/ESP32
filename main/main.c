@@ -60,7 +60,8 @@ int32_t DB_UART_BAUD_RATE = 115200;
 uint16_t TRANSPARENT_BUF_SIZE = 64;
 uint8_t LTM_FRAME_NUM_BUFFER = 1;
 uint8_t MSP_LTM_SAMEPORT = 0;
-struct db_udp_connection_t udp_conn = {};
+
+struct udp_conn_list_t *udp_conn_list;
 
 // Wifi client mode vars
 int WIFI_ESP_MAXIMUM_RETRY = 25;          // max number of retries to connect to the ap before enabling temp. ap mode
@@ -90,7 +91,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         ESP_LOGI(TAG, "WIFI_EVENT - Client disconnected - station:"MACSTR", AID=%d", MAC2STR(event->mac), event->aid);
         struct db_udp_client_t db_udp_client;
         memcpy(db_udp_client.mac, event->mac, sizeof(db_udp_client.mac));
-        remove_udp_from_known_clients(&udp_conn, db_udp_client);
+        remove_from_known_udp_clients(udp_conn_list, db_udp_client);
     } else if (event_id == WIFI_EVENT_AP_START) {
         ESP_LOGI(TAG, "WIFI_EVENT - AP started! (SSID: %s PASS: %s)", DEFAULT_SSID, DEFAULT_PWD);
     } else if (event_id == WIFI_EVENT_AP_STOP) {
@@ -105,7 +106,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         db_udp_client.udp_client.sin_len = 16;
         db_udp_client.udp_client.sin_addr.s_addr = event->ip.addr;
         memcpy(db_udp_client.mac, event->mac, sizeof(db_udp_client.mac));
-        add_udp_to_known_clients(&udp_conn, db_udp_client);
+        add_to_known_udp_clients(udp_conn_list, db_udp_client);
     }
     // Wifi client mode events
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
@@ -406,6 +407,7 @@ void read_settings_nvs() {
  *  AP-Mode: ESP32 creates an WiFi access point of its own where the ground control stations can connect
  */
 void app_main() {
+    udp_conn_list = udp_client_list_create();
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES) {
         ESP_ERROR_CHECK(nvs_flash_erase());
@@ -419,7 +421,7 @@ void app_main() {
     } else {
         if (init_wifi_clientmode() < 0) {
             ESP_LOGW(TAG, "Switching to failsafe: Enabling access point mode");
-            // De-Init all WiFi and enable the AP-Mode temporarily
+            // De-Init all Wi-Fi and enable the AP-Mode temporarily
             ESP_ERROR_CHECK(esp_event_loop_delete_default());
             esp_netif_destroy_default_wifi(esp_default_netif);
             ESP_ERROR_CHECK(esp_wifi_stop());

@@ -44,7 +44,7 @@ uint ltm_frames_in_buffer_pnt = 0;
 
 uint32_t uart_byte_count = 0;
 int8_t num_connected_tcp_clients = 0;
-int8_t num_connected_udp_clients = 0;
+//int8_t num_connected_udp_clients = 0;
 
 esp_err_t open_serial_socket() {
     uart_config_t uart_config = {
@@ -56,16 +56,13 @@ esp_err_t open_serial_socket() {
     };
     ESP_ERROR_CHECK(uart_param_config(UART_NUM, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(UART_NUM, DB_UART_PIN_TX, DB_UART_PIN_RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
-//    if ((serial_socket = open("/dev/uart/1", O_RDWR)) == -1) {
-//        ESP_LOGE(TAG, "Cannot open UART1");
-//        close(serial_socket);
-//        uart_driver_delete(UART_NUM);
-//        return ESP_FAIL;
-//    }
-//    esp_vfs_dev_uart_use_driver(UART_NUM);
     return uart_driver_install(UART_NUM, 1024, 0, 0, NULL, 0);
 }
 
+/**
+ * Opens UDP socket
+ * @return returns socket file descriptor
+ */
 int open_udp_socket() {
     char addr_str[128];
     int addr_family;
@@ -93,26 +90,31 @@ int open_udp_socket() {
     return udp_socket;
 }
 
+void send_to_all_udp_clients(struct udp_conn_list_t *n_udp_conn_list, const uint8_t *data, uint data_length) {
+    for (int i = 0; i < n_udp_conn_list->size; i++) {  // send to all UDP clients
+        resend:;
+        int sent = sendto(n_udp_conn_list->udp_socket, data, data_length, 0,
+                          (struct sockaddr *) &n_udp_conn_list->db_udp_clients[i].udp_client,
+                          sizeof(n_udp_conn_list->db_udp_clients[i].udp_client));
+        if (sent != data_length) {
+            ESP_LOGE(TAG, "UDP - Error sending (%i/%i) because of %d - trying again!", sent, data_length, errno);
+            vTaskDelay(200 / portTICK_PERIOD_MS);
+            goto resend;
+        }
+    }
+}
+
 /**
  * Send to all connected TCP & UDP clients
  *
- * @param tcp_clients
- * @param udp_conn
- * @param data
- * @param data_length
+ * @param tcp_clients Array of socket IDs for the TCP clients
+ * @param udp_conn Structure handling the UDP connection
+ * @param data payload to send
+ * @param data_length Length of payload to send
  */
-void send_to_all_clients(int tcp_clients[], struct db_udp_connection_t *udp_conn, uint8_t data[], uint data_length) {
+void send_to_all_clients(int tcp_clients[], struct udp_conn_list_t *n_udp_conn_list, uint8_t data[], uint data_length) {
     send_to_all_tcp_clients(tcp_clients, data, data_length);
-    for (int i = 0; i < MAX_UDP_CLIENTS; i++) {  // send to all UDP clients
-        if (udp_conn->db_udp_clients[i].udp_client.sin_len > 0) {
-            int sent = sendto(udp_conn->udp_socket, data, data_length, 0, (struct sockaddr *) &udp_conn->db_udp_clients[i].udp_client,
-                              sizeof(udp_conn->db_udp_clients[i].udp_client));
-            if (sent != data_length) {
-                ESP_LOGE(TAG, "UDP - Error sending (%i/%i) because of %d", sent, data_length, errno);
-                udp_conn->db_udp_clients[i].udp_client.sin_len = 0;
-            }
-        }
-    }
+    send_to_all_udp_clients(n_udp_conn_list, data, data_length);
 }
 
 void write_to_uart(const char tcp_client_buffer[], const size_t data_length) {
@@ -126,7 +128,7 @@ void write_to_uart(const char tcp_client_buffer[], const size_t data_length) {
 /**
  * @brief Parses & sends complete MSP & LTM messages
  */
-void parse_msp_ltm(int tcp_clients[], struct db_udp_connection_t *udp_conn, uint8_t msp_message_buffer[],
+void parse_msp_ltm(int tcp_clients[], struct udp_conn_list_t *udp_connection, uint8_t msp_message_buffer[],
                    uint *serial_read_bytes,
                    msp_ltm_port_t *db_msp_ltm_port) {
     uint8_t serial_bytes[TRANS_RD_BYTES_NUM];
@@ -140,7 +142,7 @@ void parse_msp_ltm(int tcp_clients[], struct db_udp_connection_t *udp_conn, uint
                 msp_message_buffer[(*serial_read_bytes - 1)] = serial_byte;
                 if (db_msp_ltm_port->parse_state == MSP_PACKET_RECEIVED) {
                     *serial_read_bytes = 0;
-                    send_to_all_clients(tcp_clients, udp_conn, msp_message_buffer, *serial_read_bytes);
+                    send_to_all_clients(tcp_clients, udp_connection, msp_message_buffer, *serial_read_bytes);
                 } else if (db_msp_ltm_port->parse_state == LTM_PACKET_RECEIVED) {
                     memcpy(&ltm_frame_buffer[ltm_frames_in_buffer_pnt], db_msp_ltm_port->ltm_frame_buffer,
                            (db_msp_ltm_port->ltm_payload_cnt + 4));
@@ -148,7 +150,7 @@ void parse_msp_ltm(int tcp_clients[], struct db_udp_connection_t *udp_conn, uint
                     ltm_frames_in_buffer++;
                     if (ltm_frames_in_buffer == LTM_FRAME_NUM_BUFFER &&
                         (LTM_FRAME_NUM_BUFFER <= MAX_LTM_FRAMES_IN_BUFFER)) {
-                        send_to_all_clients(tcp_clients, udp_conn, ltm_frame_buffer, *serial_read_bytes);
+                        send_to_all_clients(tcp_clients, udp_connection, ltm_frame_buffer, *serial_read_bytes);
                         ESP_LOGV(TAG, "Sent %i LTM message(s) to telemetry port!", LTM_FRAME_NUM_BUFFER);
                         ltm_frames_in_buffer = 0;
                         ltm_frames_in_buffer_pnt = 0;
@@ -167,7 +169,7 @@ void parse_msp_ltm(int tcp_clients[], struct db_udp_connection_t *udp_conn, uint
  * @param tcp_clients Array of connected TCP clients
  * @param serial_read_bytes Number of bytes already read for the current packet
  */
-void parse_transparent(int tcp_clients[], struct db_udp_connection_t *udp_conn, uint8_t serial_buffer[],
+void parse_transparent(int tcp_clients[], struct udp_conn_list_t *udp_connection, uint8_t serial_buffer[],
                        uint *serial_read_bytes) {
     uint8_t serial_bytes[TRANS_RD_BYTES_NUM];
     uint read;
@@ -176,7 +178,7 @@ void parse_transparent(int tcp_clients[], struct db_udp_connection_t *udp_conn, 
         uart_byte_count += read;
         *serial_read_bytes += read;
         if (*serial_read_bytes >= TRANSPARENT_BUF_SIZE) {
-            send_to_all_clients(tcp_clients, udp_conn, serial_buffer, *serial_read_bytes);
+            send_to_all_clients(tcp_clients, udp_connection, serial_buffer, *serial_read_bytes);
             *serial_read_bytes = 0;
         }
     }
@@ -209,39 +211,55 @@ void handle_tcp_master(const int tcp_master_socket, int tcp_clients[]) {
 }
 
 /**
+ *  Create structure containing all UDP connection information
+ * @return Structure containing all UDP connection information
+ */
+struct udp_conn_list_t *udp_client_list_create() {
+    struct udp_conn_list_t *n_udp_conn_list = malloc(sizeof(struct udp_conn_list_t)); // Allocate memory for the list
+    if (n_udp_conn_list == NULL) { // Check if the allocation failed
+        return NULL; // Return NULL to indicate an error
+    }
+    n_udp_conn_list->size = 0; // Initialize the size to 0
+    return n_udp_conn_list; // Return the pointer to the list
+}
+
+/**
+ *  Destroy structure containing all UDP connection information
+ * @param n_udp_conn_list Structure containing all UDP connection information
+ */
+void udp_client_list_destroy(struct udp_conn_list_t *n_udp_conn_list) {
+    if (n_udp_conn_list == NULL) { // Check if the list is NULL
+        return; // Do nothing
+    }
+    free(n_udp_conn_list); // Free the list
+}
+
+/**
  * Add a new UDP client to the list of known UDP clients. Checks if client is already known based on IP and port.
  * Added client will receive UDP packets with serial info and will be able to send UDP packets to the serial interface
  * of the ESP32.
  * PORT, MAC & IP should be set inside new_db_udp_client. If MAC is not set then the device cannot be removed later on.
  *
- * @param connections Structure containing all UDP connection information
+ * @param n_udp_conn_list Structure containing all UDP connection information
  * @param new_db_udp_client New client to add to the UDP list. PORT, MAC & IP must be set. If MAC is not set then the
  *                          device cannot be removed later on.
  */
-void add_udp_to_known_clients(struct db_udp_connection_t *connections, struct db_udp_client_t new_db_udp_client) {
-    // Check if client is already listed based on PORT and IP
-    for (int i = 0; i < MAX_UDP_CLIENTS; i++) {
-        if ((connections->db_udp_clients[i].udp_client.sin_port == new_db_udp_client.udp_client.sin_port
-        && new_db_udp_client.udp_client.sin_family == PF_INET &&
-             ((struct sockaddr_in *) &connections->db_udp_clients[i])->sin_addr.s_addr ==
-             ((struct sockaddr_in *) &new_db_udp_client)->sin_addr.s_addr)) {
+void add_to_known_udp_clients(struct udp_conn_list_t *n_udp_conn_list, struct db_udp_client_t new_db_udp_client) {
+    if (n_udp_conn_list == NULL) { // Check if the list is NULL
+        return; // Do nothing
+    }
+    if (n_udp_conn_list->size == MAX_UDP_CLIENTS) { // Check if the list is full
+        return; // Do nothing
+    }
+    for (int i = 0; i < udp_conn_list->size; i++) {
+        if ((n_udp_conn_list->db_udp_clients[i].udp_client.sin_port == new_db_udp_client.udp_client.sin_port) &&
+            (n_udp_conn_list->db_udp_clients[i].udp_client.sin_addr.s_addr ==
+             new_db_udp_client.udp_client.sin_addr.s_addr)) {
             return; // client existing - do not add
         }
     }
-    // Add new client to a free spot in the list
-    for (int i = 0; i < MAX_UDP_CLIENTS; i++) {
-        if (connections->db_udp_clients[i].udp_client.sin_len == 0) { // check if we found an empty spot in the list
-            connections->db_udp_clients[i].udp_client = new_db_udp_client.udp_client;
-            char addr_str[128];
-            if (new_db_udp_client.udp_client.sin_family == PF_INET) {
-                inet_ntoa_r(((struct sockaddr_in *) &new_db_udp_client.udp_client)->sin_addr.s_addr, addr_str,
-                            sizeof(addr_str) - 1);
-            }
-            ESP_LOGI(TAG, "UDP: New client added to list: %s:%d", addr_str, ntohs(new_db_udp_client.udp_client.sin_port));
-            num_connected_udp_clients += 1;
-            return;
-        }
-    }
+    n_udp_conn_list->db_udp_clients[n_udp_conn_list->size] = new_db_udp_client; // Copy the element data to the end of the array
+    n_udp_conn_list->size++; // Increment the size of the list
 }
 
 /**
@@ -249,16 +267,27 @@ void add_udp_to_known_clients(struct db_udp_connection_t *connections, struct db
  * Usually called in AP-Mode when a station disconnects. In any other case we will not know since UDP is a connection-less
  * protocol
  *
- * @param connections The list of open UDP connections
- * @param db_udp_client The UDP client to remove based on its MAC address
+ * @param n_udp_conn_list Structure containing all UDP connection information
+ * @param new_db_udp_client The UDP client to remove based on its MAC address
  */
-void remove_udp_from_known_clients(struct db_udp_connection_t *connections, struct db_udp_client_t db_udp_client) {
-    for (int i = 0; i < MAX_UDP_CLIENTS; i++) {
-        if (memcmp(connections->db_udp_clients[i].mac, db_udp_client.mac, sizeof(connections->db_udp_clients[i].mac)) == 0) {
-            connections->db_udp_clients[i] = (const struct db_udp_client_t){ 0 };
-            num_connected_udp_clients -= 1;
+void remove_from_known_udp_clients(struct udp_conn_list_t *n_udp_conn_list, struct db_udp_client_t new_db_udp_client) {
+    if (n_udp_conn_list == NULL) { // Check if the list is NULL
+        return; // Do nothing
+    }
+    for (int i = 0; i < n_udp_conn_list->size; i++) { // Loop through the array
+        if (memcmp(n_udp_conn_list->db_udp_clients[i].mac, new_db_udp_client.mac,
+                   sizeof(n_udp_conn_list->db_udp_clients[i].mac)) ==
+            0) { // Compare the current array element with the element
+            // Found a match
+            for (int j = i; j < n_udp_conn_list->size - 1; j++) { // Loop from the current index to the end of the array
+                n_udp_conn_list->db_udp_clients[j] = n_udp_conn_list->db_udp_clients[j +
+                                                                                     1]; // Shift the array elements to the left
+            }
+            n_udp_conn_list->size--; // Decrement the size of the list
+            return; // Exit the function
         }
     }
+    // No match found
 }
 
 /**
@@ -278,8 +307,8 @@ void control_module_udp_tcp() {
     }
     int tcp_master_socket = open_tcp_server(app_port_proxy);
 
-    udp_conn.udp_socket = open_udp_socket();
-    fcntl(udp_conn.udp_socket, F_SETFL, O_NONBLOCK);
+    udp_conn_list->udp_socket = open_udp_socket();
+    fcntl(udp_conn_list->udp_socket, F_SETFL, O_NONBLOCK);
     char udp_buffer[UDP_BUF_SIZE];
     struct db_udp_client_t new_db_udp_client = {0};
     socklen_t udp_socklen = sizeof(new_db_udp_client.udp_client);
@@ -326,7 +355,7 @@ void control_module_udp_tcp() {
         }
         // handle incoming UDP data - Read UDP and forward to flight controller
         // all devices that send us UDP data will be added to the list of MAVLink UDP receivers
-        ssize_t recv_length = recvfrom(udp_conn.udp_socket, udp_buffer, UDP_BUF_SIZE, 0,
+        ssize_t recv_length = recvfrom(udp_conn_list->udp_socket, udp_buffer, UDP_BUF_SIZE, 0,
                                        (struct sockaddr *) &new_db_udp_client.udp_client, &udp_socklen);
         if (recv_length > 0) {
             ESP_LOGD(TAG, "UDP: Received %i bytes", recv_length);
@@ -335,19 +364,19 @@ void control_module_udp_tcp() {
             // Devices/Ports added this way cannot be removed in sta-mode since UDP is connectionless, and we cannot
             // determine if the client is still existing. This will blow up the list connected devices.
             // In AP-Mode the devices can be removed based on the IP/MAC address
-            add_udp_to_known_clients(&udp_conn, new_db_udp_client);
+            add_to_known_udp_clients(udp_conn_list, new_db_udp_client);
 
         }
         switch (SERIAL_PROTOCOL) {
             case 1:
             case 2:
-                parse_msp_ltm(tcp_clients, &udp_conn, msp_message_buffer, &read_msp_ltm, &db_msp_ltm_port);
+                parse_msp_ltm(tcp_clients, udp_conn_list, msp_message_buffer, &read_msp_ltm, &db_msp_ltm_port);
                 break;
             default:
             case 3:
             case 4:
             case 5:
-                parse_transparent(tcp_clients, &udp_conn, serial_buffer, &read_transparent);
+                parse_transparent(tcp_clients, udp_conn_list, serial_buffer, &read_transparent);
                 break;
         }
     }

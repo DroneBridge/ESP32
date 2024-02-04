@@ -57,7 +57,9 @@ bool is_valid_ip4(char *ipAddress) {
     return result != 0;
 }
 
-/* Set HTTP response content type according to file extension */
+/**
+ * Set HTTP response content type according to file extension
+ */
 static esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filepath) {
     const char *type = "text/plain";
     if (CHECK_FILE_EXTENSION(filepath, ".html")) {
@@ -76,7 +78,9 @@ static esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filepa
     return httpd_resp_set_type(req, type);
 }
 
-/* Send HTTP response with the contents of the requested file */
+/**
+ * Send HTTP response with the contents of the requested file
+ */
 static esp_err_t rest_common_get_handler(httpd_req_t *req) {
     char filepath[FILE_PATH_MAX];
 
@@ -218,7 +222,11 @@ static esp_err_t settings_change_post_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-/* Simple handler for getting system handler */
+/**
+ * Returns build information esp-idf version and build version
+ * @param req
+ * @return
+ */
 static esp_err_t system_info_get_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "application/json");
     cJSON *root = cJSON_CreateObject();
@@ -235,13 +243,18 @@ static esp_err_t system_info_get_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-/* Simple handler for getting system handler */
+/**
+ * Returns a JSON containing read bytes from UART, number of connected TCP connections and UDP broadcasts as well as the
+ * current IP address of the ESP32
+ * @param req
+ * @return ESP_OK on successfully sending the http request
+ */
 static esp_err_t system_stats_get_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "application/json");
     cJSON *root = cJSON_CreateObject();
     cJSON_AddNumberToObject(root, "read_bytes", uart_byte_count);
     cJSON_AddNumberToObject(root, "tcp_connected", num_connected_tcp_clients);
-    cJSON_AddNumberToObject(root, "udp_connected", num_connected_udp_clients);
+    cJSON_AddNumberToObject(root, "udp_connected", udp_conn_list->size);
     cJSON_AddStringToObject(root, "current_client_ip", CURRENT_CLIENT_IP);
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
@@ -250,6 +263,42 @@ static esp_err_t system_stats_get_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
+/**
+ * Returns a JSON containing all active UDP connections that the ESP32 broadcasts to
+ * @param req
+ * @return ESP_OK on successfully sending the http request
+ */
+static esp_err_t system_connections_get_handler(httpd_req_t *req) {
+    httpd_resp_set_type(req, "application/json");
+    cJSON *root = cJSON_CreateObject();
+//    cJSON *tcp_clients = cJSON_CreateArray();
+//    for (int i = 0; i < udp_conn_list->size; i++) {
+//        //TODO: Save the TCP IPs and port during accept and put them here into a JSON
+//    }
+//    cJSON_AddItemToObject(root, "tcp_clients", tcp_clients);
+
+    cJSON *udp_clients = cJSON_CreateArray();
+    for (int i = 0; i < udp_conn_list->size; i++) {
+        char ip_string[INET_ADDRSTRLEN];
+        char ip_port_string[INET_ADDRSTRLEN+10];
+        inet_ntop(AF_INET, &(udp_conn_list->db_udp_clients[i].udp_client.sin_addr), ip_string, INET_ADDRSTRLEN);
+        sprintf(ip_port_string, "%s:%d", ip_string, htons (udp_conn_list->db_udp_clients[i].udp_client.sin_port));
+        cJSON_AddItemToArray(udp_clients, cJSON_CreateString(ip_port_string));
+    }
+    cJSON_AddItemToObject(root, "udp_clients", udp_clients);
+
+    const char *sys_info = cJSON_Print(root);
+    httpd_resp_sendstr(req, sys_info);
+    free((void *) sys_info);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
+/**
+ * Sends a JSON message that we are going to reboot now
+ * @param req
+ * @return
+ */
 static esp_err_t system_reboot_get_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "application/json");
     cJSON *root = cJSON_CreateObject();
@@ -259,13 +308,12 @@ static esp_err_t system_reboot_get_handler(httpd_req_t *req) {
     free((void *) sys_info);
     cJSON_Delete(root);
     esp_restart();
-    return ESP_OK;
 }
 
 /**
  * Respond with all internally known settings
  * @param req
- * @return ESP error code
+ * @return ESP_OK on successfully sending the http request
  */
 static esp_err_t settings_data_get_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "application/json");
@@ -310,6 +358,15 @@ esp_err_t start_rest_server(const char *base_path) {
             .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_info_get_uri);
+
+    /* URI handler for fetching client connection info */
+    httpd_uri_t system_connections_get = {
+            .uri = "/api/system/conns",
+            .method = HTTP_GET,
+            .handler = system_connections_get_handler,
+            .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &system_connections_get);
 
     /* URI handler for fetching system info */
     httpd_uri_t system_stats_get_uri = {

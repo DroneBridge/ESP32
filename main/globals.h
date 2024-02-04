@@ -21,11 +21,12 @@
 #define DB_ESP32_GLOBALS_H
 
 #include <freertos/event_groups.h>
+#include "db_esp32_control.h"
 
 #define MAX_LTM_FRAMES_IN_BUFFER 5
-#define BUILDVERSION 8
+#define BUILDVERSION 9
 #define MAJOR_VERSION 1
-#define MINOR_VERSION 3
+#define MINOR_VERSION 4
 
 // can be set by user
 extern uint8_t DB_WIFI_MODE;
@@ -44,9 +45,7 @@ extern uint8_t MSP_LTM_SAMEPORT;        // 0 = no (1607 MSP, 1604 LTM); >0 = yes
 
 extern uint32_t uart_byte_count;
 extern int8_t num_connected_tcp_clients;
-extern int8_t num_connected_udp_clients;
-
-extern struct db_udp_connection_t udp_conn;
+extern struct udp_conn_list_t *udp_conn_list;
 
 extern int WIFI_ESP_MAXIMUM_RETRY;
 

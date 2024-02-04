@@ -33,14 +33,16 @@ struct db_udp_client_t {
     struct sockaddr_in udp_client;    // socket address (IP & PORT) of connected client
 };
 
-// UDP connection stucture
-struct db_udp_connection_t {
+struct udp_conn_list_t {
+    struct db_udp_client_t db_udp_clients[MAX_UDP_CLIENTS]; // The array of list items
+    int size; // The number of items in the list
     int udp_socket;     // ID of UDP socket
-    struct db_udp_client_t db_udp_clients[MAX_UDP_CLIENTS];
 };
 
 void control_module();
-void add_udp_to_known_clients(struct db_udp_connection_t *connections, struct db_udp_client_t new_db_udp_client);
-void remove_udp_from_known_clients(struct db_udp_connection_t *connections, struct db_udp_client_t db_udp_client);
+struct udp_conn_list_t *udp_client_list_create();
+void udp_client_list_destroy(struct udp_conn_list_t *n_udp_conn_list);
+void add_to_known_udp_clients(struct udp_conn_list_t *n_udp_conn_list, struct db_udp_client_t new_db_udp_client);
+void remove_from_known_udp_clients(struct udp_conn_list_t *n_udp_conn_list, struct db_udp_client_t new_db_udp_client);
 
 #endif //DB_ESP32_DB_ESP32_CONTROL_H
