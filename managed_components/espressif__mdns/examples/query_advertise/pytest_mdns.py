@@ -87,26 +87,30 @@ def mdns_server(esp_host, events):
                 continue
             data, addr = sock.recvfrom(1024)
             dns = dpkt.dns.DNS(data)
-            if len(dns.qd) > 0 and dns.qd[0].type == dpkt.dns.DNS_A:
-                if dns.qd[0].name == TESTER_NAME:
-                    print('Received query: {} '.format(dns.__repr__()))
-                    sock.sendto(get_dns_answer_to_mdns(TESTER_NAME),
-                                (MCAST_GRP, UDP_PORT))
-                elif dns.qd[0].name == TESTER_NAME_LWIP:
-                    print('Received query: {} '.format(dns.__repr__()))
-                    sock.sendto(
-                        get_dns_answer_to_mdns_lwip(TESTER_NAME_LWIP, dns.id),
-                        addr)
-            if len(dns.an) > 0 and dns.an[0].type == dpkt.dns.DNS_A:
-                print('Received answer from {}'.format(dns.an[0].name))
-                if dns.an[0].name == esp_host + u'.local':
-                    print('Received answer to esp32-mdns query: {}'.format(
-                        dns.__repr__()))
-                    events['esp_answered'].set()
-                if dns.an[0].name == esp_host + u'-delegated.local':
-                    print('Received answer to esp32-mdns-delegate query: {}'.
-                          format(dns.__repr__()))
-                    events['esp_delegated_answered'].set()
+            if len(dns.qd) > 0:
+                for dns_query in dns.qd:
+                    if dns_query.type == dpkt.dns.DNS_A:
+                        if dns_query.name == TESTER_NAME:
+                            print('Received query: {} '.format(dns.__repr__()))
+                            sock.sendto(get_dns_answer_to_mdns(TESTER_NAME),
+                                        (MCAST_GRP, UDP_PORT))
+                        elif dns_query.name == TESTER_NAME_LWIP:
+                            print('Received query: {} '.format(dns.__repr__()))
+                            sock.sendto(
+                                get_dns_answer_to_mdns_lwip(TESTER_NAME_LWIP, dns.id),
+                                addr)
+            if len(dns.an) > 0:
+                for dns_answer in dns.an:
+                    if dns_answer.type == dpkt.dns.DNS_A:
+                        print('Received answer from {}'.format(dns_answer.name))
+                        if dns_answer.name == esp_host + u'.local':
+                            print('Received answer to esp32-mdns query: {}'.format(
+                                dns.__repr__()))
+                            events['esp_answered'].set()
+                        if dns_answer.name == esp_host + u'-delegated.local':
+                            print('Received answer to esp32-mdns-delegate query: {}'.format(
+                                dns.__repr__()))
+                            events['esp_delegated_answered'].set()
         except socket.timeout:
             break
         except dpkt.UnpackError:
@@ -133,62 +137,66 @@ def test_examples_protocol_mdns(dut):
     }
     mdns_responder = Thread(target=mdns_server,
                             args=(str(specific_host), mdns_server_events))
-    ipv4 = dut.expect(r'IPv4 address: (\d+\.\d+\.\d+\.\d+)[^\d]',
-                      timeout=30)[1].decode()
-    ip_addresses = [ipv4]
+    ip_addresses = []
+    if dut.app.sdkconfig.get('LWIP_IPV4') is True:
+        ipv4 = dut.expect(r'IPv4 address: (\d+\.\d+\.\d+\.\d+)[^\d]',
+                          timeout=30)[1].decode()
+        ip_addresses.append(ipv4)
     if dut.app.sdkconfig.get('LWIP_IPV6') is True:
         ipv6_r = r':'.join((r'[0-9a-fA-F]{4}', ) * 8)
         ipv6 = dut.expect(ipv6_r, timeout=30)[0].decode()
         ip_addresses.append(ipv6)
     print('Connected with IP addresses: {}'.format(','.join(ip_addresses)))
     try:
-        # 3. check the mdns name is accessible.
+        # TODO: Add test for example disabling IPV4
         mdns_responder.start()
-        if not mdns_server_events['esp_answered'].wait(timeout=30):
-            raise ValueError(
-                'Test has failed: did not receive mdns answer within timeout')
-        if not mdns_server_events['esp_delegated_answered'].wait(timeout=30):
-            raise ValueError(
-                'Test has failed: did not receive mdns answer for delegated host within timeout'
+        if dut.app.sdkconfig.get('LWIP_IPV4') is True:
+            # 3. check the mdns name is accessible.
+            if not mdns_server_events['esp_answered'].wait(timeout=30):
+                raise ValueError(
+                    'Test has failed: did not receive mdns answer within timeout')
+            if not mdns_server_events['esp_delegated_answered'].wait(timeout=30):
+                raise ValueError(
+                    'Test has failed: did not receive mdns answer for delegated host within timeout'
+                )
+            # 4. check DUT output if mdns advertized host is resolved
+            dut.expect(
+                re.compile(
+                    b'mdns-test: Query A: tinytester.local resolved to: 127.0.0.1')
             )
-        # 4. check DUT output if mdns advertized host is resolved
-        dut.expect(
-            re.compile(
-                b'mdns-test: Query A: tinytester.local resolved to: 127.0.0.1')
-        )
-        dut.expect(
-            re.compile(
-                b'mdns-test: gethostbyname: tinytester-lwip.local resolved to: 127.0.0.1'
-            ))
-        dut.expect(
-            re.compile(
-                b'mdns-test: getaddrinfo: tinytester-lwip.local resolved to: 127.0.0.1'
-            ))
-        # 5. check the DUT answers to `dig` command
-        dig_output = subprocess.check_output([
-            'dig', '+short', '-p', '5353', '@224.0.0.251',
-            '{}.local'.format(specific_host)
-        ])
-        print('Resolving {} using "dig" succeeded with:\n{}'.format(
-            specific_host, dig_output))
-        if not ipv4.encode('utf-8') in dig_output:
-            raise ValueError(
-                'Test has failed: Incorrectly resolved DUT hostname using dig'
-                "Output should've contained DUT's IP address:{}".format(ipv4))
-        # 6. check the DUT reverse lookup
-        if dut.app.sdkconfig.get('MDNS_RESPOND_REVERSE_QUERIES') is True:
-            for ip_address in ip_addresses:
-                dig_output = subprocess.check_output([
-                    'dig', '+short', '-p', '5353', '@224.0.0.251', '-x',
-                    '{}'.format(ip_address)
-                ])
-                print('Reverse lookup for {} using "dig" succeeded with:\n{}'.
-                      format(ip_address, dig_output))
-                if specific_host not in dig_output.decode():
-                    raise ValueError(
-                        'Test has failed: Incorrectly resolved DUT IP address using dig'
-                        "Output should've contained DUT's name:{}".format(
-                            specific_host))
+            dut.expect(
+                re.compile(
+                    b'mdns-test: gethostbyname: tinytester-lwip.local resolved to: 127.0.0.1'
+                ))
+            dut.expect(
+                re.compile(
+                    b'mdns-test: getaddrinfo: tinytester-lwip.local resolved to: 127.0.0.1'
+                ))
+            # 5. check the DUT answers to `dig` command
+            dig_output = subprocess.check_output([
+                'dig', '+short', '-p', '5353', '@224.0.0.251',
+                '{}.local'.format(specific_host)
+            ])
+            print('Resolving {} using "dig" succeeded with:\n{}'.format(
+                specific_host, dig_output))
+            if not ipv4.encode('utf-8') in dig_output:
+                raise ValueError(
+                    'Test has failed: Incorrectly resolved DUT hostname using dig'
+                    "Output should've contained DUT's IP address:{}".format(ipv4))
+            # 6. check the DUT reverse lookup
+            if dut.app.sdkconfig.get('MDNS_RESPOND_REVERSE_QUERIES') is True:
+                for ip_address in ip_addresses:
+                    dig_output = subprocess.check_output([
+                        'dig', '+short', '-p', '5353', '@224.0.0.251', '-x',
+                        '{}'.format(ip_address)
+                    ])
+                    print('Reverse lookup for {} using "dig" succeeded with:\n{}'.
+                          format(ip_address, dig_output))
+                    if specific_host not in dig_output.decode():
+                        raise ValueError(
+                            'Test has failed: Incorrectly resolved DUT IP address using dig'
+                            "Output should've contained DUT's name:{}".format(
+                                specific_host))
 
     finally:
         mdns_server_events['stop'].set()

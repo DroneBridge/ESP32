@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2015-2022 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2015-2023 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -38,6 +38,14 @@
 #else
 #define NETIF_IPV6_MAX_NUMS 3
 #endif
+
+#if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 1, 0)
+/* CONFIG_LWIP_IPV4 was introduced in IDF v5.1 */
+/* For IDF v5.0, set CONFIG_LWIP_IPV4 to 1 by default */
+#ifndef CONFIG_LWIP_IPV4
+#define CONFIG_LWIP_IPV4 1
+#endif // CONFIG_LWIP_IPV4
+#endif // ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 1, 0)
 
 /** Number of configured interfaces */
 #if MDNS_MAX_PREDEF_INTERFACES > CONFIG_MDNS_MAX_INTERFACES

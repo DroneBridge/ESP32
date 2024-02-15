@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.4](https://github.com/espressif/esp-protocols/commits/mdns-v1.2.4)
+
+### Bug Fixes
+
+- Correction on 6d2c475 MDNS_PREDEF_NETIF_ETH fix ([fc59f87c4e](https://github.com/espressif/esp-protocols/commit/fc59f87c4e))
+- fix the logic of creating pcb for networking socket ([5000a9a20a](https://github.com/espressif/esp-protocols/commit/5000a9a20a))
+- fix compiling issue when disabling IPv4 ([2646dcd23a](https://github.com/espressif/esp-protocols/commit/2646dcd23a))
+- Fix compile error when MDNS_PREDEF_NETIF_ETH is defined, but ETH_ENABLED is not (#459) ([6d2c475c20](https://github.com/espressif/esp-protocols/commit/6d2c475c20))
+
 ## [1.2.3](https://github.com/espressif/esp-protocols/commits/mdns-v1.2.3)
 
 ### Bug Fixes

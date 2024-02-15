@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2015-2022 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2015-2023 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -8,6 +8,7 @@
 #include "esp_console.h"
 #include "argtable3/argtable3.h"
 #include "mdns.h"
+#include "mdns_private.h"
 
 static const char *ip_protocol_str[] = {"V4", "V6", "MAX"};
 
@@ -50,6 +51,7 @@ static struct {
     struct arg_end *end;
 } mdns_query_a_args;
 
+#ifdef CONFIG_LWIP_IPV4
 static int cmd_mdns_query_a(int argc, char **argv)
 {
     int nerrors = arg_parse(argc, argv, (void **) &mdns_query_a_args);
@@ -106,8 +108,9 @@ static void register_mdns_query_a(void)
 
     ESP_ERROR_CHECK( esp_console_cmd_register(&cmd_init) );
 }
+#endif /* CONFIG_LWIP_IPV4 */
 
-#if CONFIG_LWIP_IPV6
+#ifdef CONFIG_LWIP_IPV6
 static int cmd_mdns_query_aaaa(int argc, char **argv)
 {
     int nerrors = arg_parse(argc, argv, (void **) &mdns_query_a_args);
@@ -164,7 +167,7 @@ static void register_mdns_query_aaaa(void)
 
     ESP_ERROR_CHECK( esp_console_cmd_register(&cmd_init) );
 }
-#endif
+#endif /* CONFIG_LWIP_IPV6 */
 
 static struct {
     struct arg_str *instance;
@@ -1042,8 +1045,10 @@ void mdns_console_register(void)
     register_mdns_service_txt_remove();
     register_mdns_service_remove_all();
 
+#ifdef CONFIG_LWIP_IPV4
     register_mdns_query_a();
-#if CONFIG_LWIP_IPV6
+#endif
+#ifdef CONFIG_LWIP_IPV6
     register_mdns_query_aaaa();
 #endif
     register_mdns_query_txt();

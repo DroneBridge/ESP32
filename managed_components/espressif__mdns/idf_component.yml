@@ -3,4 +3,4 @@ dependencies:
     version: '>=5.0'
 description: mDNS
 url: https://github.com/espressif/esp-protocols/tree/master/components/mdns
-version: 1.2.3
+version: 1.2.4

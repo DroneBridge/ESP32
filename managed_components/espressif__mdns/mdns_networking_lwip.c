@@ -96,6 +96,7 @@ static esp_err_t _udp_join_group(mdns_if_t if_inx, mdns_ip_protocol_t ip_protoco
     netif = esp_netif_get_netif_impl(tcpip_if);
     assert(netif);
 
+#if LWIP_IPV4
     if (ip_protocol == MDNS_IP_PROTOCOL_V4) {
         ip4_addr_t multicast_addr;
         IP4_ADDR(&multicast_addr, 224, 0, 0, 251);
@@ -110,21 +111,22 @@ static esp_err_t _udp_join_group(mdns_if_t if_inx, mdns_ip_protocol_t ip_protoco
             }
         }
     }
-#if CONFIG_LWIP_IPV6
-    else {
+#endif // LWIP_IPV4
+#if LWIP_IPV6
+    if (ip_protocol == MDNS_IP_PROTOCOL_V6) {
         ip_addr_t multicast_addr = IPADDR6_INIT(0x000002ff, 0, 0, 0xfb000000);
 
         if (join) {
-            if (mld6_joingroup_netif(netif, &(multicast_addr.u_addr.ip6))) {
+            if (mld6_joingroup_netif(netif, ip_2_ip6(&multicast_addr))) {
                 return ESP_ERR_INVALID_STATE;
             }
         } else {
-            if (mld6_leavegroup_netif(netif, &(multicast_addr.u_addr.ip6))) {
+            if (mld6_leavegroup_netif(netif, ip_2_ip6(&multicast_addr))) {
                 return ESP_ERR_INVALID_STATE;
             }
         }
     }
-#endif
+#endif // LWIP_IPV6
     return ESP_OK;
 }
 
@@ -152,29 +154,34 @@ static void _udp_recv(void *arg, struct udp_pcb *upcb, struct pbuf *pb, const ip
         packet->tcpip_if = MDNS_MAX_INTERFACES;
         packet->pb = this_pb;
         packet->src_port = rport;
-#if CONFIG_LWIP_IPV6
+#if LWIP_IPV4 && LWIP_IPV6
         packet->src.type = raddr->type;
         memcpy(&packet->src.u_addr, &raddr->u_addr, sizeof(raddr->u_addr));
-#else
+#elif LWIP_IPV4
         packet->src.type = IPADDR_TYPE_V4;
-        memcpy(&packet->src.u_addr.ip4, &raddr->addr, sizeof(ip_addr_t));
+        packet->src.u_addr.ip4.addr = raddr->addr;
+#elif LWIP_IPV6
+        packet->src.type = IPADDR_TYPE_V6;
+        memcpy(&packet->src.u_addr.ip6, raddr, sizeof(ip_addr_t));
 #endif
         packet->dest.type = packet->src.type;
 
+#if LWIP_IPV4
         if (packet->src.type == IPADDR_TYPE_V4) {
             packet->ip_protocol = MDNS_IP_PROTOCOL_V4;
             struct ip_hdr *iphdr = (struct ip_hdr *)(((uint8_t *)(packet->pb->payload)) - UDP_HLEN - IP_HLEN);
             packet->dest.u_addr.ip4.addr = iphdr->dest.addr;
             packet->multicast = ip4_addr_ismulticast(&(packet->dest.u_addr.ip4));
         }
-#if CONFIG_LWIP_IPV6
-        else {
+#endif // LWIP_IPV4
+#if LWIP_IPV6
+        if (packet->src.type == IPADDR_TYPE_V6) {
             packet->ip_protocol = MDNS_IP_PROTOCOL_V6;
             struct ip6_hdr *ip6hdr = (struct ip6_hdr *)(((uint8_t *)(packet->pb->payload)) - UDP_HLEN - IP6_HLEN);
             memcpy(&packet->dest.u_addr.ip6.addr, (uint8_t *)ip6hdr->dest.addr, 16);
             packet->multicast = ip6_addr_ismulticast(&(packet->dest.u_addr.ip6));
         }
-#endif
+#endif // LWIP_IPV6
 
         //lwip does not return the proper pcb if you have more than one for the same multicast address (but different interfaces)
         struct netif *netif = NULL;
@@ -182,15 +189,14 @@ static void _udp_recv(void *arg, struct udp_pcb *upcb, struct pbuf *pb, const ip
         for (i = 0; i < MDNS_MAX_INTERFACES; i++) {
             netif = esp_netif_get_netif_impl(_mdns_get_esp_netif(i));
             if (s_interfaces[i].proto && netif && netif == ip_current_input_netif ()) {
+#if LWIP_IPV4
                 if (packet->src.type == IPADDR_TYPE_V4) {
-#if CONFIG_LWIP_IPV6
-                    if ((packet->src.u_addr.ip4.addr & netif->netmask.u_addr.ip4.addr) != (netif->ip_addr.u_addr.ip4.addr & netif->netmask.u_addr.ip4.addr)) {
-#else
-                    if ((packet->src.u_addr.ip4.addr & netif->netmask.addr) != (netif->ip_addr.addr & netif->netmask.addr)) {
-#endif                  //packet source is not in the same subnet
+                    if ((packet->src.u_addr.ip4.addr & ip_2_ip4(&netif->netmask)->addr) != (ip_2_ip4(&netif->ip_addr)->addr & ip_2_ip4(&netif->netmask)->addr)) {
+                        //packet source is not in the same subnet
                         break;
                     }
                 }
+#endif // LWIP_IPV4
                 packet->tcpip_if = i;
                 found = true;
                 break;
@@ -347,12 +353,17 @@ size_t _mdns_udp_pcb_write(mdns_if_t tcpip_if, mdns_ip_protocol_t ip_protocol, c
     memcpy((uint8_t *)pbt->payload, data, len);
 
     ip_addr_t ip_add_copy;
-#if CONFIG_LWIP_IPV6
+#if LWIP_IPV6 && LWIP_IPV4
     ip_add_copy.type = ip->type;
     memcpy(&(ip_add_copy.u_addr), &(ip->u_addr), sizeof(ip_add_copy.u_addr));
-#else
-    memcpy(&(ip_add_copy.addr), &(ip->u_addr), sizeof(ip_add_copy.addr));
-#endif // CONFIG_LWIP_IPV6
+#elif LWIP_IPV4
+    ip_add_copy.addr = ip->u_addr.ip4.addr;
+#elif LWIP_IPV6
+#if LWIP_IPV6_SCOPES
+    ip_add_copy.zone = ip->u_addr.ip6.zone;
+#endif // LWIP_IPV6_SCOPES
+    memcpy(ip_add_copy.addr, ip->u_addr.ip6.addr, sizeof(ip_add_copy.addr));
+#endif
 
     mdns_api_call_t msg = {
         .tcpip_if = tcpip_if,
