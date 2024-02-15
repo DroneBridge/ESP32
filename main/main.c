@@ -284,7 +284,7 @@ int init_wifi_clientmode() {
             .sta = {
                     .ssid = "DroneBridge_ESP32_Init",
                     .password = "dronebridge",
-                    .threshold.authmode = WIFI_AUTH_WPA_PSK
+                    .threshold.authmode = WIFI_AUTH_OPEN
             },
     };
     strncpy((char *)wifi_config.sta.ssid, (char *)DEFAULT_SSID, 32);

@@ -35,7 +35,7 @@ connected devices/stations. Allows additional clients to register for UDP. Clien
 ## Download or Compile
 
 Ready to use binaries for ESP32 via [GitHub releases](https://github.com/DroneBridge/ESP32/releases).  
-Or compile for ESP32S2, ESP32S3 & ESP32C3 using esp-idf v5.1:
+Or compile using esp-idf v5.1:
 -   ESP32   `idf.py set-target esp32 build`
 -   ESP32S2 `idf.py set-target esp32s2 build`
 -   ESP32S3 `idf.py set-target esp32s3 build`

@@ -44,7 +44,6 @@ uint ltm_frames_in_buffer_pnt = 0;
 
 uint32_t uart_byte_count = 0;
 int8_t num_connected_tcp_clients = 0;
-//int8_t num_connected_udp_clients = 0;
 
 esp_err_t open_serial_socket() {
     uart_config_t uart_config = {
@@ -133,7 +132,7 @@ void parse_msp_ltm(int tcp_clients[], struct udp_conn_list_t *udp_connection, ui
                    msp_ltm_port_t *db_msp_ltm_port) {
     uint8_t serial_bytes[TRANS_RD_BYTES_NUM];
     uint read;
-    if ((read = uart_read_bytes(UART_NUM, serial_bytes, TRANS_RD_BYTES_NUM, 200 / portTICK_PERIOD_MS)) > 0) {
+    if ((read = uart_read_bytes(UART_NUM, serial_bytes, TRANS_RD_BYTES_NUM, 0)) > 0) {
         uart_byte_count += read;
         for (uint j = 0; j < read; j++) {
             (*serial_read_bytes)++;
@@ -173,7 +172,7 @@ void parse_transparent(int tcp_clients[], struct udp_conn_list_t *udp_connection
                        uint *serial_read_bytes) {
     uint8_t serial_bytes[TRANS_RD_BYTES_NUM];
     uint read;
-    if ((read = uart_read_bytes(UART_NUM, serial_bytes, TRANS_RD_BYTES_NUM, 200 / portTICK_PERIOD_MS)) > 0) {
+    if ((read = uart_read_bytes(UART_NUM, serial_bytes, TRANS_RD_BYTES_NUM, 0)) > 0) {
         memcpy(&serial_buffer[*serial_read_bytes], serial_bytes, read);
         uart_byte_count += read;
         *serial_read_bytes += read;
