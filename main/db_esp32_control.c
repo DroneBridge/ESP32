@@ -59,7 +59,7 @@ esp_err_t open_serial_socket() {
 }
 
 /**
- * Opens UDP socket
+ * Opens non-blocking UDP socket
  * @return returns socket file descriptor
  */
 int open_udp_socket() {
@@ -84,8 +84,8 @@ int open_udp_socket() {
     if (err < 0) {
         ESP_LOGE(TAG, "Socket unable to bind: errno %d", errno);
     }
+    fcntl(udp_socket, F_SETFL, O_NONBLOCK);
     ESP_LOGI(TAG, "Opened UDP socket on port %i", APP_PORT_PROXY_UDP);
-
     return udp_socket;
 }
 
@@ -116,8 +116,13 @@ void send_to_all_clients(int tcp_clients[], struct udp_conn_list_t *n_udp_conn_l
     send_to_all_udp_clients(n_udp_conn_list, data, data_length);
 }
 
-void write_to_uart(const char tcp_client_buffer[], const size_t data_length) {
-    int written = uart_write_bytes(UART_NUM, tcp_client_buffer, data_length);
+/**
+ * Writes data from buffer to UART
+ * @param data_buffer Payload to write to UART
+ * @param data_length Size of payload to write to UART
+ */
+void write_to_uart(const char data_buffer[], const size_t data_length) {
+    int written = uart_write_bytes(UART_NUM, data_buffer, data_length);
     if (written > 0)
         ESP_LOGD(TAG, "Wrote %i bytes", written);
     else
@@ -161,24 +166,24 @@ void parse_msp_ltm(int tcp_clients[], struct udp_conn_list_t *udp_connection, ui
     }
 }
 
-
 /**
  * Reads TRANS_RD_BYTES_NUM bytes from UART and checks if we already got enough bytes to send them out
  *
  * @param tcp_clients Array of connected TCP clients
+ * @param udp_connection Structure containing all UDP connection data including the sockets
+ * @param serial_buffer Buffer that gets filled with data and then sent via TCP and UDP
  * @param serial_read_bytes Number of bytes already read for the current packet
  */
 void parse_transparent(int tcp_clients[], struct udp_conn_list_t *udp_connection, uint8_t serial_buffer[],
                        uint *serial_read_bytes) {
-    uint8_t serial_bytes[TRANS_RD_BYTES_NUM];
-    uint read;
-    if ((read = uart_read_bytes(UART_NUM, serial_bytes, TRANS_RD_BYTES_NUM, 0)) > 0) {
-        memcpy(&serial_buffer[*serial_read_bytes], serial_bytes, read);
-        uart_byte_count += read;
-        *serial_read_bytes += read;
+    uint16_t read;
+    // read from UART directly into TCP & UDP send buffer
+    if ((read = uart_read_bytes(UART_NUM, &serial_buffer[*serial_read_bytes], (TRANSPARENT_BUF_SIZE-*serial_read_bytes), 0)) > 0) {
+        uart_byte_count += read;    // increase total bytes read via UART
+        *serial_read_bytes += read; // set new buffer position
         if (*serial_read_bytes >= TRANSPARENT_BUF_SIZE) {
             send_to_all_clients(tcp_clients, udp_connection, serial_buffer, *serial_read_bytes);
-            *serial_read_bytes = 0;
+            *serial_read_bytes = 0; // reset buffer position
         }
     }
 }
@@ -307,7 +312,6 @@ void control_module_udp_tcp() {
     int tcp_master_socket = open_tcp_server(app_port_proxy);
 
     udp_conn_list->udp_socket = open_udp_socket();
-    fcntl(udp_conn_list->udp_socket, F_SETFL, O_NONBLOCK);
     char udp_buffer[UDP_BUF_SIZE];
     struct db_udp_client_t new_db_udp_client = {0};
     socklen_t udp_socklen = sizeof(new_db_udp_client.udp_client);
@@ -327,6 +331,7 @@ void control_module_udp_tcp() {
     uint8_t msp_message_buffer[UART_BUF_SIZE];
     uint8_t serial_buffer[TRANSPARENT_BUF_SIZE];
     msp_ltm_port_t db_msp_ltm_port;
+    int delay_timer_cnt = 0;
 
     ESP_LOGI(TAG, "Started control module");
     while (1) {
@@ -364,7 +369,6 @@ void control_module_udp_tcp() {
             // determine if the client is still existing. This will blow up the list connected devices.
             // In AP-Mode the devices can be removed based on the IP/MAC address
             add_to_known_udp_clients(udp_conn_list, new_db_udp_client);
-
         }
         switch (SERIAL_PROTOCOL) {
             case 1:
@@ -377,6 +381,14 @@ void control_module_udp_tcp() {
             case 5:
                 parse_transparent(tcp_clients, udp_conn_list, serial_buffer, &read_transparent);
                 break;
+        }
+        if (delay_timer_cnt == 10000) {
+            // all actions are non-blocking so allow some delay so that the IDLE task of FreeRTOS and the watchdog can run
+            // read: https://esp32developer.com/programming-in-c-c/tasks/tasks-vs-co-routines for reference
+            vTaskDelay(10/portTICK_PERIOD_MS);
+            delay_timer_cnt = 0;
+        } else {
+            delay_timer_cnt++;
         }
     }
     vTaskDelete(NULL);

@@ -316,11 +316,6 @@ int init_wifi_clientmode() {
     } else {
         ESP_LOGE(TAG, "UNEXPECTED WIFI EVENT");
     }
-//    /* The event will not be processed after unregister */
-//    ESP_ERROR_CHECK(esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, instance_got_ip));
-//    ESP_ERROR_CHECK(esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, instance_any_id));
-//    vEventGroupDelete(s_wifi_event_group);
-
     if (enable_temp_ap_mode) {
         ESP_LOGW(TAG, "WiFi client mode was not able to connect to the specified access point");
         return -1;
