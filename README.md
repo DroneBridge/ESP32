@@ -122,15 +122,15 @@ Defaults: UART2 (RX2, TX2 on GPIO 16, 17)
     -   `WiFi Client Mode`  
     ESP32 will connect to the specified WiFi Access Point. After 50 failed connection retries (~60 seconds) the ESP32 will temporarily switch to WiFi Access Point Mode with SSID `Failsafe DroneBridge ESP32` and password `dronebridge`. This mode allows you to check and change the configuration. On reboot the stored configuration will be loaded.  
                             In this mode the ESP32 can connect to WiFi and ESP-NOW (LR-Mode) devices.
-    -   `ESP-NOW Access Point Mode`   
+    -   `(In future release) ESP-NOW Access Point Mode`   
     Launches an access point that is ESP-NOW enabled. ESP-NOW Access Point Mode makes the device invisible for non-ESP-NOW enabled devices. You will not be able to change the config!  
         You will have to manually erase the flash memory of the ESP32 and re-flash DroneBridge for ESP32 to get back into normal Wi-Fi Mode!
 -   `Wifi SSID`: Up to 31 character long
--   `Wifi password`: Up to 63 character long
+-   `Wifi password`: Min. 8 characters, max 63 character long. WiFi must be at least WEP encrypted. No support for unencrypted networks!
 -   `UART baud rate`: Same as you configured on your flight controller
--   `GPIO TX PIN Number` & `GPIO RX PIN Number`: The pins you want to use for TX & RX (UART). See pin out of manufacturer of your ESP32 device **Flight controller UART must be 3.3V or use an inverter.** If pins are the same for TX & RX the UART will not be opened.
+-   `GPIO TX PIN Number` & `GPIO RX PIN Number`: The pins you want to use for TX & RX (UART). See pin out of manufacturer of your ESP32 device **Flight controller UART must be 3.3V or use an inverter.** If pins are the same for TX & RX the UART connection will not be established.
 -   `UART serial protocol`: MultiWii based or MAVLink based - configures the parser
--   `Transparent packet size`: Only used with 'serial protocol' set to transparent. Length of UDP packets in transparent mode
+-   `Transparent packet size`: Only used with 'serial protocol' set to transparent. Length of UDP packets in transparent mode. **ESP-NOW only supports packets <250bytes**
 -   `LTM frames per packet`: Buffer the specified number of packets and send them at once in one packet
 -   `Gateway IP address`: IPv4 address you want the ESP32 access point to have
 

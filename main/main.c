@@ -60,6 +60,7 @@ int32_t DB_UART_BAUD_RATE = 115200;
 uint16_t TRANSPARENT_BUF_SIZE = 64;
 uint8_t LTM_FRAME_NUM_BUFFER = 1;
 uint8_t MSP_LTM_SAMEPORT = 0;
+int station_rssi = 0;
 
 struct udp_conn_list_t *udp_conn_list;
 
@@ -284,7 +285,7 @@ int init_wifi_clientmode() {
             .sta = {
                     .ssid = "DroneBridge_ESP32_Init",
                     .password = "dronebridge",
-                    .threshold.authmode = WIFI_AUTH_OPEN
+                    .threshold.authmode = WIFI_AUTH_WEP
             },
     };
     strncpy((char *)wifi_config.sta.ssid, (char *)DEFAULT_SSID, 32);

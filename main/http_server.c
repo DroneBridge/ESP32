@@ -256,6 +256,7 @@ static esp_err_t system_stats_get_handler(httpd_req_t *req) {
     cJSON_AddNumberToObject(root, "tcp_connected", num_connected_tcp_clients);
     cJSON_AddNumberToObject(root, "udp_connected", udp_conn_list->size);
     cJSON_AddStringToObject(root, "current_client_ip", CURRENT_CLIENT_IP);
+    cJSON_AddNumberToObject(root, "rssi", station_rssi);
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
     free((void *) sys_info);

@@ -159,7 +159,12 @@ function get_stats() {
 			document.getElementById("udp_connected").innerHTML = udp_clients + " client"
 		}
 
-		document.getElementById("current_client_ip").innerHTML = "IP Address: " + json_data["current_client_ip"]
+		let rssi = parseInt(json_data["rssi"])
+		if (!isNaN(rssi) && rssi < 0) {
+			document.getElementById("current_client_ip").innerHTML = "IP Address: " + json_data["current_client_ip"] + "<br />RSSI: " + rssi + "dBm"
+		} else if (!isNaN(rssi)) {
+			document.getElementById("current_client_ip").innerHTML = "IP Address: " + json_data["current_client_ip"]
+		}
 	}).catch(error => {
 		conn_status = 0
 		error.message;

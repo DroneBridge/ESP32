@@ -42,6 +42,7 @@ extern int DB_UART_BAUD_RATE;
 extern uint16_t TRANSPARENT_BUF_SIZE;
 extern uint8_t LTM_FRAME_NUM_BUFFER;    // Number of LTM frames per UDP packet (min = 1; max = 5)
 extern uint8_t MSP_LTM_SAMEPORT;        // 0 = no (1607 MSP, 1604 LTM); >0 = yes (1604)
+extern int station_rssi;               // updated when ESP32 is in station mode and connected to an access point
 
 extern uint32_t uart_byte_count;
 extern int8_t num_connected_tcp_clients;

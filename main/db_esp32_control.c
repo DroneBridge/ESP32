@@ -24,6 +24,7 @@
 #include <esp_vfs_dev.h>
 #include <lwip/inet.h>
 #include <esp_timer.h>
+#include <esp_wifi.h>
 #include "esp_log.h"
 #include "lwip/sockets.h"
 #include "driver/uart.h"
@@ -32,6 +33,7 @@
 #include "db_protocol.h"
 #include "tcp_server.h"
 #include "db_esp32_control.h"
+#include "main.h"
 
 #define UART_NUM UART_NUM_1
 
@@ -387,6 +389,12 @@ void control_module_udp_tcp() {
             // read: https://esp32developer.com/programming-in-c-c/tasks/tasks-vs-co-routines for reference
             vTaskDelay(10/portTICK_PERIOD_MS);
             delay_timer_cnt = 0;
+            if (DB_WIFI_MODE == DB_WIFI_MODE_STA) {
+                // update rssi variable - set to 0 when not available
+                if (esp_wifi_sta_get_rssi(&station_rssi) != ESP_OK) {
+                    station_rssi = 0;
+                }
+            }
         } else {
             delay_timer_cnt++;
         }
