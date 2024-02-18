@@ -11,6 +11,9 @@
 # cache dir
 .cache/
 
+# logs
+*.log
+
 # ESP-IDF default build directory name
 build
 

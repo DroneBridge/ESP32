@@ -158,7 +158,7 @@ static esp_err_t settings_change_post_handler(httpd_req_t *req) {
     cJSON *root = cJSON_Parse(buf);
 
     cJSON *json = cJSON_GetObjectItem(root, "esp32_mode");
-    if (json) DB_WIFI_MODE = json->valueint;
+    if (json) DB_NETIF_MODE = json->valueint;
 
     json = cJSON_GetObjectItem(root, "wifi_ssid");
     if (json && strlen(json->valuestring) < 32 && strlen(json->valuestring) > 0)
@@ -319,7 +319,7 @@ static esp_err_t system_reboot_get_handler(httpd_req_t *req) {
 static esp_err_t settings_data_get_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "application/json");
     cJSON *root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "esp32_mode", DB_WIFI_MODE);
+    cJSON_AddNumberToObject(root, "esp32_mode", DB_NETIF_MODE);
     cJSON_AddStringToObject(root, "wifi_ssid", (char *) DEFAULT_SSID);
     cJSON_AddStringToObject(root, "wifi_pass", (char *) DEFAULT_PWD);
     cJSON_AddNumberToObject(root, "ap_channel", DEFAULT_CHANNEL);

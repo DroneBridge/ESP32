@@ -29,7 +29,7 @@
 #define MINOR_VERSION 4
 
 // can be set by user
-extern uint8_t DB_WIFI_MODE;
+extern uint8_t DB_NETIF_MODE;
 extern uint8_t DEFAULT_SSID[32];
 extern uint8_t DEFAULT_PWD[64];
 extern char DEFAULT_AP_IP[32];

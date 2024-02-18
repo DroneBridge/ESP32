@@ -17,34 +17,11 @@
  *
  */
 
-#include <stdio.h>
-#include <nvs_flash.h>
-#include <esp_wifi_types.h>
-#include <string.h>
-#include <driver/gpio.h>
-#include <lwip/apps/netbiosns.h>
-
-#include "freertos/event_groups.h"
-#include "esp_mac.h"
-#include "esp_wifi.h"
-#include "esp_wifi_types.h"
-#include "esp_log.h"
-#include "esp_event.h"
-#include "db_esp32_control.h"
-#include "http_server.h"
-#include "db_esp32_comm.h"
-#include "db_protocol.h"
-#include "esp_vfs_semihost.h"
-#include "esp_spiffs.h"
-#include "http_server.h"
 #include "main.h"
-#include "mdns.h"
-
-#define NVS_NAMESPACE "settings"
 
 static const char *TAG = "DB_ESP32";
 
-uint8_t DB_WIFI_MODE = DB_WIFI_MODE_AP; // 1=Wifi AP mode, 2=Wifi client mode, 3=ESP-NOW LR Mode
+uint8_t DB_NETIF_MODE = DB_ETH_MODE;  // 1=Wifi AP mode, 2=Wifi client mode, 3=ESP-NOW LR Mode, 4=Ethernet mode
 uint8_t DEFAULT_SSID[32] = "DroneBridge ESP32";
 uint8_t DEFAULT_PWD[64] = "dronebridge";
 char DEFAULT_AP_IP[32] = "192.168.2.1";
@@ -65,11 +42,9 @@ int station_rssi = 0;
 struct udp_conn_list_t *udp_conn_list;
 
 // Wifi client mode vars
-int WIFI_ESP_MAXIMUM_RETRY = 25;          // max number of retries to connect to the ap before enabling temp. ap mode
+int WIFI_ESP_MAXIMUM_RETRY = 25;  // max number of retries to connect to the ap before enabling temp. ap mode
 static int s_retry_num = 0;
 static EventGroupHandle_t s_wifi_event_group;
-#define WIFI_CONNECTED_BIT BIT0
-#define WIFI_FAIL_BIT      BIT1
 
 esp_netif_t *esp_default_netif;
 
@@ -85,11 +60,11 @@ esp_netif_t *esp_default_netif;
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
     // Wifi access point mode events
     if (event_id == WIFI_EVENT_AP_STACONNECTED) {
-        wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *) event_data;
-        ESP_LOGI(TAG, "WIFI_EVENT - Client connected - station:"MACSTR", AID=%d", MAC2STR(event->mac), event->aid);
+        wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *)event_data;
+        ESP_LOGI(TAG, "WIFI_EVENT - Client connected - station:" MACSTR ", AID=%d", MAC2STR(event->mac), event->aid);
     } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
-        wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *) event_data;
-        ESP_LOGI(TAG, "WIFI_EVENT - Client disconnected - station:"MACSTR", AID=%d", MAC2STR(event->mac), event->aid);
+        wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *)event_data;
+        ESP_LOGI(TAG, "WIFI_EVENT - Client disconnected - station:" MACSTR ", AID=%d", MAC2STR(event->mac), event->aid);
         struct db_udp_client_t db_udp_client;
         memcpy(db_udp_client.mac, event->mac, sizeof(db_udp_client.mac));
         remove_from_known_udp_clients(udp_conn_list, db_udp_client);
@@ -97,8 +72,8 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         ESP_LOGI(TAG, "WIFI_EVENT - AP started! (SSID: %s PASS: %s)", DEFAULT_SSID, DEFAULT_PWD);
     } else if (event_id == WIFI_EVENT_AP_STOP) {
         ESP_LOGI(TAG, "WIFI_EVENT - AP stopped!");
-    } else if(event_base == IP_EVENT && event_id == IP_EVENT_AP_STAIPASSIGNED){
-        ip_event_ap_staipassigned_t* event = (ip_event_ap_staipassigned_t*) event_data;
+    } else if (event_base == IP_EVENT && event_id == IP_EVENT_AP_STAIPASSIGNED) {
+        ip_event_ap_staipassigned_t *event = (ip_event_ap_staipassigned_t *)event_data;
         ESP_LOGI(TAG, "WIFI_EVENT - New station IP:" IPSTR, IP2STR(&event->ip));
         ESP_LOGI(TAG, "WIFI_EVENT - MAC: " MACSTR, MAC2STR(event->mac));
         struct db_udp_client_t db_udp_client;
@@ -109,7 +84,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         memcpy(db_udp_client.mac, event->mac, sizeof(db_udp_client.mac));
         add_to_known_udp_clients(udp_conn_list, db_udp_client);
     }
-    // Wifi client mode events
+    // Wifi client mode and Ethernet events
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         ESP_LOGI(TAG, "WIFI_EVENT - Wifi Started");
         ESP_ERROR_CHECK(esp_wifi_connect());
@@ -120,20 +95,27 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
             s_retry_num++;
             ESP_LOGI(TAG, "Retry to connect to the AP (%i/%i)", s_retry_num, WIFI_ESP_MAXIMUM_RETRY);
         } else {
-            ESP_LOGI(TAG,"Connecting to the AP failed");
+            ESP_LOGI(TAG, "Connecting to the AP failed");
             xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
         }
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
+        ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
         ESP_LOGI(TAG, "WIFI_EVENT - Got IP:" IPSTR, IP2STR(&event->ip_info.ip));
         sprintf(CURRENT_CLIENT_IP, IPSTR, IP2STR(&event->ip_info.ip));
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+    } else if (event_base == IP_EVENT && event_id == IP_EVENT_ETH_GOT_IP) {
+        ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
+        ESP_LOGI(TAG, "ETH_EVENT - Got IP:" IPSTR, IP2STR(&event->ip_info.ip));
+        sprintf(CURRENT_CLIENT_IP, IPSTR, IP2STR(&event->ip_info.ip));
     }
 }
 
+/**
+ * @brief Initialize mDNS service
+ * 
+ */
 void start_mdns_service() {
-    //initialize mDNS service
     esp_err_t err = mdns_init();
     if (err) {
         printf("MDNS Init failed: %d\n", err);
@@ -160,16 +142,14 @@ esp_err_t init_fs(void) {
 }
 #endif
 
-
 #if CONFIG_WEB_DEPLOY_SF
 
 esp_err_t init_fs(void) {
     esp_vfs_spiffs_conf_t conf = {
-            .base_path = CONFIG_WEB_MOUNT_POINT,
-            .partition_label = NULL,
-            .max_files = 5,
-            .format_if_mount_failed = false
-    };
+        .base_path = CONFIG_WEB_MOUNT_POINT,
+        .partition_label = NULL,
+        .max_files = 5,
+        .format_if_mount_failed = false};
     esp_err_t ret = esp_vfs_spiffs_register(&conf);
 
     if (ret != ESP_OK) {
@@ -188,7 +168,7 @@ esp_err_t init_fs(void) {
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to get SPIFFS partition information (%s)", esp_err_to_name(ret));
     } else {
-        ESP_LOGI(TAG, "Filesystem init finished! Partition size: total: %d bytes, used: %d bytes (%i%%)", total, used, (used*100)/total);
+        ESP_LOGI(TAG, "Filesystem init finished! Partition size: total: %d bytes, used: %d bytes (%i%%)", total, used, (used * 100) / total);
     }
     return ret;
 }
@@ -200,7 +180,7 @@ esp_err_t init_fs(void) {
  *
  * @param wifi_mode Allowes to overwrite an AP mode from traditional WiFi to LR Mode
  */
-void init_wifi_apmode(int wifi_mode) {
+void init_netif_wifi_apmode(int wifi_mode) {
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     esp_default_netif = esp_netif_create_default_wifi_ap();
@@ -220,15 +200,14 @@ void init_wifi_apmode(int wifi_mode) {
                                                         &ap_staipassigned_ip));
 
     wifi_config_t wifi_config = {
-            .ap = {
-                    .ssid = "DroneBridge_ESP32_Init",
-                    .ssid_len = 0,
-                    .authmode = WIFI_AUTH_WPA2_PSK,
-                    .channel = DEFAULT_CHANNEL,
-                    .ssid_hidden = 0,
-                    .beacon_interval = 100,
-                    .max_connection = 10
-            },
+        .ap = {
+            .ssid = "DroneBridge_ESP32_Init",
+            .ssid_len = 0,
+            .authmode = WIFI_AUTH_WPA2_PSK,
+            .channel = DEFAULT_CHANNEL,
+            .ssid_hidden = 0,
+            .beacon_interval = 100,
+            .max_connection = 10},
     };
     strncpy((char *)wifi_config.ap.ssid, (char *)DEFAULT_SSID, 32);
     strncpy((char *)wifi_config.ap.password, (char *)DEFAULT_PWD, 64);
@@ -261,7 +240,7 @@ void init_wifi_apmode(int wifi_mode) {
 /**
  * Initializes the ESP Wifi client mode where we connect to a known access point.
  */
-int init_wifi_clientmode() {
+int init_netif_wifi_clientmode() {
     s_wifi_event_group = xEventGroupCreate();
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
@@ -293,7 +272,7 @@ int init_wifi_clientmode() {
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_LR));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
 
     ESP_LOGI(TAG, "Init of WiFi Client-Mode finished. (SSID: %s PASS: %s)", DEFAULT_SSID, DEFAULT_PWD);
@@ -325,6 +304,59 @@ int init_wifi_clientmode() {
     return 0;
 }
 
+/**
+ * Initializes the ESP W32-ETH0 Ethernet mode
+ */
+void init_netif_ethernet_mode() {
+    ESP_LOGD(TAG, "Initializing Ethernet MAC ...");
+    ESP_ERROR_CHECK(esp_netif_init());
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+
+    ESP_LOGD(TAG, "Initializing Ethernet PHY (LAN8720A) ...");
+    // Init common MAC and PHY configs to default
+    eth_mac_config_t mac_config = ETH_MAC_DEFAULT_CONFIG();
+    mac_config.sw_reset_timeout_ms = 1000;  // from ETH.cpp
+    eth_phy_config_t phy_config = ETH_PHY_DEFAULT_CONFIG();
+
+    // Update PHY config based on board specific configuration
+    phy_config.phy_addr = 1;
+    phy_config.reset_gpio_num = 16;
+    // Init vendor specific MAC config to default
+    eth_esp32_emac_config_t esp32_emac_config = ETH_ESP32_EMAC_DEFAULT_CONFIG();
+    // Update vendor specific MAC config based on board configuration
+    esp32_emac_config.interface = EMAC_DATA_INTERFACE_RMII;
+    esp32_emac_config.clock_config.rmii.clock_mode = EMAC_CLK_EXT_IN;
+    esp32_emac_config.clock_config.rmii.clock_gpio = EMAC_CLK_IN_GPIO;
+    esp32_emac_config.smi_mdc_gpio_num = 23;
+    esp32_emac_config.smi_mdio_gpio_num = 18;
+    esp_eth_mac_t *mac = esp_eth_mac_new_esp32(&esp32_emac_config, &mac_config);
+    esp_eth_phy_t *phy = esp_eth_phy_new_lan87xx(&phy_config);
+    
+    // Install and start Ethernet driver
+    esp_eth_handle_t eth_handle = NULL;
+    esp_eth_config_t config = ETH_DEFAULT_CONFIG(mac, phy);
+    ESP_ERROR_CHECK(esp_eth_driver_install(&config, &eth_handle));
+
+    // Enable external oscillator (pulled down at boot to allow IO0 strapping)
+    ESP_ERROR_CHECK(gpio_set_direction(GPIO_NUM_16, GPIO_MODE_OUTPUT));
+    ESP_ERROR_CHECK(gpio_set_level(GPIO_NUM_16, 1));
+
+    ESP_LOGD(TAG, "Starting Ethernet interface...");
+
+    esp_netif_config_t cfg = ESP_NETIF_DEFAULT_ETH();
+    esp_default_netif = esp_netif_new(&cfg);
+    // Attach Ethernet driver to TCP/IP stack
+    ESP_ERROR_CHECK(esp_netif_attach(esp_default_netif, esp_eth_new_netif_glue(eth_handle)));
+
+    esp_event_handler_instance_t instance_got_ip;
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT,
+                                               IP_EVENT_ETH_GOT_IP,
+                                               &wifi_event_handler,
+                                               &instance_got_ip));
+    ESP_ERROR_CHECK(esp_eth_start(eth_handle));
+    ESP_LOGI(TAG, "Ethernet interface started");
+}
+
 void write_settings_to_nvs() {
     ESP_LOGI(TAG,
              "Trying to save: ssid %s\nwifi_pass %s\nwifi_chan %i\nbaud %liu\ngpio_tx %i\ngpio_rx %i\nproto %i\n"
@@ -334,9 +366,9 @@ void write_settings_to_nvs() {
     ESP_LOGI(TAG, "Saving to NVS %s", NVS_NAMESPACE);
     nvs_handle my_handle;
     ESP_ERROR_CHECK(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &my_handle));
-    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "esp32_mode", DB_WIFI_MODE));
-    ESP_ERROR_CHECK(nvs_set_str(my_handle, "ssid", (char *) DEFAULT_SSID));
-    ESP_ERROR_CHECK(nvs_set_str(my_handle, "wifi_pass", (char *) DEFAULT_PWD));
+    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "esp32_mode", DB_NETIF_MODE));
+    ESP_ERROR_CHECK(nvs_set_str(my_handle, "ssid", (char *)DEFAULT_SSID));
+    ESP_ERROR_CHECK(nvs_set_str(my_handle, "wifi_pass", (char *)DEFAULT_PWD));
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "wifi_chan", DEFAULT_CHANNEL));
     ESP_ERROR_CHECK(nvs_set_i32(my_handle, "baud", DB_UART_BAUD_RATE));
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "gpio_tx", DB_UART_PIN_TX));
@@ -350,7 +382,6 @@ void write_settings_to_nvs() {
     nvs_close(my_handle);
 }
 
-
 void read_settings_nvs() {
     nvs_handle my_handle;
     if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &my_handle) != ESP_OK) {
@@ -362,7 +393,7 @@ void read_settings_nvs() {
     } else {
         ESP_LOGI(TAG, "Reading settings from NVS");
         size_t required_size = 0;
-        ESP_ERROR_CHECK(nvs_get_u8(my_handle, "esp32_mode", &DB_WIFI_MODE));
+        ESP_ERROR_CHECK(nvs_get_u8(my_handle, "esp32_mode", &DB_NETIF_MODE));
 
         ESP_ERROR_CHECK(nvs_get_str(my_handle, "ssid", NULL, &required_size));
         char *ssid = malloc(required_size);
@@ -403,6 +434,7 @@ void read_settings_nvs() {
  *  AP-Mode: ESP32 creates an WiFi access point of its own where the ground control stations can connect
  */
 void app_main() {
+    esp_log_level_set("*", ESP_LOG_DEBUG);
     udp_conn_list = udp_client_list_create();
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES) {
@@ -411,21 +443,21 @@ void app_main() {
     }
     ESP_ERROR_CHECK(ret);
     read_settings_nvs();
-    esp_log_level_set("*", ESP_LOG_INFO);
-    if (DB_WIFI_MODE == DB_WIFI_MODE_AP || DB_WIFI_MODE == DB_WIFI_MODE_AP_LR) {
-        init_wifi_apmode(DB_WIFI_MODE);
-    } else {
-        if (init_wifi_clientmode() < 0) {
-            ESP_LOGW(TAG, "Switching to failsafe: Enabling access point mode");
-            // De-Init all Wi-Fi and enable the AP-Mode temporarily
-            ESP_ERROR_CHECK(esp_event_loop_delete_default());
-            esp_netif_destroy_default_wifi(esp_default_netif);
-            ESP_ERROR_CHECK(esp_wifi_stop());
-            strncpy((char *) DEFAULT_SSID, "Failsafe DroneBridge ESP32", sizeof(DEFAULT_SSID));
-            strncpy((char *) DEFAULT_PWD, "dronebridge", sizeof(DEFAULT_PWD));
-            init_wifi_apmode(DB_WIFI_MODE_AP);
-        }
-    }
+    init_netif_ethernet_mode();
+    // if (DB_NETIF_MODE == DB_WIFI_MODE_AP || DB_NETIF_MODE == DB_WIFI_MODE_AP_LR) {
+    //     init_netif_wifi_apmode(DB_NETIF_MODE);
+    // } else {
+    //     if (init_netif_wifi_clientmode() < 0) {
+    //         ESP_LOGW(TAG, "Switching to failsafe: Enabling access point mode");
+    //         // De-Init all Wi-Fi and enable the AP-Mode temporarily
+    //         ESP_ERROR_CHECK(esp_event_loop_delete_default());
+    //         esp_netif_destroy_default_wifi(esp_default_netif);
+    //         ESP_ERROR_CHECK(esp_wifi_stop());
+    //         strncpy((char *)DEFAULT_SSID, "Failsafe DroneBridge ESP32", sizeof(DEFAULT_SSID));
+    //         strncpy((char *)DEFAULT_PWD, "dronebridge", sizeof(DEFAULT_PWD));
+    //         init_netif_wifi_apmode(DB_WIFI_MODE_AP);
+    //     }
+    // }
 
     start_mdns_service();
     netbiosns_init();
