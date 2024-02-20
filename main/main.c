@@ -57,63 +57,83 @@ esp_netif_t *esp_default_netif;
  * @param event_id
  * @param event_data
  */
-static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
-    // Wifi access point mode events
-    if (event_id == WIFI_EVENT_AP_STACONNECTED) {
-        wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *)event_data;
-        ESP_LOGI(TAG, "WIFI_EVENT - Client connected - station:" MACSTR ", AID=%d", MAC2STR(event->mac), event->aid);
-    } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
-        wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *)event_data;
-        ESP_LOGI(TAG, "WIFI_EVENT - Client disconnected - station:" MACSTR ", AID=%d", MAC2STR(event->mac), event->aid);
-        struct db_udp_client_t db_udp_client;
-        memcpy(db_udp_client.mac, event->mac, sizeof(db_udp_client.mac));
-        remove_from_known_udp_clients(udp_conn_list, db_udp_client);
-    } else if (event_id == WIFI_EVENT_AP_START) {
-        ESP_LOGI(TAG, "WIFI_EVENT - AP started! (SSID: %s PASS: %s)", DEFAULT_SSID, DEFAULT_PWD);
-    } else if (event_id == WIFI_EVENT_AP_STOP) {
-        ESP_LOGI(TAG, "WIFI_EVENT - AP stopped!");
-    } else if (event_base == IP_EVENT && event_id == IP_EVENT_AP_STAIPASSIGNED) {
-        ip_event_ap_staipassigned_t *event = (ip_event_ap_staipassigned_t *)event_data;
-        ESP_LOGI(TAG, "WIFI_EVENT - New station IP:" IPSTR, IP2STR(&event->ip));
-        ESP_LOGI(TAG, "WIFI_EVENT - MAC: " MACSTR, MAC2STR(event->mac));
-        struct db_udp_client_t db_udp_client;
-        db_udp_client.udp_client.sin_family = PF_INET;
-        db_udp_client.udp_client.sin_port = htons(APP_PORT_PROXY_UDP);
-        db_udp_client.udp_client.sin_len = 16;
-        db_udp_client.udp_client.sin_addr.s_addr = event->ip.addr;
-        memcpy(db_udp_client.mac, event->mac, sizeof(db_udp_client.mac));
-        add_to_known_udp_clients(udp_conn_list, db_udp_client);
-    }
-    // Wifi client mode and Ethernet events
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
-        ESP_LOGI(TAG, "WIFI_EVENT - Wifi Started");
-        ESP_ERROR_CHECK(esp_wifi_connect());
-    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        ESP_LOGI(TAG, "WIFI_EVENT - Lost connection to access point");
-        if (s_retry_num < WIFI_ESP_MAXIMUM_RETRY) {
-            ESP_ERROR_CHECK(esp_wifi_connect());
-            s_retry_num++;
-            ESP_LOGI(TAG, "Retry to connect to the AP (%i/%i)", s_retry_num, WIFI_ESP_MAXIMUM_RETRY);
-        } else {
-            ESP_LOGI(TAG, "Connecting to the AP failed");
-            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
+static void netif_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
+    if (event_base == WIFI_EVENT) {
+        // AP events
+        if (event_id == WIFI_EVENT_AP_STACONNECTED) {
+            wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *)event_data;
+            ESP_LOGI(TAG, "%s - Client connected - station:" MACSTR ", AID=%d", event_base, MAC2STR(event->mac), event->aid);
+        } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
+            wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *)event_data;
+            ESP_LOGI(TAG, "%s - Client disconnected - station:" MACSTR ", AID=%d", event_base, MAC2STR(event->mac), event->aid);
+            struct db_udp_client_t db_udp_client;
+            memcpy(db_udp_client.mac, event->mac, sizeof(db_udp_client.mac));
+            remove_from_known_udp_clients(udp_conn_list, db_udp_client);
+        } else if (event_id == WIFI_EVENT_AP_START) {
+            ESP_LOGI(TAG, "%s - AP started! (SSID: %s PASS: %s)", event_base, DEFAULT_SSID, DEFAULT_PWD);
+        } else if (event_id == WIFI_EVENT_AP_STOP) {
+            ESP_LOGI(TAG, "%s - AP stopped!", event_base);
         }
-    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-        ESP_LOGI(TAG, "WIFI_EVENT - Got IP:" IPSTR, IP2STR(&event->ip_info.ip));
-        sprintf(CURRENT_CLIENT_IP, IPSTR, IP2STR(&event->ip_info.ip));
-        s_retry_num = 0;
-        xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
-    } else if (event_base == IP_EVENT && event_id == IP_EVENT_ETH_GOT_IP) {
-        ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-        ESP_LOGI(TAG, "ETH_EVENT - Got IP:" IPSTR, IP2STR(&event->ip_info.ip));
-        sprintf(CURRENT_CLIENT_IP, IPSTR, IP2STR(&event->ip_info.ip));
+        // STA events
+        else if (event_id == WIFI_EVENT_STA_START) {
+            ESP_LOGI(TAG, "%s - Wifi Started", event_base);
+            ESP_ERROR_CHECK(esp_wifi_connect());
+        } else if (event_id == WIFI_EVENT_STA_DISCONNECTED) {
+            ESP_LOGI(TAG, "%s - Lost connection to access point", event_base);
+            if (s_retry_num < WIFI_ESP_MAXIMUM_RETRY) {
+                ESP_ERROR_CHECK(esp_wifi_connect());
+                s_retry_num++;
+                ESP_LOGI(TAG, "Retry to connect to the AP (%i/%i)", s_retry_num, WIFI_ESP_MAXIMUM_RETRY);
+            } else {
+                ESP_LOGI(TAG, "Connecting to the AP failed");
+                xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
+            }
+        }
+    } else if (event_base == ETH_EVENT) {
+        if (event_id == ETHERNET_EVENT_CONNECTED) {
+            uint8_t mac_addr[6] = {0};
+            esp_eth_handle_t eth_handle = *(esp_eth_handle_t *)event_data;
+            esp_eth_ioctl(eth_handle, ETH_CMD_G_MAC_ADDR, mac_addr);
+            ESP_LOGI(TAG, "%s - Link Up", event_base);
+            ESP_LOGI(TAG, "%s - HW Addr:" MACSTR, event_base, MAC2STR(mac_addr));
+        } else if (event_id == ETHERNET_EVENT_DISCONNECTED) {
+            uint8_t mac_addr[6] = {0};
+            esp_eth_handle_t eth_handle = *(esp_eth_handle_t *)event_data;
+            esp_eth_ioctl(eth_handle, ETH_CMD_G_MAC_ADDR, mac_addr);
+            ESP_LOGI(TAG, "%s - Link Down", event_base);
+            struct db_udp_client_t db_udp_client;
+            memcpy(db_udp_client.mac, mac_addr, sizeof(db_udp_client.mac));
+            remove_from_known_udp_clients(udp_conn_list, db_udp_client);
+        } else if (event_id == ETHERNET_EVENT_START) {
+            ESP_LOGI(TAG, "%s - Started", event_base);
+        } else if (event_id == ETHERNET_EVENT_STOP) {
+            ESP_LOGI(TAG, "%s - Stopped", event_base);
+        }
+    } else if (event_base == IP_EVENT) {
+        if (event_id == IP_EVENT_AP_STAIPASSIGNED || event_id == IP_EVENT_ETH_GOT_IP) {
+            ip_event_ap_staipassigned_t *event = (ip_event_ap_staipassigned_t *)event_data;
+            ESP_LOGI(TAG, "%s - New station IP:" IPSTR, event_base, IP2STR(&event->ip));
+            ESP_LOGI(TAG, "%s - MAC: " MACSTR, event_base, MAC2STR(event->mac));
+            struct db_udp_client_t db_udp_client;
+            db_udp_client.udp_client.sin_family = PF_INET;
+            db_udp_client.udp_client.sin_port = htons(APP_PORT_PROXY_UDP);
+            db_udp_client.udp_client.sin_len = 16;
+            db_udp_client.udp_client.sin_addr.s_addr = event->ip.addr;
+            memcpy(db_udp_client.mac, event->mac, sizeof(db_udp_client.mac));
+            add_to_known_udp_clients(udp_conn_list, db_udp_client);
+        } else if (event_id == IP_EVENT_STA_GOT_IP) {
+            ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
+            sprintf(CURRENT_CLIENT_IP, IPSTR, IP2STR(&event->ip_info.ip));
+            ESP_LOGI(TAG, "%s - Got IP:%s", event_base, CURRENT_CLIENT_IP);
+            s_retry_num = 0;
+            xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+        }
     }
 }
 
 /**
  * @brief Initialize mDNS service
- * 
+ *
  */
 void start_mdns_service() {
     esp_err_t err = mdns_init();
@@ -188,14 +208,14 @@ void init_netif_wifi_apmode(int wifi_mode) {
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
                                                         ESP_EVENT_ANY_ID,
-                                                        &wifi_event_handler,
+                                                        &netif_event_handler,
                                                         NULL,
                                                         NULL));
 
     esp_event_handler_instance_t ap_staipassigned_ip;
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
                                                         IP_EVENT_AP_STAIPASSIGNED,
-                                                        &wifi_event_handler,
+                                                        &netif_event_handler,
                                                         NULL,
                                                         &ap_staipassigned_ip));
 
@@ -251,12 +271,12 @@ int init_netif_wifi_clientmode() {
     esp_event_handler_instance_t instance_got_ip;
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
                                                         ESP_EVENT_ANY_ID,
-                                                        &wifi_event_handler,
+                                                        &netif_event_handler,
                                                         NULL,
                                                         &instance_any_id));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
                                                         IP_EVENT_STA_GOT_IP,
-                                                        &wifi_event_handler,
+                                                        &netif_event_handler,
                                                         NULL,
                                                         &instance_got_ip));
 
@@ -311,19 +331,20 @@ void init_netif_ethernet_mode() {
     ESP_LOGD(TAG, "Initializing Ethernet MAC ...");
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
+    esp_netif_config_t cfg = ESP_NETIF_DEFAULT_ETH();
+    esp_default_netif = esp_netif_new(&cfg);
 
     ESP_LOGD(TAG, "Initializing Ethernet PHY (LAN8720A) ...");
     // Init common MAC and PHY configs to default
     eth_mac_config_t mac_config = ETH_MAC_DEFAULT_CONFIG();
     mac_config.sw_reset_timeout_ms = 1000;  // from ETH.cpp
-    eth_phy_config_t phy_config = ETH_PHY_DEFAULT_CONFIG();
-
     // Update PHY config based on board specific configuration
+    eth_phy_config_t phy_config = ETH_PHY_DEFAULT_CONFIG();
     phy_config.phy_addr = 1;
     phy_config.reset_gpio_num = 16;
-    // Init vendor specific MAC config to default
+
+    // Init vendor specific MAC config
     eth_esp32_emac_config_t esp32_emac_config = ETH_ESP32_EMAC_DEFAULT_CONFIG();
-    // Update vendor specific MAC config based on board configuration
     esp32_emac_config.interface = EMAC_DATA_INTERFACE_RMII;
     esp32_emac_config.clock_config.rmii.clock_mode = EMAC_CLK_EXT_IN;
     esp32_emac_config.clock_config.rmii.clock_gpio = EMAC_CLK_IN_GPIO;
@@ -331,30 +352,53 @@ void init_netif_ethernet_mode() {
     esp32_emac_config.smi_mdio_gpio_num = 18;
     esp_eth_mac_t *mac = esp_eth_mac_new_esp32(&esp32_emac_config, &mac_config);
     esp_eth_phy_t *phy = esp_eth_phy_new_lan87xx(&phy_config);
-    
+
     // Install and start Ethernet driver
     esp_eth_handle_t eth_handle = NULL;
     esp_eth_config_t config = ETH_DEFAULT_CONFIG(mac, phy);
     ESP_ERROR_CHECK(esp_eth_driver_install(&config, &eth_handle));
 
-    // Enable external oscillator (pulled down at boot to allow IO0 strapping)
-    ESP_ERROR_CHECK(gpio_set_direction(GPIO_NUM_16, GPIO_MODE_OUTPUT));
-    ESP_ERROR_CHECK(gpio_set_level(GPIO_NUM_16, 1));
+    // // Enable external oscillator (pulled down at boot to allow IO0 strapping)
+    // ESP_ERROR_CHECK(gpio_set_direction(GPIO_NUM_16, GPIO_MODE_OUTPUT));
+    // ESP_ERROR_CHECK(gpio_set_level(GPIO_NUM_16, 1));
 
     ESP_LOGD(TAG, "Starting Ethernet interface...");
 
-    esp_netif_config_t cfg = ESP_NETIF_DEFAULT_ETH();
-    esp_default_netif = esp_netif_new(&cfg);
     // Attach Ethernet driver to TCP/IP stack
     ESP_ERROR_CHECK(esp_netif_attach(esp_default_netif, esp_eth_new_netif_glue(eth_handle)));
 
     esp_event_handler_instance_t instance_got_ip;
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT,
                                                IP_EVENT_ETH_GOT_IP,
-                                               &wifi_event_handler,
+                                               &netif_event_handler,
                                                &instance_got_ip));
+    // esp_netif_flags_t flags_before = esp_netif_get_flags(esp_default_netif);
+    // ESP_LOGD(TAG, "flags before: %d", flags_before);
     ESP_ERROR_CHECK(esp_eth_start(eth_handle));
     ESP_LOGI(TAG, "Ethernet interface started");
+
+    // esp_netif_flags_t flags_after = esp_netif_get_flags(esp_default_netif);
+    // if (flags_after & ESP_NETIF_DHCP_CLIENT) {
+    //     ESP_LOGD(TAG, "DHCP client!");
+    //     ESP_ERROR_CHECK(esp_netif_dhcpc_stop(esp_default_netif));
+
+    // } else if (flags_after & ESP_NETIF_DHCP_SERVER) {
+    //     ESP_LOGD(TAG, "DHCP server!");
+    // }
+    // If DHCP is already started, stop it
+    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_netif_dhcps_stop(esp_default_netif));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_netif_dhcpc_stop(esp_default_netif));
+
+    // Setting IP address
+    esp_netif_ip_info_t ip;
+    memset(&ip, 0, sizeof(esp_netif_ip_info_t));
+    ip.ip.addr = ipaddr_addr(DEFAULT_AP_IP);
+    ip.netmask.addr = ipaddr_addr("255.255.255.0");
+    ip.gw.addr = ipaddr_addr(DEFAULT_AP_IP);
+    ESP_ERROR_CHECK(esp_netif_set_ip_info(esp_default_netif, &ip));
+    // ESP_ERROR_CHECK(esp_netif_dhcps_start(esp_default_netif));
+    ESP_ERROR_CHECK(esp_netif_set_hostname(esp_default_netif, "DBESP32"));
+    strncpy(CURRENT_CLIENT_IP, DEFAULT_AP_IP, sizeof(CURRENT_CLIENT_IP));
 }
 
 void write_settings_to_nvs() {
@@ -434,7 +478,6 @@ void read_settings_nvs() {
  *  AP-Mode: ESP32 creates an WiFi access point of its own where the ground control stations can connect
  */
 void app_main() {
-    esp_log_level_set("*", ESP_LOG_DEBUG);
     udp_conn_list = udp_client_list_create();
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES) {
@@ -443,6 +486,8 @@ void app_main() {
     }
     ESP_ERROR_CHECK(ret);
     read_settings_nvs();
+
+    // ESP_ERROR_CHECK(esp_event_loop_delete_default());
     init_netif_ethernet_mode();
     // if (DB_NETIF_MODE == DB_WIFI_MODE_AP || DB_NETIF_MODE == DB_WIFI_MODE_AP_LR) {
     //     init_netif_wifi_apmode(DB_NETIF_MODE);
