@@ -25,7 +25,7 @@ DroneBridge for ESP32 is a telemetry/low data rate only solution. There is no su
 -   Reliable, low latency, light weight
 -   Upload mission etc.
 
-![ESP32 module with VCP](https://upload.wikimedia.org/wikipedia/commons/thumb/2/20/ESP32_Espressif_ESP-WROOM-32_Dev_Board.jpg/313px-ESP32_Espressif_ESP-WROOM-32_Dev_Board.jpg)
+<img src="https://media-cdn.seeedstudio.com/media/catalog/product/cache/bb49d3ec4ee05b6f018e93f896b8a25d/1/-/1-113991054-seeed-studio-xiao-esp32c3-45font_1.jpg" width="350">
 
 ![DroneBridge for ESP32 block diagram blackbox](wiki/DroneBridgeForESP32Blackbox.png)
 
@@ -43,18 +43,19 @@ Or compile using esp-idf v5.1:
 
 ## Hardware
 
-All ESP32 development boards will work. No additional PSRAM required. You will need a USB to serial adapter if for flashing the firmware, if your ESP32 board does not come with one. Follow the instructions of the board manufacturer when it comes to wiring the power supply lines. Some modules do not like an external 5V power input connected in addition to an USB at the same time.
+**Officially supported and tested boards:**  
+Do the project and yourself a favour and use one of the officially supported and tested boards below.   
+These boards are very low in price, have everything you need and are also very small. Perfect for use on any drone.   
+The sponsored links below help dedicate more resources to the project.
+* [Seeed Studio XIAO ESP32C3](https://www.seeedstudio.com/Seeed-XIAO-ESP32C3-p-5431.html?sensecap_affiliate=JboL6N1&referring_service=link) + [External antenna](https://www.seeedstudio.com/2-4GHz-2-81dBi-Antenna-for-XIAO-ESP32C3-p-5475.html?sensecap_affiliate=JboL6N1&referring_service=link) for more range.
 
-Examples for boards that will work:
+Other non-tested boards that will likely work:
 * AZDelivery DevKit C
 * ESP32-C3-DevKitM-1
-* [TinyPICO - ESP32 Development Board - V2](https://www.adafruit.com/product/4335)
-* [Adafruit HUZZAH32 – ESP32 Feather Board](https://www.adafruit.com/product/3405)
-* [Adafruit AirLift – ESP32 WiFi Co-Processor Breakout Board](https://www.adafruit.com/product/4201) (requires FTDI adapter for flashing firmware)
-* [Adafruit HUZZAH32](https://www.adafruit.com/product/4172) (requires FTDI adapter for flashing firmware)
+* TinyPICO - ESP32 Development Board - V2
+* Adafruit HUZZAH32 – ESP32 Feather Board
 
-DroneBridge for ESP32 is tested with an DOIT ESP32 and ESP32-C3-DevKitM-1 development board.  
-**Other ESP boards are very likely to work as well.**
+Other ESP boards are very likely to work as well. No additional PSRAM is required. You will need a USB to serial adapter for flashing the firmware if your ESP32 board does not come with one. Follow the instructions of the board manufacturer when it comes to wiring the power supply lines. Some modules do not like an external 5V power input connected in addition to a USB at the same time.
 
 ## Installation/Flashing using precompiled binaries
 
@@ -97,15 +98,13 @@ There are many multiple ways on how to flash the firmware. The easy ones are exp
 
 ### Wiring
 
-1.  Connect the UART of the ESP32 to a 3.3V UART of your flight controller.
+1.  Connect the UART of the ESP32 to a 3.3V UART of your flight controller. It is not recommended to use the ESP32s pins that are marked with TX & RX since they often are connected to the internal serial ouput. Go for any other pin instead!
 2.  Set the flight controller port to the desired protocol.
 
-(Power the ESP32 module with a stable 3.3-5V power source) 
 **Check out manufacturer datasheet! Only some modules can take more than 3.3V. Follow the recommendations by the ESP32 boards manufacturer for powering the device**
 
-Defaults: UART2 (RX2, TX2 on GPIO 16, 17)
 
-![Example wiring adafruit ESP32 DevBoard](wiki/Pixhawk_wiring.png)
+![Example wiring ESP32C3](wiki/Pixhawk_wiring.png)
 
 ### Configuration
 1.  Connect to the wifi `DroneBridge ESP32` with password `dronebridge`
