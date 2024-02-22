@@ -21,6 +21,7 @@
 #include "esp_log.h"
 #include "lwip/err.h"
 #include "lwip/sockets.h"
+#include "tcp_server.h"
 
 #define TCP_TAG "TCP_SERVER_SETUP"
 

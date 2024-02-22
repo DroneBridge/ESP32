@@ -1,22 +1,3 @@
-/*
- *   This file is part of DroneBridge: https://github.com/DroneBridge/ESP32
- *
- *   Copyright 2017 Wolfgang Christl
- *
- *   Licensed under the Apache License, Version 2.0 (the "License");
- *   you may not use this file except in compliance with the License.
- *   You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- *   Unless required by applicable law or agreed to in writing, software
- *   distributed under the License is distributed on an "AS IS" BASIS,
- *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *   See the License for the specific language governing permissions and
- *   limitations under the License.
- *
- */
-
 /**
  * \file
  * Functions and types for CRC checks.
@@ -145,6 +126,8 @@ static inline crc_t crc_finalize(crc_t crc)
 
 uint8_t crc8_dvb_s2(uint8_t crc, unsigned char a);
 uint8_t crc8_dvb_s2_table(uint8_t crc, unsigned char a);
+uint32_t calc_crc32(uint32_t crc, unsigned char *buf, size_t len);
+int crc_ok(uint8_t *buf, int msg_length);
 
 #ifdef __cplusplus
 }           /* closing brace for extern "C" */
