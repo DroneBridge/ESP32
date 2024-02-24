@@ -1,0 +1,1 @@
+idf_component_register(INCLUDE_DIRS "c_library_v2")
