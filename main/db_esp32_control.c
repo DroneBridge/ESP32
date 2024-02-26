@@ -47,17 +47,28 @@ uint ltm_frames_in_buffer_pnt = 0;
 uint32_t uart_byte_count = 0;
 int8_t num_connected_tcp_clients = 0;
 
+/**
+ * Opens UART socket.
+ * Enables UART flow control if RTS and CTS pins do NOT match.
+ *
+ * 8 data bits, no parity, 1 stop bit
+ * @return ESP_ERROR of uart_driver_install
+ */
 esp_err_t open_serial_socket() {
+    bool flow_control = DB_UART_PIN_CTS != DB_UART_PIN_RTS;
     uart_config_t uart_config = {
             .baud_rate = DB_UART_BAUD_RATE,
             .data_bits = UART_DATA_8_BITS,
             .parity    = UART_PARITY_DISABLE,
             .stop_bits = UART_STOP_BITS_1,
-            .flow_ctrl = UART_HW_FLOWCTRL_DISABLE
+            .flow_ctrl = flow_control ? UART_HW_FLOWCTRL_CTS_RTS : UART_HW_FLOWCTRL_DISABLE,
+            .rx_flow_ctrl_thresh = DB_UART_RTS_THRESH,
     };
     ESP_ERROR_CHECK(uart_param_config(UART_NUM, &uart_config));
-    ESP_ERROR_CHECK(uart_set_pin(UART_NUM, DB_UART_PIN_TX, DB_UART_PIN_RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
-    return uart_driver_install(UART_NUM, 1024, 0, 0, NULL, 0);
+    ESP_ERROR_CHECK(uart_set_pin(UART_NUM, DB_UART_PIN_TX, DB_UART_PIN_RX,
+                                 flow_control ? DB_UART_PIN_RTS : UART_PIN_NO_CHANGE,
+                                 flow_control ? DB_UART_PIN_CTS : UART_PIN_NO_CHANGE));
+    return uart_driver_install(UART_NUM, 1024, 0, 10, NULL, 0);
 }
 
 /**

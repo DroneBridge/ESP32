@@ -186,6 +186,13 @@ static esp_err_t settings_change_post_handler(httpd_req_t *req) {
     if (json) DB_UART_PIN_TX = json->valueint;
     json = cJSON_GetObjectItem(root, "rx_pin");
     if (json) DB_UART_PIN_RX = json->valueint;
+    json = cJSON_GetObjectItem(root, "rts_pin");
+    if (json) DB_UART_PIN_RTS = json->valueint;
+    json = cJSON_GetObjectItem(root, "cts_pin");
+    if (json) DB_UART_PIN_CTS = json->valueint;
+    json = cJSON_GetObjectItem(root, "rts_thresh");
+    if (json) DB_UART_RTS_THRESH = json->valueint;
+
     json = cJSON_GetObjectItem(root, "baud");
     if (json) DB_UART_BAUD_RATE = json->valueint;
 

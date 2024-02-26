@@ -33,7 +33,7 @@
         .toast-close,.toastify{color:#fff;cursor:pointer}.toastify{padding:12px 20px;display:inline-block;box-shadow:0 3px 6px -1px rgba(0,0,0,.12),0 10px 36px -4px rgba(77,96,232,.3);background:-webkit-linear-gradient(315deg,#73a5ff,#5477f5);background:linear-gradient(135deg,#73a5ff,#5477f5);position:fixed;opacity:0;transition:.4s cubic-bezier(.215, .61, .355, 1);border-radius:2px;text-decoration:none;max-width:calc(50% - 20px);z-index:2147483647}.toastify.on{opacity:1}.toast-close{background:0 0;border:0;font-family:inherit;font-size:1em;opacity:.4;padding:0 5px}.toastify-right{right:15px}.toastify-left{left:15px}.toastify-top{top:-150px}.toastify-bottom{bottom:-150px}.toastify-rounded{border-radius:25px}.toastify-avatar{width:1.5em;height:1.5em;margin:-7px 5px;border-radius:2px}.toastify-center{margin-left:auto;margin-right:auto;left:0;right:0;max-width:fit-content;}@media only screen and (max-width:360px){.toastify-left,.toastify-right{margin-left:auto;margin-right:auto;left:0;right:0;max-width:fit-content}}
     </style>
     <style>
-        form,h3{margin-bottom:.5rem}.dot_green,.dot_red{height:.8rem;width:.8rem;border-radius:50%;display:inline-block}html{min-height:100%}body{height:100%;margin:0;color:#fff;background:#003166;background:linear-gradient(180deg,#003166 0,#135ba8 100%)}h2{font-size:x-large;padding-top:2rem;margin-bottom:.8rem}h3{font-family:Arial,sans-serif;font-size:large}button.button-primary{background-color:#ff881a;border-color:grey}button.button-primary:hover{background-color:#003166;color:#ff881a;border-color:#ff881a}button.button-primary:focus{background-color:#003166;color:#9a4e0b;border-color:#9a4e0b}input,select{color:#000}.dot_green{background-color:#68b838}.dot_red{background-color:#f63e3e}
+        label{font-weight:normal;font-size:small}form,h3{margin-bottom:.5rem}.dot_green,.dot_red{height:.8rem;width:.8rem;border-radius:50%;display:inline-block}html{min-height:100%}body{height:100%;margin:0;color:#fff;background:#003166;background:linear-gradient(180deg,#003166 0,#135ba8 100%)}h2{font-size:x-large;padding-top:2rem;margin-bottom:.8rem}h3{font-family:Arial,sans-serif;font-size:large}button.button-primary{background-color:#ff881a;border-color:grey}button.button-primary:hover{background-color:#003166;color:#ff881a;border-color:#ff881a}button.button-primary:focus{background-color:#003166;color:#9a4e0b;border-color:#9a4e0b}input,select{color:#000}.dot_green{background-color:#68b838}.dot_red{background-color:#f63e3e}
     </style>
     <script type="text/javascript">
         /*!
@@ -122,6 +122,22 @@
                 <div class="six columns">
                     <label for="rx_pin">UART RX Pin</label>
                     <input type="text" name="rx_pin" value="" id="rx_pin">
+                </div>
+            </div>
+            <div class="row">
+                <div class="six columns">
+                    <label for="rts_pin">UART RTS Pin</label>
+                    <input type="text" name="rts_pin" value="" id="rts_pin">
+                </div>
+                <div class="six columns">
+                    <label for="cts_pin">UART CTS Pin</label>
+                    <input type="text" name="cts_pin" value="" id="cts_pin">
+                </div>
+            </div>
+            <div class="row">
+                <div class="six columns">
+                    <label for="rts_thresh">UART RTS threshold</label>
+                    <input type="number" id="rts_thresh" name="rts_thresh" min="1" max="128">
                 </div>
             </div>
             <div class="row">
