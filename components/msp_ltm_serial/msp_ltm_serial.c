@@ -1,6 +1,8 @@
+#include "msp_ltm_serial.h"
+
 #include <stdbool.h>
 #include <stdint.h>
-#include "msp_ltm_serial.h"
+
 #include "crc.h"
 
 /**
@@ -30,7 +32,9 @@ bool parse_msp_ltm_byte(msp_ltm_port_t *msp_ltm_port, uint8_t new_byte) {
                 msp_ltm_port->mspVersion = MSP_V1;
                 msp_ltm_port->parse_state = HEADER_START;
                 msp_ltm_port->ltm_frame_buffer[0] = '$';
-            } else { return false; }
+            } else {
+                return false;
+            }
             msp_ltm_port->ltm_payload_cnt = 0;
             msp_ltm_port->checksum1 = 0;
             break;
@@ -145,7 +149,7 @@ bool parse_msp_ltm_byte(msp_ltm_port_t *msp_ltm_port, uint8_t new_byte) {
             msp_ltm_port->inBuf[msp_ltm_port->offset++] = new_byte;
             msp_ltm_port->checksum1 ^= new_byte;
             if (msp_ltm_port->offset == sizeof(mspHeaderV1_t)) {
-                mspHeaderV1_t *hdr = (mspHeaderV1_t *) &msp_ltm_port->inBuf[0];
+                mspHeaderV1_t *hdr = (mspHeaderV1_t *)&msp_ltm_port->inBuf[0];
                 // Check incoming buffer size limit
                 if (hdr->size > MSP_PORT_INBUF_SIZE) {
                     msp_ltm_port->parse_state = IDLE;
@@ -187,7 +191,7 @@ bool parse_msp_ltm_byte(msp_ltm_port_t *msp_ltm_port, uint8_t new_byte) {
             msp_ltm_port->checksum1 ^= new_byte;
             msp_ltm_port->checksum2 = crc8_dvb_s2_table(msp_ltm_port->checksum2, new_byte);
             if (msp_ltm_port->offset == (sizeof(mspHeaderV2_t) + sizeof(mspHeaderV1_t))) {
-                mspHeaderV2_t *hdrv2 = (mspHeaderV2_t *) &msp_ltm_port->inBuf[sizeof(mspHeaderV1_t)];
+                mspHeaderV2_t *hdrv2 = (mspHeaderV2_t *)&msp_ltm_port->inBuf[sizeof(mspHeaderV1_t)];
                 msp_ltm_port->dataSize = hdrv2->size;
                 if (hdrv2->size > MSP_PORT_INBUF_SIZE) {
                     msp_ltm_port->parse_state = IDLE;
@@ -196,7 +200,7 @@ bool parse_msp_ltm_byte(msp_ltm_port_t *msp_ltm_port, uint8_t new_byte) {
                     msp_ltm_port->cmdFlags = hdrv2->flags;
                     msp_ltm_port->offset = 0;
                     msp_ltm_port->parse_state =
-                            msp_ltm_port->dataSize > 0 ? MSP_PAYLOAD_V2_OVER_V1 : MSP_CHECKSUM_V2_OVER_V1;
+                        msp_ltm_port->dataSize > 0 ? MSP_PAYLOAD_V2_OVER_V1 : MSP_CHECKSUM_V2_OVER_V1;
                 }
             }
             break;
@@ -224,7 +228,7 @@ bool parse_msp_ltm_byte(msp_ltm_port_t *msp_ltm_port, uint8_t new_byte) {
             msp_ltm_port->inBuf[msp_ltm_port->offset++] = new_byte;
             msp_ltm_port->checksum2 = crc8_dvb_s2_table(msp_ltm_port->checksum2, new_byte);
             if (msp_ltm_port->offset == sizeof(mspHeaderV2_t)) {
-                mspHeaderV2_t *hdrv2 = (mspHeaderV2_t *) &msp_ltm_port->inBuf[0];
+                mspHeaderV2_t *hdrv2 = (mspHeaderV2_t *)&msp_ltm_port->inBuf[0];
                 if (hdrv2->size > MSP_PORT_INBUF_SIZE) {
                     msp_ltm_port->parse_state = IDLE;
                 } else {
@@ -233,7 +237,7 @@ bool parse_msp_ltm_byte(msp_ltm_port_t *msp_ltm_port, uint8_t new_byte) {
                     msp_ltm_port->cmdFlags = hdrv2->flags;
                     msp_ltm_port->offset = 0;
                     msp_ltm_port->parse_state =
-                            msp_ltm_port->dataSize > 0 ? MSP_PAYLOAD_V2_NATIVE : MSP_CHECKSUM_V2_NATIVE;
+                        msp_ltm_port->dataSize > 0 ? MSP_PAYLOAD_V2_NATIVE : MSP_CHECKSUM_V2_NATIVE;
                 }
             }
             break;

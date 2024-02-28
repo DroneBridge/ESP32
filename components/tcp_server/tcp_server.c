@@ -1,8 +1,9 @@
+#include "tcp_server.h"
+
 #include "esp_event.h"
 #include "esp_log.h"
 #include "lwip/err.h"
 #include "lwip/sockets.h"
-#include "tcp_server.h"
 
 #define TCP_TAG "TCP_SERVER_SETUP"
 
@@ -48,5 +49,4 @@ void send_to_all_tcp_clients(const int tcp_clients[], uint8_t data[], uint data_
             }
         }
     }
-
 }
