@@ -103,5 +103,5 @@ void communication_module_server(void *parameters) {
 
 
 void communication_module() {
-    xTaskCreate(&communication_module_server, "comm_server", 8192, NULL, 5, NULL);
+    xTaskCreatePinnedToCore(&communication_module_server, "comm_server", 8192, NULL, 5, NULL, 0);
 }

@@ -1,10 +1,12 @@
 #include "main.h"
 
+#include "mavlink_parser.h"
+
 static const char *TAG = "DB_ESP32";
 
-uint8_t DB_NETIF_MODE = DB_ETH_MODE;  // 1=Wifi AP mode, 2=Wifi client mode, 3=ESP-NOW LR Mode, 4=Ethernet mode
-uint8_t DEFAULT_SSID[32] = "DroneBridge ESP32";
-uint8_t DEFAULT_PWD[64] = "dronebridge";
+uint8_t DB_NETIF_MODE = DB_WIFI_MODE_STA;  // 1=Wifi AP mode, 2=Wifi client mode, 3=ESP-NOW LR Mode, 4=Ethernet mode
+uint8_t DEFAULT_SSID[32] = "Amurka";
+uint8_t DEFAULT_PWD[64] = "HiAmurka44";
 char DEFAULT_AP_IP[32] = "192.168.2.1";
 char CURRENT_CLIENT_IP[32] = "192.168.2.1";
 uint8_t DEFAULT_CHANNEL = 6;
@@ -262,17 +264,16 @@ int init_netif_wifi_clientmode() {
                                                         &instance_got_ip));
 
     wifi_config_t wifi_config = {
-            .sta = {
-                    .ssid = "DroneBridge_ESP32_Init",
-                    .password = "dronebridge",
-                    .threshold.authmode = WIFI_AUTH_WEP
-            },
+        .sta = {
+            .ssid = "DroneBridge_ESP32_Init",
+            .password = "dronebridge",
+            .threshold.authmode = WIFI_AUTH_WPA2_PSK},
     };
     strncpy((char *)wifi_config.sta.ssid, (char *)DEFAULT_SSID, 32);
     strncpy((char *)wifi_config.sta.password, (char *)DEFAULT_PWD, 64);
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_LR));
+    ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N | WIFI_PROTOCOL_LR));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
 
@@ -407,47 +408,44 @@ void write_settings_to_nvs() {
     nvs_close(my_handle);
 }
 
-void read_settings_nvs() {
+esp_err_t read_settings_nvs() {
     nvs_handle my_handle;
-    if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &my_handle) != ESP_OK) {
-        // First start
-        nvs_close(my_handle);
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ESP_ERROR_CHECK(nvs_flash_init());
-        write_settings_to_nvs();
-    } else {
-        ESP_LOGI(TAG, "Reading settings from NVS");
-        size_t required_size = 0;
-        ESP_ERROR_CHECK(nvs_get_u8(my_handle, "esp32_mode", &DB_NETIF_MODE));
+    esp_err_t ret = ESP_OK;
 
-        ESP_ERROR_CHECK(nvs_get_str(my_handle, "ssid", NULL, &required_size));
-        char *ssid = malloc(required_size);
-        ESP_ERROR_CHECK(nvs_get_str(my_handle, "ssid", ssid, &required_size));
-        memcpy(DEFAULT_SSID, ssid, required_size);
+    ESP_GOTO_ON_ERROR(nvs_open(NVS_NAMESPACE, NVS_READONLY, &my_handle), err, TAG, "Error (%s) opening NVS handle!", esp_err_to_name(ret));
+    ESP_LOGI(TAG, "Reading settings from NVS");
+    size_t required_size = 0;
+    ESP_GOTO_ON_ERROR(nvs_get_u8(my_handle, "esp32_mode", &DB_NETIF_MODE), err, TAG, "Failed to read esp32_mode");
 
-        ESP_ERROR_CHECK(nvs_get_str(my_handle, "wifi_pass", NULL, &required_size));
-        char *wifi_pass = malloc(required_size);
-        ESP_ERROR_CHECK(nvs_get_str(my_handle, "wifi_pass", wifi_pass, &required_size));
-        memcpy(DEFAULT_PWD, wifi_pass, required_size);
+    ESP_GOTO_ON_ERROR(nvs_get_str(my_handle, "ssid", NULL, &required_size), err, TAG, "Failed to read esp32_mode");
+    char *ssid = malloc(required_size);
+    ESP_GOTO_ON_ERROR(nvs_get_str(my_handle, "ssid", ssid, &required_size), err, TAG, "Failed to read esp32_mode");
+    memcpy(DEFAULT_SSID, ssid, required_size);
+    free(ssid);
 
-        ESP_ERROR_CHECK(nvs_get_str(my_handle, "ap_ip", NULL, &required_size));
-        char *ap_ip = malloc(required_size);
-        ESP_ERROR_CHECK(nvs_get_str(my_handle, "ap_ip", ap_ip, &required_size));
-        memcpy(DEFAULT_AP_IP, ap_ip, required_size);
+    ESP_GOTO_ON_ERROR(nvs_get_str(my_handle, "wifi_pass", NULL, &required_size), err, TAG, "Failed to read esp32_mode");
+    char *wifi_pass = malloc(required_size);
+    ESP_GOTO_ON_ERROR(nvs_get_str(my_handle, "wifi_pass", wifi_pass, &required_size), err, TAG, "Failed to read esp32_mode");
+    memcpy(DEFAULT_PWD, wifi_pass, required_size);
+    free(wifi_pass);
 
-        ESP_ERROR_CHECK(nvs_get_u8(my_handle, "wifi_chan", &DEFAULT_CHANNEL));
-        ESP_ERROR_CHECK(nvs_get_i32(my_handle, "baud", &DB_UART_BAUD_RATE));
-        ESP_ERROR_CHECK(nvs_get_u8(my_handle, "gpio_tx", &DB_UART_PIN_TX));
-        ESP_ERROR_CHECK(nvs_get_u8(my_handle, "gpio_rx", &DB_UART_PIN_RX));
-        ESP_ERROR_CHECK(nvs_get_u8(my_handle, "proto", &SERIAL_PROTOCOL));
-        ESP_ERROR_CHECK(nvs_get_u16(my_handle, "trans_pack_size", &TRANSPARENT_BUF_SIZE));
-        ESP_ERROR_CHECK(nvs_get_u8(my_handle, "ltm_per_packet", &LTM_FRAME_NUM_BUFFER));
-        ESP_ERROR_CHECK(nvs_get_u8(my_handle, "msp_ltm", &MSP_LTM_SAMEPORT));
-        nvs_close(my_handle);
-        free(wifi_pass);
-        free(ssid);
-        free(ap_ip);
-    }
+    ESP_GOTO_ON_ERROR(nvs_get_str(my_handle, "ap_ip", NULL, &required_size), err, TAG, "Failed to read esp32_mode");
+    char *ap_ip = malloc(required_size);
+    ESP_GOTO_ON_ERROR(nvs_get_str(my_handle, "ap_ip", ap_ip, &required_size), err, TAG, "Failed to read esp32_mode");
+    memcpy(DEFAULT_AP_IP, ap_ip, required_size);
+    free(ap_ip);
+
+    ESP_GOTO_ON_ERROR(nvs_get_u8(my_handle, "wifi_chan", &DEFAULT_CHANNEL), err, TAG, "Failed to read esp32_mode");
+    ESP_GOTO_ON_ERROR(nvs_get_i32(my_handle, "baud", &DB_UART_BAUD_RATE), err, TAG, "Failed to read esp32_mode");
+    ESP_GOTO_ON_ERROR(nvs_get_u8(my_handle, "gpio_tx", &DB_UART_PIN_TX), err, TAG, "Failed to read esp32_mode");
+    ESP_GOTO_ON_ERROR(nvs_get_u8(my_handle, "gpio_rx", &DB_UART_PIN_RX), err, TAG, "Failed to read esp32_mode");
+    ESP_GOTO_ON_ERROR(nvs_get_u8(my_handle, "proto", &SERIAL_PROTOCOL), err, TAG, "Failed to read esp32_mode");
+    ESP_GOTO_ON_ERROR(nvs_get_u16(my_handle, "trans_pack_size", &TRANSPARENT_BUF_SIZE), err, TAG, "Failed to read esp32_mode");
+    ESP_GOTO_ON_ERROR(nvs_get_u8(my_handle, "ltm_per_packet", &LTM_FRAME_NUM_BUFFER), err, TAG, "Failed to read esp32_mode");
+    ESP_GOTO_ON_ERROR(nvs_get_u8(my_handle, "msp_ltm", &MSP_LTM_SAMEPORT), err, TAG, "Failed to read esp32_mode");
+err:
+    nvs_close(my_handle);
+    return ret;
 }
 
 /**
@@ -466,24 +464,30 @@ void app_main() {
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
-    read_settings_nvs();
+    ret = read_settings_nvs();
+    if (ret != ESP_OK) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ESP_ERROR_CHECK(nvs_flash_init());
+        write_settings_to_nvs();
+    }
 
-    // ESP_ERROR_CHECK(esp_event_loop_delete_default());
-    init_netif_ethernet_mode();
+    // init_netif_ethernet_mode();
     // if (DB_NETIF_MODE == DB_WIFI_MODE_AP || DB_NETIF_MODE == DB_WIFI_MODE_AP_LR) {
     //     init_netif_wifi_apmode(DB_NETIF_MODE);
     // } else {
-    //     if (init_netif_wifi_clientmode() < 0) {
-    //         ESP_LOGW(TAG, "Switching to failsafe: Enabling access point mode");
-    //         // De-Init all Wi-Fi and enable the AP-Mode temporarily
-    //         ESP_ERROR_CHECK(esp_event_loop_delete_default());
-    //         esp_netif_destroy_default_wifi(esp_default_netif);
-    //         ESP_ERROR_CHECK(esp_wifi_stop());
-    //         strncpy((char *)DEFAULT_SSID, "Failsafe DroneBridge ESP32", sizeof(DEFAULT_SSID));
-    //         strncpy((char *)DEFAULT_PWD, "dronebridge", sizeof(DEFAULT_PWD));
-    //         init_netif_wifi_apmode(DB_WIFI_MODE_AP);
-    //     }
+    if (init_netif_wifi_clientmode() < 0) {
+        ESP_LOGW(TAG, "Switching to failsafe: Enabling access point mode");
+        // De-Init all Wi-Fi and enable the AP-Mode temporarily
+        ESP_ERROR_CHECK(esp_event_loop_delete_default());
+        esp_netif_destroy_default_wifi(esp_default_netif);
+        ESP_ERROR_CHECK(esp_wifi_stop());
+        strncpy((char *)DEFAULT_SSID, "Failsafe DroneBridge ESP32", sizeof(DEFAULT_SSID));
+        strncpy((char *)DEFAULT_PWD, "dronebridge", sizeof(DEFAULT_PWD));
+        init_netif_wifi_apmode(DB_WIFI_MODE_AP);
+    }
     // }
+
+    mavlink_parse_start();
 
     start_mdns_service();
     netbiosns_init();
