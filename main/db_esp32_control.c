@@ -158,8 +158,8 @@ void parse_msp_ltm(int tcp_clients[], struct udp_conn_list_t *udp_connection, ui
             if (parse_msp_ltm_byte(db_msp_ltm_port, serial_byte)) {
                 msp_message_buffer[(*serial_read_bytes - 1)] = serial_byte;
                 if (db_msp_ltm_port->parse_state == MSP_PACKET_RECEIVED) {
-                    *serial_read_bytes = 0;
                     send_to_all_clients(tcp_clients, udp_connection, msp_message_buffer, *serial_read_bytes);
+                    *serial_read_bytes = 0;
                 } else if (db_msp_ltm_port->parse_state == LTM_PACKET_RECEIVED) {
                     memcpy(&ltm_frame_buffer[ltm_frames_in_buffer_pnt], db_msp_ltm_port->ltm_frame_buffer,
                            (db_msp_ltm_port->ltm_payload_cnt + 4));
