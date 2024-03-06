@@ -49,64 +49,25 @@ These boards are very low in price, have everything you need and are also very s
 The sponsored links below help dedicate more resources to the project.
 * [Seeed Studio XIAO ESP32C3](https://www.seeedstudio.com/Seeed-XIAO-ESP32C3-p-5431.html?sensecap_affiliate=JboL6N1&referring_service=link) + [External antenna](https://www.seeedstudio.com/2-4GHz-2-81dBi-Antenna-for-XIAO-ESP32C3-p-5475.html?sensecap_affiliate=JboL6N1&referring_service=link) for more range.
 
-Other non-tested boards that will likely work:
-* AZDelivery DevKit C
-* ESP32-C3-DevKitM-1
-* TinyPICO - ESP32 Development Board - V2
-* Adafruit HUZZAH32 – ESP32 Feather Board
-
-Other ESP boards are very likely to work as well. No additional PSRAM is required. You will need a USB to serial adapter for flashing the firmware if your ESP32 board does not come with one. Follow the instructions of the board manufacturer when it comes to wiring the power supply lines. Some modules do not like an external 5V power input connected in addition to a USB at the same time.
+[For further info please check the wiki!](https://github.com/DroneBridge/ESP32/wiki/Supported-Hardware)
 
 ## Installation/Flashing using precompiled binaries
 
 First download the latest release from this repository.
 [You can find them here](https://github.com/DroneBridge/ESP32/releases).
 
-There are many multiple ways on how to flash the firmware. The easy ones are explained below.
+There are many multiple ways on how to flash the firmware.  
+**[For further info please check the wiki!](https://github.com/DroneBridge/ESP32/wiki/Flashing-DroneBridge-for-ESP32)**
 
-**Erase the flash before flashing a new release!**
-
-#### All platforms: Use Espressif firmware flashing tool
-
-#### Recommended
-
-1.  [Download the esp-idf for windows](https://docs.espressif.com/projects/esp-idf/en/release-v4.3/esp32/get-started/windows-setup.html#get-started-windows-tools-installer) or [linux](https://docs.espressif.com/projects/esp-idf/en/release-v4.3/esp32/get-started/linux-setup.html) or install via `pip install esptool`
-2.  Connect via USB/Serial. Find out the serial port via `dmesg` on linux or using the device manager on windows.
-  In this example the serial connection to the ESP32 is on `COM4` (in Linux e.g. `/dev/ttyUSB0`).
-3. `esptool.py -p COM4 erase_flash`
-4. ```shell
-   esptool.py -p COM4 -b 460800 --before default_reset --after hard_reset  write_flash --flash_mode dio --flash_size detect --flash_freq 40m 0x1000 bootloader.bin 0x8000 partition-table.bin 0x10000 db_esp32.bin 0x110000 www.bin
-   ```
-   You might need to press the boot button on your ESP to start the upload/flash process.
-
-[Look here for more detailed information](https://github.com/espressif/esptool)
-
-#### Windows only: Use flash download tools
-
-1. [Get it here](https://www.espressif.com/en/support/download/other-tools?5)
-2. Erase the flash of the ESP32 befor flashing a new release\
-   ![ESP32 erase flash with flash download tools](wiki/ESP32Flasher_Erase.PNG)
-3. Select the firmware, bootloader & partition table and set everything as below
-   ```shell
-    0x8000 partition_table/partition-table.bin
-    0x1000 bootloader/bootloader.bin
-    0x10000 db_esp32.bin
-    0x110000 www.bin
-   ```
-   ![ESP download tool configuration](wiki/ESP32Flasher.png)
-3.  Hit Start and power cycle your ESP32 after flashing
-
-### Wiring
+## Wiring
 
 1.  Connect the UART of the ESP32 to a 3.3V UART of your flight controller. It is not recommended to use the ESP32s pins that are marked with TX & RX since they often are connected to the internal serial ouput. Go for any other pin instead!
 2.  Set the flight controller port to the desired protocol.
 
-**Check out manufacturer datasheet! Only some modules can take more than 3.3V. Follow the recommendations by the ESP32 boards manufacturer for powering the device**
+**Check out manufacturer datasheet! Only some modules can take more than 3.3V. Follow the recommendations by the ESP32 boards manufacturer for powering the device**  
+**[For further info please check the wiki!](https://github.com/DroneBridge/ESP32/wiki/Wiring-Instructions)**
 
-
-![Example wiring ESP32C3](wiki/Pixhawk_wiring.png)
-
-### Configuration
+## Configuration
 1.  Connect to the wifi `DroneBridge ESP32` with password `dronebridge`
 2.  In your browser type: `dronebridge.local` (Chrome: `http://dronebridge.local`) or `192.168.2.1` into the address bar.
  **You might need to disable the cellular connection to force the browser to use the WiFi connection**
