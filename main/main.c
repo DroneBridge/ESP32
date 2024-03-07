@@ -328,11 +328,14 @@ int init_wifi_clientmode() {
     return 0;
 }
 
+/**
+ * Write settings to non-volatile storage
+ */
 void write_settings_to_nvs() {
     ESP_LOGI(TAG,
-             "Trying to save: ssid %s\nwifi_pass %s\nwifi_chan %i\nbaud %liu\ngpio_tx %i\ngpio_rx %i\ngpio_cts %i\ngpio_rts %i\nrts_thresh %i\nproto %i\n"
+             "Trying to save:\nWifi Mode: %i\nssid %s\nwifi_pass %s\nwifi_chan %i\nbaud %liu\ngpio_tx %i\ngpio_rx %i\ngpio_cts %i\ngpio_rts %i\nrts_thresh %i\nproto %i\n"
              "trans_pack_size %i\nltm_per_packet %i\nmsp_ltm %i\nap_ip %s",
-             DEFAULT_SSID, DEFAULT_PWD, DEFAULT_CHANNEL, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
+             DB_WIFI_MODE, DEFAULT_SSID, DEFAULT_PWD, DEFAULT_CHANNEL, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
              DB_UART_PIN_CTS, DB_UART_PIN_RTS, DB_UART_RTS_THRESH,
              SERIAL_PROTOCOL, TRANSPARENT_BUF_SIZE, LTM_FRAME_NUM_BUFFER, MSP_LTM_SAMEPORT, DEFAULT_AP_IP);
     ESP_LOGI(TAG, "Saving to NVS %s", NVS_NAMESPACE);
@@ -357,7 +360,9 @@ void write_settings_to_nvs() {
     nvs_close(my_handle);
 }
 
-
+/**
+ * Read stored settings from internal storage
+ */
 void read_settings_nvs() {
     nvs_handle my_handle;
     if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &my_handle) != ESP_OK) {
@@ -401,6 +406,12 @@ void read_settings_nvs() {
         free(wifi_pass);
         free(ssid);
         free(ap_ip);
+        ESP_LOGI(TAG,
+                 "Stored settings:\nWifi Mode: %i\nssid %s\nwifi_pass %s\nwifi_chan %i\nbaud %liu\ngpio_tx %i\ngpio_rx %i\ngpio_cts %i\n"
+                 "gpio_rts %i\nrts_thresh %i\nproto %i\ntrans_pack_size %i\nltm_per_packet %i\nmsp_ltm %i\nap_ip %s",
+                 DB_WIFI_MODE, DEFAULT_SSID, DEFAULT_PWD, DEFAULT_CHANNEL, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
+                 DB_UART_PIN_CTS, DB_UART_PIN_RTS, DB_UART_RTS_THRESH, SERIAL_PROTOCOL, TRANSPARENT_BUF_SIZE,
+                 LTM_FRAME_NUM_BUFFER, MSP_LTM_SAMEPORT, DEFAULT_AP_IP);
     }
 }
 

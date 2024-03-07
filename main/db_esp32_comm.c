@@ -34,6 +34,13 @@
 uint8_t tcp_comm_buffer[TCP_COMM_BUF_SIZE];
 uint8_t comm_resp_buf[TCP_COMM_BUF_SIZE];
 
+/**
+ * The communication protocol is a DroneBridge specific protocol that allows settings changes via JSON. It is not
+ * implemented for DroneBridge for ESP32. This is just an implementation to respond with an error.
+ *
+ * @param client_socket
+ * @param new_json_bytes
+ */
 void parse_comm_protocol(int client_socket, char *new_json_bytes) {
     cJSON *json_pointer = cJSON_Parse(new_json_bytes);
     int dest = cJSON_GetObjectItem(json_pointer, DB_COMM_KEY_DEST)->valueint;
