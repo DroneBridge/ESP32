@@ -68,7 +68,7 @@ bool parse_msp_ltm_byte(msp_ltm_port_t *msp_ltm_port, uint8_t new_byte) {
                     break;
                 default:
                     msp_ltm_port->parse_state = IDLE;
-                    break;
+                    return false;
             }
             break;
 
@@ -125,7 +125,7 @@ bool parse_msp_ltm_byte(msp_ltm_port_t *msp_ltm_port, uint8_t new_byte) {
                     break;
                 default:
                     msp_ltm_port->parse_state = IDLE;
-                    break;
+                    return false;
             }
             break;
 
@@ -165,15 +165,15 @@ bool parse_msp_ltm_byte(msp_ltm_port_t *msp_ltm_port, uint8_t new_byte) {
             msp_ltm_port->checksum1 ^= new_byte;
             if (msp_ltm_port->offset == sizeof(mspHeaderV1_t)) {
                 mspHeaderV1_t *hdr = (mspHeaderV1_t *) &msp_ltm_port->inBuf[0];
-                // Check incoming buffer size limit
-                if (hdr->size > MSP_PORT_INBUF_SIZE) {
-                    msp_ltm_port->parse_state = IDLE;
-                } else if (hdr->cmd == MSP_V2_FRAME_ID) {
+                // No need to check incoming buffer size limit for V1
+                // because the buffer is 512 which is bigger than the INTMAX for byte
+                if (hdr->cmd == MSP_V2_FRAME_ID) {
                     if (hdr->size >= sizeof(mspHeaderV2_t) + 1) {
                         msp_ltm_port->mspVersion = MSP_V2_OVER_V1;
                         msp_ltm_port->parse_state = MSP_HEADER_V2_OVER_V1;
                     } else {
                         msp_ltm_port->parse_state = IDLE;
+                        return false;
                     }
                 } else {
                     msp_ltm_port->dataSize = hdr->size;
@@ -210,6 +210,7 @@ bool parse_msp_ltm_byte(msp_ltm_port_t *msp_ltm_port, uint8_t new_byte) {
                 msp_ltm_port->dataSize = hdrv2->size;
                 if (hdrv2->size > MSP_PORT_INBUF_SIZE) {
                     msp_ltm_port->parse_state = IDLE;
+                    return false;
                 } else {
                     msp_ltm_port->cmdMSP = hdrv2->cmd;
                     msp_ltm_port->cmdFlags = hdrv2->flags;
@@ -236,6 +237,7 @@ bool parse_msp_ltm_byte(msp_ltm_port_t *msp_ltm_port, uint8_t new_byte) {
                 msp_ltm_port->parse_state = MSP_CHECKSUM_V1;
             } else {
                 msp_ltm_port->parse_state = IDLE;
+                return false;
             }
             break;
 
@@ -271,6 +273,7 @@ bool parse_msp_ltm_byte(msp_ltm_port_t *msp_ltm_port, uint8_t new_byte) {
                 msp_ltm_port->parse_state = MSP_PACKET_RECEIVED;
             } else {
                 msp_ltm_port->parse_state = IDLE;
+                return false;
             }
             break;
     }

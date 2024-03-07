@@ -137,7 +137,7 @@ void send_to_all_clients(int tcp_clients[], struct udp_conn_list_t *n_udp_conn_l
 void write_to_uart(const char data_buffer[], const size_t data_length) {
     int written = uart_write_bytes(UART_NUM, data_buffer, data_length);
     if (written > 0)
-        ESP_LOGD(TAG, "Wrote %i bytes", written);
+        ESP_LOGD(TAG, "Wrote %i bytes to UART", written);
     else
         ESP_LOGE(TAG, "Error writing to UART %s", esp_err_to_name(errno));
 }
@@ -174,6 +174,8 @@ void parse_msp_ltm(int tcp_clients[], struct udp_conn_list_t *udp_connection, ui
                         *serial_read_bytes = 0;
                     }
                 }
+            } else { // XXX Leads to crashes of the ESP32 without it!
+                *serial_read_bytes = 0;
             }
         }
     }

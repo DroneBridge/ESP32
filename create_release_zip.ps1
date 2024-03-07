@@ -10,7 +10,7 @@ cp .\flashing_instructions.txt $release_foldername
 rm -Recurse .\build
 idf.py set-target esp32 build
 mkdir $release_foldername\esp32
-cp .\build\flash_args $release_foldername\esp32
+cp .\build\flash_args $release_foldername\esp32\flash_args.txt
 cp .\build\db_esp32.bin $release_foldername\esp32
 cp .\build\bootloader\bootloader.bin $release_foldername\esp32
 cp .\build\www.bin $release_foldername\esp32
@@ -19,7 +19,7 @@ cp .\build\partition_table\partition-table.bin $release_foldername\esp32
 rm -Recurse .\build
 idf.py set-target esp32s2 build
 mkdir $release_foldername\esp32s2
-cp .\build\flash_args $release_foldername\esp32s2
+cp .\build\flash_args $release_foldername\esp32s2\flash_args.txt
 cp .\build\db_esp32.bin $release_foldername\esp32s2
 cp .\build\bootloader\bootloader.bin $release_foldername\esp32s2
 cp .\build\www.bin $release_foldername\esp32s2
@@ -28,7 +28,7 @@ cp .\build\partition_table\partition-table.bin $release_foldername\esp32s2
 rm -Recurse .\build
 idf.py set-target esp32s3 build
 mkdir $release_foldername\esp32s3
-cp .\build\flash_args $release_foldername\esp32s3
+cp .\build\flash_args $release_foldername\esp32s3\flash_args.txt
 cp .\build\db_esp32.bin $release_foldername\esp32s3
 cp .\build\bootloader\bootloader.bin $release_foldername\esp32s3
 cp .\build\www.bin $release_foldername\esp32s3
@@ -37,7 +37,7 @@ cp .\build\partition_table\partition-table.bin $release_foldername\esp32s3
 rm -Recurse .\build
 idf.py set-target esp32c3 build
 mkdir $release_foldername\esp32c3
-cp .\build\flash_args $release_foldername\esp32c3
+cp .\build\flash_args $release_foldername\esp32c3\flash_args.txt
 cp .\build\db_esp32.bin $release_foldername\esp32c3
 cp .\build\bootloader\bootloader.bin $release_foldername\esp32c3
 cp .\build\www.bin $release_foldername\esp32c3
