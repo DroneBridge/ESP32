@@ -397,7 +397,7 @@ void control_module_udp_tcp() {
                 parse_transparent(tcp_clients, udp_conn_list, serial_buffer, &read_transparent);
                 break;
         }
-        if (delay_timer_cnt == 5000) {
+        if (delay_timer_cnt == 9000) {
             // all actions are non-blocking so allow some delay so that the IDLE task of FreeRTOS and the watchdog can run
             // read: https://esp32developer.com/programming-in-c-c/tasks/tasks-vs-co-routines for reference
             vTaskDelay(10/portTICK_PERIOD_MS);
