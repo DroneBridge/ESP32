@@ -62,7 +62,6 @@ uint8_t DB_UART_RTS_THRESH = 64;
 int32_t DB_UART_BAUD_RATE = 57600;
 uint16_t TRANSPARENT_BUF_SIZE = 64;
 uint8_t LTM_FRAME_NUM_BUFFER = 2;
-uint8_t MSP_LTM_SAMEPORT = 0;
 int station_rssi = 0;
 
 struct udp_conn_list_t *udp_conn_list;
@@ -334,10 +333,10 @@ int init_wifi_clientmode() {
 void write_settings_to_nvs() {
     ESP_LOGI(TAG,
              "Trying to save:\nWifi Mode: %i\nssid %s\nwifi_pass %s\nwifi_chan %i\nbaud %liu\ngpio_tx %i\ngpio_rx %i\ngpio_cts %i\ngpio_rts %i\nrts_thresh %i\nproto %i\n"
-             "trans_pack_size %i\nltm_per_packet %i\nmsp_ltm %i\nap_ip %s",
+             "trans_pack_size %i\nltm_per_packet %i\nap_ip %s",
              DB_WIFI_MODE, DEFAULT_SSID, DEFAULT_PWD, DEFAULT_CHANNEL, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
              DB_UART_PIN_CTS, DB_UART_PIN_RTS, DB_UART_RTS_THRESH,
-             SERIAL_PROTOCOL, TRANSPARENT_BUF_SIZE, LTM_FRAME_NUM_BUFFER, MSP_LTM_SAMEPORT, DEFAULT_AP_IP);
+             SERIAL_PROTOCOL, TRANSPARENT_BUF_SIZE, LTM_FRAME_NUM_BUFFER, DEFAULT_AP_IP);
     ESP_LOGI(TAG, "Saving to NVS %s", NVS_NAMESPACE);
     nvs_handle my_handle;
     ESP_ERROR_CHECK(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &my_handle));
@@ -354,7 +353,6 @@ void write_settings_to_nvs() {
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "proto", SERIAL_PROTOCOL));
     ESP_ERROR_CHECK(nvs_set_u16(my_handle, "trans_pack_size", TRANSPARENT_BUF_SIZE));
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "ltm_per_packet", LTM_FRAME_NUM_BUFFER));
-    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "msp_ltm", MSP_LTM_SAMEPORT));
     ESP_ERROR_CHECK(nvs_set_str(my_handle, "ap_ip", DEFAULT_AP_IP));
     ESP_ERROR_CHECK(nvs_commit(my_handle));
     nvs_close(my_handle);
@@ -401,17 +399,16 @@ void read_settings_nvs() {
         ESP_ERROR_CHECK(nvs_get_u8(my_handle, "proto", &SERIAL_PROTOCOL));
         ESP_ERROR_CHECK(nvs_get_u16(my_handle, "trans_pack_size", &TRANSPARENT_BUF_SIZE));
         ESP_ERROR_CHECK(nvs_get_u8(my_handle, "ltm_per_packet", &LTM_FRAME_NUM_BUFFER));
-        ESP_ERROR_CHECK(nvs_get_u8(my_handle, "msp_ltm", &MSP_LTM_SAMEPORT));
         nvs_close(my_handle);
         free(wifi_pass);
         free(ssid);
         free(ap_ip);
         ESP_LOGI(TAG,
                  "Stored settings:\nWifi Mode: %i\nssid %s\nwifi_pass %s\nwifi_chan %i\nbaud %liu\ngpio_tx %i\ngpio_rx %i\ngpio_cts %i\n"
-                 "gpio_rts %i\nrts_thresh %i\nproto %i\ntrans_pack_size %i\nltm_per_packet %i\nmsp_ltm %i\nap_ip %s",
+                 "gpio_rts %i\nrts_thresh %i\nproto %i\ntrans_pack_size %i\nltm_per_packet %i\nap_ip %s",
                  DB_WIFI_MODE, DEFAULT_SSID, DEFAULT_PWD, DEFAULT_CHANNEL, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
                  DB_UART_PIN_CTS, DB_UART_PIN_RTS, DB_UART_RTS_THRESH, SERIAL_PROTOCOL, TRANSPARENT_BUF_SIZE,
-                 LTM_FRAME_NUM_BUFFER, MSP_LTM_SAMEPORT, DEFAULT_AP_IP);
+                 LTM_FRAME_NUM_BUFFER, DEFAULT_AP_IP);
     }
 }
 

@@ -207,12 +207,6 @@ static esp_err_t settings_change_post_handler(httpd_req_t *req) {
     json = cJSON_GetObjectItem(root, "ltm_pp");
     if (json) LTM_FRAME_NUM_BUFFER = json->valueint;
 
-    json = cJSON_GetObjectItem(root, "msp_ltm_port");
-    if (json && (json->valueint == 0 || json->valueint == 1))
-        MSP_LTM_SAMEPORT = json->valueint;
-    else if (json)
-        ESP_LOGE(REST_TAG, "Only option 0 or 1 are allowed for msp_ltm_port parameter! Not changing!");
-
     json = cJSON_GetObjectItem(root, "ap_ip");
     if (json && is_valid_ip4(json->valuestring)) {
         strncpy(DEFAULT_AP_IP, json->valuestring, sizeof(DEFAULT_AP_IP) - 1);
@@ -339,7 +333,6 @@ static esp_err_t settings_data_get_handler(httpd_req_t *req) {
     cJSON_AddNumberToObject(root, "baud", DB_UART_BAUD_RATE);
     cJSON_AddNumberToObject(root, "telem_proto", SERIAL_PROTOCOL);
     cJSON_AddNumberToObject(root, "ltm_pp", LTM_FRAME_NUM_BUFFER);
-    cJSON_AddNumberToObject(root, "msp_ltm_port", MSP_LTM_SAMEPORT);
     cJSON_AddStringToObject(root, "ap_ip", DEFAULT_AP_IP);
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
