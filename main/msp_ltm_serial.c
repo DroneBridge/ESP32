@@ -139,7 +139,7 @@ bool parse_msp_ltm_byte(msp_ltm_port_t *msp_ltm_port, uint8_t new_byte) {
             break;
 
         case MSP_HEADER_M:
-            if (new_byte == '>') {
+            if (new_byte == '>' || new_byte == '!') {
                 msp_ltm_port->offset = 0;
                 msp_ltm_port->checksum1 = 0;
                 msp_ltm_port->checksum2 = 0;
@@ -150,7 +150,7 @@ bool parse_msp_ltm_byte(msp_ltm_port_t *msp_ltm_port, uint8_t new_byte) {
             break;
 
         case MSP_HEADER_X:
-            if (new_byte == '>') {
+            if (new_byte == '>' || new_byte == '!') {
                 msp_ltm_port->offset = 0;
                 msp_ltm_port->checksum2 = 0;
                 msp_ltm_port->mspVersion = MSP_V2_NATIVE;
