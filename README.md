@@ -46,8 +46,12 @@ Or compile using esp-idf v5.1:
 **Officially supported and tested boards:**  
 Do the project and yourself a favour and use one of the officially supported and tested boards below.   
 These boards are very low in price, have everything you need and are also very small. Perfect for use on any drone.   
-The sponsored links below help dedicate more resources to the project.
-* [Seeed Studio XIAO ESP32C3](https://www.seeedstudio.com/Seeed-XIAO-ESP32C3-p-5431.html?sensecap_affiliate=JboL6N1&referring_service=link) + [External antenna](https://www.seeedstudio.com/2-4GHz-2-81dBi-Antenna-for-XIAO-ESP32C3-p-5475.html?sensecap_affiliate=JboL6N1&referring_service=link) for more range.
+
+* [Official board for DroneBridge for ESP32](https://www.ebay.de/itm/116111278197) - spares from first batch, pre-installed and ready for use  
+currently shipping to EU only - contact seller for non-EU shipping options
+
+Other official options
+* [Seeed Studio XIAO ESP32C3](https://www.seeedstudio.com/Seeed-XIAO-ESP32C3-p-5431.html) + [External antenna](https://www.seeedstudio.com/2-4GHz-2-81dBi-Antenna-for-XIAO-ESP32C3-p-5475.html) for more range.
 
 [For further info please check the wiki!](https://github.com/DroneBridge/ESP32/wiki/Supported-Hardware)
 
