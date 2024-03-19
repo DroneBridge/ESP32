@@ -1,7 +1,7 @@
 /*
  *   This file is part of DroneBridge: https://github.com/DroneBridge/ESP32
  *
- *   Copyright 2018 Wolfgang Christl
+ *   Copyright 2024 Wolfgang Christl
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -17,18 +17,17 @@
  *
  */
 
+#ifndef DB_ESP32_DB_SERIAL_H
+#define DB_ESP32_DB_SERIAL_H
 
-#ifndef DB_ESP32_MAIN_H
-#define DB_ESP32_MAIN_H
+#define UART_NUM UART_NUM_1
 
-enum E_DB_WIFI_MODE {
-    DB_WIFI_MODE_AP = 1,            // Wi-Fi access point mode with Wi-Fi B mode enabled
-    DB_WIFI_MODE_STA = 2,           // Wi-Fi client mode with Wi-Fi B and LR mode enabled
-    DB_WIFI_MODE_AP_LR = 3,         // ESP32 LR Mode
-    DB_WIFI_MODE_ESPNOW_AIR = 4,    // ESP-NOW Mode for broadcasting device - automatically enables Wi-Fi B and LR mode
-    DB_WIFI_MODE_ESPNOW_GND = 5,    // ESP-NOW Mode for GND station - automatically enables Wi-Fi B and LR mode
-};
+int open_serial_socket();
+void write_to_uart(const char data_buffer[], const unsigned int data_length);
+void parse_msp_ltm(int tcp_clients[], struct udp_conn_list_t *udp_connection, uint8_t msp_message_buffer[],
+                   unsigned int *serial_read_bytes,
+                   msp_ltm_port_t *db_msp_ltm_port);
+void parse_transparent(int tcp_clients[], struct udp_conn_list_t *udp_connection, uint8_t serial_buffer[],
+                       unsigned int *serial_read_bytes);
 
-void write_settings_to_nvs();
-
-#endif //DB_ESP32_MAIN_H
+#endif //DB_ESP32_DB_SERIAL_H

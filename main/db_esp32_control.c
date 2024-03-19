@@ -1,5 +1,5 @@
 /*
- *   This file is part of DroneBridge: https://github.com/seeul8er/DroneBridge
+ *   This file is part of DroneBridge: https://github.com/DroneBridge/ESP32
  *
  *   Copyright 2018 Wolfgang Christl
  *
@@ -34,42 +34,13 @@
 #include "tcp_server.h"
 #include "db_esp32_control.h"
 #include "main.h"
-
-#define UART_NUM UART_NUM_1
+#include "db_serial.h"
 
 #define TAG "DB_CONTROL"
 
 uint16_t app_port_proxy = APP_PORT_PROXY;
-uint8_t ltm_frame_buffer[MAX_LTM_FRAMES_IN_BUFFER * LTM_MAX_FRAME_SIZE];
-uint ltm_frames_in_buffer = 0;
-uint ltm_frames_in_buffer_pnt = 0;
 
-uint32_t uart_byte_count = 0;
 int8_t num_connected_tcp_clients = 0;
-
-/**
- * Opens UART socket.
- * Enables UART flow control if RTS and CTS pins do NOT match.
- *
- * 8 data bits, no parity, 1 stop bit
- * @return ESP_ERROR of uart_driver_install
- */
-esp_err_t open_serial_socket() {
-    bool flow_control = DB_UART_PIN_CTS != DB_UART_PIN_RTS;
-    uart_config_t uart_config = {
-            .baud_rate = DB_UART_BAUD_RATE,
-            .data_bits = UART_DATA_8_BITS,
-            .parity    = UART_PARITY_DISABLE,
-            .stop_bits = UART_STOP_BITS_1,
-            .flow_ctrl = flow_control ? UART_HW_FLOWCTRL_CTS_RTS : UART_HW_FLOWCTRL_DISABLE,
-            .rx_flow_ctrl_thresh = DB_UART_RTS_THRESH,
-    };
-    ESP_ERROR_CHECK(uart_param_config(UART_NUM, &uart_config));
-    ESP_ERROR_CHECK(uart_set_pin(UART_NUM, DB_UART_PIN_TX, DB_UART_PIN_RX,
-                                 flow_control ? DB_UART_PIN_RTS : UART_PIN_NO_CHANGE,
-                                 flow_control ? DB_UART_PIN_CTS : UART_PIN_NO_CHANGE));
-    return uart_driver_install(UART_NUM, 1024, 0, 10, NULL, 0);
-}
 
 /**
  * Opens non-blocking UDP socket
@@ -117,7 +88,7 @@ void send_to_all_udp_clients(struct udp_conn_list_t *n_udp_conn_list, const uint
 }
 
 /**
- * Send to all connected TCP & UDP clients
+ * Send to all connected TCP & UDP clients. Typically called by a function that read from UART.
  *
  * @param tcp_clients Array of socket IDs for the TCP clients
  * @param udp_conn Structure handling the UDP connection
@@ -125,81 +96,11 @@ void send_to_all_udp_clients(struct udp_conn_list_t *n_udp_conn_list, const uint
  * @param data_length Length of payload to send
  */
 void send_to_all_clients(int tcp_clients[], struct udp_conn_list_t *n_udp_conn_list, uint8_t data[], uint data_length) {
-    send_to_all_tcp_clients(tcp_clients, data, data_length);
-    send_to_all_udp_clients(n_udp_conn_list, data, data_length);
-}
-
-/**
- * Writes data from buffer to UART
- * @param data_buffer Payload to write to UART
- * @param data_length Size of payload to write to UART
- */
-void write_to_uart(const char data_buffer[], const size_t data_length) {
-    int written = uart_write_bytes(UART_NUM, data_buffer, data_length);
-    if (written > 0)
-        ESP_LOGD(TAG, "Wrote %i bytes to UART", written);
-    else
-        ESP_LOGE(TAG, "Error writing to UART %s", esp_err_to_name(errno));
-}
-
-/**
- * @brief Parses & sends complete MSP & LTM messages
- */
-void parse_msp_ltm(int tcp_clients[], struct udp_conn_list_t *udp_connection, uint8_t msp_message_buffer[],
-                   uint *serial_read_bytes,
-                   msp_ltm_port_t *db_msp_ltm_port) {
-    uint8_t serial_bytes[TRANS_RD_BYTES_NUM];
-    uint read;
-    if ((read = uart_read_bytes(UART_NUM, serial_bytes, TRANS_RD_BYTES_NUM, 0)) > 0) {
-        uart_byte_count += read;
-        for (uint j = 0; j < read; j++) {
-            (*serial_read_bytes)++;
-            uint8_t serial_byte = serial_bytes[j];
-            if (parse_msp_ltm_byte(db_msp_ltm_port, serial_byte)) {
-                msp_message_buffer[(*serial_read_bytes - 1)] = serial_byte;
-                if (db_msp_ltm_port->parse_state == MSP_PACKET_RECEIVED) {
-                    send_to_all_clients(tcp_clients, udp_connection, msp_message_buffer, *serial_read_bytes);
-                    *serial_read_bytes = 0;
-                } else if (db_msp_ltm_port->parse_state == LTM_PACKET_RECEIVED) {
-                    memcpy(&ltm_frame_buffer[ltm_frames_in_buffer_pnt], db_msp_ltm_port->ltm_frame_buffer,
-                           (db_msp_ltm_port->ltm_payload_cnt + 4));
-                    ltm_frames_in_buffer_pnt += (db_msp_ltm_port->ltm_payload_cnt + 4);
-                    ltm_frames_in_buffer++;
-                    if (ltm_frames_in_buffer == LTM_FRAME_NUM_BUFFER &&
-                        (LTM_FRAME_NUM_BUFFER <= MAX_LTM_FRAMES_IN_BUFFER)) {
-                        send_to_all_clients(tcp_clients, udp_connection, ltm_frame_buffer, *serial_read_bytes);
-                        ESP_LOGV(TAG, "Sent %i LTM message(s) to telemetry port!", LTM_FRAME_NUM_BUFFER);
-                        ltm_frames_in_buffer = 0;
-                        ltm_frames_in_buffer_pnt = 0;
-                        *serial_read_bytes = 0;
-                    }
-                }
-            } else { // XXX Leads to crashes of the ESP32 without it!
-                *serial_read_bytes = 0;
-            }
-        }
-    }
-}
-
-/**
- * Reads TRANS_RD_BYTES_NUM bytes from UART and checks if we already got enough bytes to send them out
- *
- * @param tcp_clients Array of connected TCP clients
- * @param udp_connection Structure containing all UDP connection data including the sockets
- * @param serial_buffer Buffer that gets filled with data and then sent via TCP and UDP
- * @param serial_read_bytes Number of bytes already read for the current packet
- */
-void parse_transparent(int tcp_clients[], struct udp_conn_list_t *udp_connection, uint8_t serial_buffer[],
-                       uint *serial_read_bytes) {
-    uint16_t read;
-    // read from UART directly into TCP & UDP send buffer
-    if ((read = uart_read_bytes(UART_NUM, &serial_buffer[*serial_read_bytes], (TRANSPARENT_BUF_SIZE-*serial_read_bytes), 0)) > 0) {
-        uart_byte_count += read;    // increase total bytes read via UART
-        *serial_read_bytes += read; // set new buffer position
-        if (*serial_read_bytes >= TRANSPARENT_BUF_SIZE) {
-            send_to_all_clients(tcp_clients, udp_connection, serial_buffer, *serial_read_bytes);
-            *serial_read_bytes = 0; // reset buffer position
-        }
+    if (DB_WIFI_MODE != DB_WIFI_MODE_ESPNOW_AIR && DB_WIFI_MODE != DB_WIFI_MODE_ESPNOW_GND) {
+        send_to_all_tcp_clients(tcp_clients, data, data_length);
+        send_to_all_udp_clients(n_udp_conn_list, data, data_length);
+    } else {
+        // TODO: Send via ESP-Now
     }
 }
 
@@ -230,7 +131,7 @@ void handle_tcp_master(const int tcp_master_socket, int tcp_clients[]) {
 }
 
 /**
- *  Create structure containing all UDP connection information
+ *  Init/Create structure containing all UDP connection information
  * @return Structure containing all UDP connection information
  */
 struct udp_conn_list_t *udp_client_list_create() {
@@ -262,23 +163,25 @@ void udp_client_list_destroy(struct udp_conn_list_t *n_udp_conn_list) {
  * @param n_udp_conn_list Structure containing all UDP connection information
  * @param new_db_udp_client New client to add to the UDP list. PORT, MAC & IP must be set. If MAC is not set then the
  *                          device cannot be removed later on.
+ * @return 1 if added - 0 if not
  */
-void add_to_known_udp_clients(struct udp_conn_list_t *n_udp_conn_list, struct db_udp_client_t new_db_udp_client) {
+bool add_to_known_udp_clients(struct udp_conn_list_t *n_udp_conn_list, struct db_udp_client_t new_db_udp_client) {
     if (n_udp_conn_list == NULL) { // Check if the list is NULL
-        return; // Do nothing
+        return false; // Do nothing
     }
     if (n_udp_conn_list->size == MAX_UDP_CLIENTS) { // Check if the list is full
-        return; // Do nothing
+        return false; // Do nothing
     }
     for (int i = 0; i < udp_conn_list->size; i++) {
         if ((n_udp_conn_list->db_udp_clients[i].udp_client.sin_port == new_db_udp_client.udp_client.sin_port) &&
             (n_udp_conn_list->db_udp_clients[i].udp_client.sin_addr.s_addr ==
              new_db_udp_client.udp_client.sin_addr.s_addr)) {
-            return; // client existing - do not add
+            return false; // client existing - do not add
         }
     }
     n_udp_conn_list->db_udp_clients[n_udp_conn_list->size] = new_db_udp_client; // Copy the element data to the end of the array
     n_udp_conn_list->size++; // Increment the size of the list
+    return true;
 }
 
 /**
@@ -288,10 +191,11 @@ void add_to_known_udp_clients(struct udp_conn_list_t *n_udp_conn_list, struct db
  *
  * @param n_udp_conn_list Structure containing all UDP connection information
  * @param new_db_udp_client The UDP client to remove based on its MAC address
+ * @return true if removed - false if nothing was removed
  */
-void remove_from_known_udp_clients(struct udp_conn_list_t *n_udp_conn_list, struct db_udp_client_t new_db_udp_client) {
+bool remove_from_known_udp_clients(struct udp_conn_list_t *n_udp_conn_list, struct db_udp_client_t new_db_udp_client) {
     if (n_udp_conn_list == NULL) { // Check if the list is NULL
-        return; // Do nothing
+        return false; // Do nothing
     }
     for (int i = 0; i < n_udp_conn_list->size; i++) { // Loop through the array
         if (memcmp(n_udp_conn_list->db_udp_clients[i].mac, new_db_udp_client.mac,
@@ -303,53 +207,110 @@ void remove_from_known_udp_clients(struct udp_conn_list_t *n_udp_conn_list, stru
                                                                                      1]; // Shift the array elements to the left
             }
             n_udp_conn_list->size--; // Decrement the size of the list
-            return; // Exit the function
+            return true; // Exit the function
         }
     }
     // No match found
+    return false;
 }
 
 /**
- * Thread that manages all incoming and outgoing TCP, UDP and serial (UART) connections
+ * Reads UART transparently or parsing MSP/LTM protocol.
+ * Then sends read data to all connected clients via TCP/UDP or ESP-NOW.
+ * Non-Blocking function
+ *
+ * @param tcp_clients Array of connected TCP client sockets
+ * @param transparent_buff_pos Counter variable for total read UART bytes
+ * @param msp_ltm_buff_pos Pointer position/data length of destination-buffer for read MSP messages
+ * @param msp_message_buffer Destination-buffer for read MSP messages
+ * @param serial_buffer Destination-buffer for the serial data
+ * @param db_msp_ltm_port Pointer to structure containing MSP/LTM parser information
  */
-void control_module_udp_tcp() {
-    ESP_LOGI(TAG, "Starting control module");
+void read_process_uart(int *tcp_clients, uint *transparent_buff_pos, uint *msp_ltm_buff_pos, uint8_t *msp_message_buffer,
+                       uint8_t *serial_buffer, msp_ltm_port_t *db_msp_ltm_port) {
+    switch (DB_SERIAL_PROTOCOL) {
+        case 1:
+        case 2:
+            parse_msp_ltm(tcp_clients, udp_conn_list, msp_message_buffer, msp_ltm_buff_pos, db_msp_ltm_port);
+            break;
+        default:
+        case 3:
+        case 4:
+        case 5:
+            parse_transparent(tcp_clients, udp_conn_list, serial_buffer, transparent_buff_pos);
+            break;
+    }
+}
+
+/**
+ * Thread that manages all incoming and outgoing ESP-NOW and serial (UART) connections.
+ * Called only when ESP-NOW mode is selected
+ */
+void control_module_esp_now(){
+    ESP_LOGI(TAG, "Starting control module (ESP-NOW)");
     // only open serial socket/UART if PINs are not matching - matching PIN nums mean they still need to be defined by
     // the user no pre-defined pins as of this release since ESP32 boards have wildly different pin configurations
-    int uart_socket = ESP_FAIL;
-    if (DB_UART_PIN_RX != DB_UART_PIN_TX) {
-        uart_socket = open_serial_socket();
-    } else {
-        // do no long continue setting up the system and kill task
-        ESP_LOGW(TAG, "Init of control module aborted. TX GPIO == RX GPIO - Configure first!");
+    int uart_socket = open_serial_socket();
+    if (uart_socket == ESP_FAIL) {
+        ESP_LOGE(TAG, "UART socket not opened. Aborting start of control module.");
         vTaskDelete(NULL);
     }
+
+    uint transparent_buff_pos = 0;
+    uint msp_ltm_buff_pos = 0;
+    uint8_t msp_message_buffer[UART_BUF_SIZE];
+    uint8_t serial_buffer[DB_TRANS_BUF_SIZE];
+    msp_ltm_port_t db_msp_ltm_port;
+    ESP_LOGI(TAG, "Started control module (ESP-NOW)");
+    while (1) {
+        // TODO: Process ESP-NOW data and clients
+        read_process_uart(NULL, &transparent_buff_pos, &msp_ltm_buff_pos, msp_message_buffer, serial_buffer,
+                          &db_msp_ltm_port);
+    }
+    vTaskDelete(NULL);
+}
+
+/**
+ * Thread that manages all incoming and outgoing TCP, UDP and serial (UART) connections.
+ * Called when Wi-Fi modes are selected
+ */
+void control_module_udp_tcp() {
+    ESP_LOGI(TAG, "Starting control module (Wi-Fi)");
+    int uart_socket = open_serial_socket();
+    if (uart_socket == ESP_FAIL) {
+        ESP_LOGE(TAG, "UART socket not opened. Aborting start of control module.");
+        vTaskDelete(NULL);
+    }
+
     int tcp_master_socket = open_tcp_server(app_port_proxy);
+    if (tcp_master_socket == ESP_FAIL) {
+        ESP_LOGE(TAG, "TCP master socket failed to open. Aborting start of control module.");
+        vTaskDelete(NULL);
+    }
+    fcntl(tcp_master_socket, F_SETFL, O_NONBLOCK);
+    int tcp_clients[CONFIG_LWIP_MAX_ACTIVE_TCP];
+    for (int i = 0; i < CONFIG_LWIP_MAX_ACTIVE_TCP; i++) {
+        tcp_clients[i] = -1;
+    }
 
     udp_conn_list->udp_socket = open_udp_socket();
     char udp_buffer[UDP_BUF_SIZE];
     struct db_udp_client_t new_db_udp_client = {0};
     socklen_t udp_socklen = sizeof(new_db_udp_client.udp_client);
 
-    int tcp_clients[CONFIG_LWIP_MAX_ACTIVE_TCP];
-    for (int i = 0; i < CONFIG_LWIP_MAX_ACTIVE_TCP; i++) {
-        tcp_clients[i] = -1;
-    }
-    if (tcp_master_socket == ESP_FAIL || uart_socket == ESP_FAIL) {
-        ESP_LOGE(TAG, "Can not start control module: tcp socket: %i UART socket: %i", tcp_master_socket, uart_socket);
-    }
-    fcntl(tcp_master_socket, F_SETFL, O_NONBLOCK);
-    uint read_transparent = 0;
-    uint read_msp_ltm = 0;
+    uint transparent_buff_pos = 0;
+    uint msp_ltm_buff_pos = 0;
     char tcp_client_buffer[TCP_BUFF_SIZ];
     memset(tcp_client_buffer, 0, TCP_BUFF_SIZ);
     uint8_t msp_message_buffer[UART_BUF_SIZE];
-    uint8_t serial_buffer[TRANSPARENT_BUF_SIZE];
+    uint8_t serial_buffer[DB_TRANS_BUF_SIZE];
     msp_ltm_port_t db_msp_ltm_port;
     int delay_timer_cnt = 0;
 
-    ESP_LOGI(TAG, "Started control module");
+    ESP_LOGI(TAG, "Started control module (Wi-Fi)");
     while (1) {
+        // Read incoming wireless data (Wi-Fi)
+        // Wi-Fi based modes that use TCP and UDP communication
         handle_tcp_master(tcp_master_socket, tcp_clients);
         for (int i = 0; i < CONFIG_LWIP_MAX_ACTIVE_TCP; i++) {  // handle TCP clients
             if (tcp_clients[i] > 0) {
@@ -372,7 +333,7 @@ void control_module_udp_tcp() {
                 }
             }
         }
-        // handle incoming UDP data - Read UDP and forward to flight controller
+        // handle incoming UDP data - Read UDP and forward to UART
         // all devices that send us UDP data will be added to the list of MAVLink UDP receivers
         ssize_t recv_length = recvfrom(udp_conn_list->udp_socket, udp_buffer, UDP_BUF_SIZE, 0,
                                        (struct sockaddr *) &new_db_udp_client.udp_client, &udp_socklen);
@@ -385,22 +346,15 @@ void control_module_udp_tcp() {
             // In AP-Mode the devices can be removed based on the IP/MAC address
             add_to_known_udp_clients(udp_conn_list, new_db_udp_client);
         }
-        switch (SERIAL_PROTOCOL) {
-            case 1:
-            case 2:
-                parse_msp_ltm(tcp_clients, udp_conn_list, msp_message_buffer, &read_msp_ltm, &db_msp_ltm_port);
-                break;
-            default:
-            case 3:
-            case 4:
-            case 5:
-                parse_transparent(tcp_clients, udp_conn_list, serial_buffer, &read_transparent);
-                break;
-        }
+
+        // Second check for incoming UART data and send it to TCP/UDP
+        read_process_uart(tcp_clients, &transparent_buff_pos, &msp_ltm_buff_pos, msp_message_buffer, serial_buffer,
+                          &db_msp_ltm_port);
+
         if (delay_timer_cnt == 9000) {
             // all actions are non-blocking so allow some delay so that the IDLE task of FreeRTOS and the watchdog can run
             // read: https://esp32developer.com/programming-in-c-c/tasks/tasks-vs-co-routines for reference
-            vTaskDelay(10/portTICK_PERIOD_MS);
+            vTaskDelay(10 / portTICK_PERIOD_MS);
             delay_timer_cnt = 0;
             if (DB_WIFI_MODE == DB_WIFI_MODE_STA) {
                 // update rssi variable - set to 0 when not available
@@ -422,5 +376,9 @@ void control_module_udp_tcp() {
  * MAVLink is passed through (fully transparent). Can be used with any protocol.
  */
 void control_module() {
-    xTaskCreate(&control_module_udp_tcp, "control_tcp", 40960, NULL, 5, NULL);
+    if (DB_WIFI_MODE != DB_WIFI_MODE_ESPNOW_GND && DB_WIFI_MODE != DB_WIFI_MODE_ESPNOW_AIR) {
+        xTaskCreate(&control_module_udp_tcp, "control_wifi", 40960, NULL, 5, NULL);
+    } else {
+        xTaskCreate(&control_module_esp_now, "control_espnow", 40960, NULL, 5, NULL);
+    }
 }

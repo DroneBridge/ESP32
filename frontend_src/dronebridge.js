@@ -5,7 +5,7 @@ let conn_status = 0;
 function change_ap_ip_visibility(){
 	var ap_ip_div = document.getElementById("ap_ip_div");
 	var ap_channel_div = document.getElementById("ap_channel_div");
-	var disclamer_div = document.getElementById("esp-now-ap-disclaimer");
+	var disclamer_div = document.getElementById("esp-lr-ap-disclaimer");
 	if (document.getElementById("esp32_mode").value === "2") {
 		ap_ip_div.style.display = "none";
 		ap_channel_div.style.display = "none";
@@ -13,7 +13,7 @@ function change_ap_ip_visibility(){
 		ap_ip_div.style.display = "block";
 		ap_channel_div.style.display = "block";
 	}
-	if (document.getElementById("esp32_mode").value === "3") {
+	if (document.getElementById("esp32_mode").value >= "3") {
 		disclamer_div.style.display = "block";
 	} else {
 		disclamer_div.style.display = "none";

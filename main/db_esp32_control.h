@@ -42,7 +42,8 @@ struct udp_conn_list_t {
 void control_module();
 struct udp_conn_list_t *udp_client_list_create();
 void udp_client_list_destroy(struct udp_conn_list_t *n_udp_conn_list);
-void add_to_known_udp_clients(struct udp_conn_list_t *n_udp_conn_list, struct db_udp_client_t new_db_udp_client);
-void remove_from_known_udp_clients(struct udp_conn_list_t *n_udp_conn_list, struct db_udp_client_t new_db_udp_client);
+bool add_to_known_udp_clients(struct udp_conn_list_t *n_udp_conn_list, struct db_udp_client_t new_db_udp_client);
+void send_to_all_clients(int tcp_clients[], struct udp_conn_list_t *n_udp_conn_list, uint8_t data[], uint data_length);
+bool remove_from_known_udp_clients(struct udp_conn_list_t *n_udp_conn_list, struct db_udp_client_t new_db_udp_client);
 
 #endif //DB_ESP32_DB_ESP32_CONTROL_H

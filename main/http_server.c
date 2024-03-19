@@ -29,6 +29,7 @@
 #include "cJSON.h"
 #include "globals.h"
 #include "main.h"
+#include "db_serial.h"
 
 static const char *REST_TAG = "DB_HTTP_REST";
 #define REST_CHECK(a, str, goto_tag, ...)                                              \
@@ -162,26 +163,26 @@ static esp_err_t settings_change_post_handler(httpd_req_t *req) {
 
     json = cJSON_GetObjectItem(root, "wifi_ssid");
     if (json && strlen(json->valuestring) < 32 && strlen(json->valuestring) > 0)
-        strncpy((char *) DEFAULT_SSID, json->valuestring, sizeof(DEFAULT_SSID) - 1);
+        strncpy((char *) DB_WIFI_SSID, json->valuestring, sizeof(DB_WIFI_SSID) - 1);
     else if (json)
         ESP_LOGE(REST_TAG, "Invalid SSID length (1-31)");
 
     json = cJSON_GetObjectItem(root, "wifi_pass");
     if (json && strlen(json->valuestring) < 64 && strlen(json->valuestring) > 7)
-        strncpy((char *) DEFAULT_PWD, json->valuestring, sizeof(DEFAULT_PWD) - 1);
+        strncpy((char *) DB_WIFI_PWD, json->valuestring, sizeof(DB_WIFI_PWD) - 1);
     else if (json)
         ESP_LOGE(REST_TAG, "Invalid password length (8-63)");
 
 
     json = cJSON_GetObjectItem(root, "ap_channel");
     if (json && json->valueint > 0 && json->valueint < 14) {
-        DEFAULT_CHANNEL = json->valueint;
+        DB_WIFI_CHANNEL = json->valueint;
     } else if (json) {
         ESP_LOGE(REST_TAG, "No a valid wifi channel (1-13). Not changing!");
     }
 
     json = cJSON_GetObjectItem(root, "trans_pack_size");
-    if (json) TRANSPARENT_BUF_SIZE = json->valueint;
+    if (json) DB_TRANS_BUF_SIZE = json->valueint;
     json = cJSON_GetObjectItem(root, "tx_pin");
     if (json) DB_UART_PIN_TX = json->valueint;
     json = cJSON_GetObjectItem(root, "rx_pin");
@@ -198,14 +199,14 @@ static esp_err_t settings_change_post_handler(httpd_req_t *req) {
 
     json = cJSON_GetObjectItem(root, "telem_proto");
     if (json && (json->valueint == 1 || json->valueint == 4)) {
-        SERIAL_PROTOCOL = json->valueint;
+        DB_SERIAL_PROTOCOL = json->valueint;
     } else if (json) {
         ESP_LOGW(REST_TAG, "telem_proto is not 1 (LTM/MSP) or 4 (MAVLink/Transparent). Changing to transparent");
-        SERIAL_PROTOCOL = 4;
+        DB_SERIAL_PROTOCOL = 4;
     }
 
     json = cJSON_GetObjectItem(root, "ltm_pp");
-    if (json) LTM_FRAME_NUM_BUFFER = json->valueint;
+    if (json) DB_LTM_FRAME_NUM_BUFFER = json->valueint;
 
     json = cJSON_GetObjectItem(root, "ap_ip");
     if (json && is_valid_ip4(json->valuestring)) {
@@ -220,6 +221,77 @@ static esp_err_t settings_change_post_handler(httpd_req_t *req) {
                             "    \"status\": \"success\",\n"
                             "    \"msg\": \"Settings changed!\"\n"
                             "  }");
+    return ESP_OK;
+}
+
+/**
+ * Process incoming UDP connection add request. Only one IPv4 connection can be added
+ * Expecting JSON in the form of:
+ * {
+ *   "ip": "XXX.XXX.XXX.XXX",
+ *   "port": 452
+ *   }
+ * @param req
+ * @return
+ */
+static esp_err_t udp_conn_add_post_handler(httpd_req_t *req) {
+    // Process HTTP request
+    int total_len = req->content_len;
+    int cur_len = 0;
+    char *buf = ((rest_server_context_t *) (req->user_ctx))->scratch;
+    int received = 0;
+    if (total_len >= SCRATCH_BUFSIZE) {
+        /* Respond with 500 Internal Server Error */
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
+        return ESP_FAIL;
+    }
+    while (cur_len < total_len) {
+        received = httpd_req_recv(req, buf + cur_len, total_len);
+        if (received <= 0) {
+            /* Respond with 500 Internal Server Error */
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to post control value");
+            return ESP_FAIL;
+        }
+        cur_len += received;
+    }
+    buf[total_len] = '\0';
+    // Obtain & process JSON from request
+    cJSON *root = cJSON_Parse(buf);
+
+    int new_udp_port = 0;
+    char new_ip[IP4ADDR_STRLEN_MAX];
+    cJSON *json = cJSON_GetObjectItem(root, "ip");
+    if (json) strncpy(new_ip, json->valuestring, IP4ADDR_STRLEN_MAX);
+    json = cJSON_GetObjectItem(root, "port");
+    if (json) new_udp_port = json->valueint;
+
+    // populate the UDP connections list with a new connection
+    struct sockaddr_in new_sockaddr;
+    memset(&new_sockaddr, 0, sizeof(new_sockaddr));
+    new_sockaddr.sin_family = AF_INET;
+    inet_pton(AF_INET, new_ip, &new_sockaddr.sin_addr);
+    struct db_udp_client_t new_udp_client = {
+            .udp_client = new_sockaddr,
+            .mac = {0, 0, 0, 0, 0, 0}   // dummy MAC
+    };
+    new_sockaddr.sin_port = htons(new_udp_port);
+    // udp_conn_list is initialized as the very first thing during startup - we expect it to be there
+    bool success = add_to_known_udp_clients(udp_conn_list, new_udp_client);
+
+    // Clean up
+    cJSON_Delete(root);
+    if (success) {
+        httpd_resp_sendstr(req, "{\n"
+                                "    \"status\": \"success\",\n"
+                                "    \"msg\": \"Added UDP connection!\"\n"
+                                "  }");
+    } else {
+        httpd_resp_sendstr(req, "{\n"
+                                "    \"status\": \"failed\",\n"
+                                "    \"msg\": \"Failed to add UDP connection!\"\n"
+                                "  }");
+    }
+
     return ESP_OK;
 }
 
@@ -266,7 +338,7 @@ static esp_err_t system_stats_get_handler(httpd_req_t *req) {
 }
 
 /**
- * Returns a JSON containing all active UDP connections that the ESP32 broadcasts to
+ * Returns a JSON containing all active UDP connections that the ESP32 sends to
  * @param req
  * @return ESP_OK on successfully sending the http request
  */
@@ -321,18 +393,18 @@ static esp_err_t settings_data_get_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "application/json");
     cJSON *root = cJSON_CreateObject();
     cJSON_AddNumberToObject(root, "esp32_mode", DB_WIFI_MODE);
-    cJSON_AddStringToObject(root, "wifi_ssid", (char *) DEFAULT_SSID);
-    cJSON_AddStringToObject(root, "wifi_pass", (char *) DEFAULT_PWD);
-    cJSON_AddNumberToObject(root, "ap_channel", DEFAULT_CHANNEL);
-    cJSON_AddNumberToObject(root, "trans_pack_size", TRANSPARENT_BUF_SIZE);
+    cJSON_AddStringToObject(root, "wifi_ssid", (char *) DB_WIFI_SSID);
+    cJSON_AddStringToObject(root, "wifi_pass", (char *) DB_WIFI_PWD);
+    cJSON_AddNumberToObject(root, "ap_channel", DB_WIFI_CHANNEL);
+    cJSON_AddNumberToObject(root, "trans_pack_size", DB_TRANS_BUF_SIZE);
     cJSON_AddNumberToObject(root, "tx_pin", DB_UART_PIN_TX);
     cJSON_AddNumberToObject(root, "rx_pin", DB_UART_PIN_RX);
     cJSON_AddNumberToObject(root, "cts_pin", DB_UART_PIN_CTS);
     cJSON_AddNumberToObject(root, "rts_pin", DB_UART_PIN_RTS);
     cJSON_AddNumberToObject(root, "rts_thresh", DB_UART_RTS_THRESH);
     cJSON_AddNumberToObject(root, "baud", DB_UART_BAUD_RATE);
-    cJSON_AddNumberToObject(root, "telem_proto", SERIAL_PROTOCOL);
-    cJSON_AddNumberToObject(root, "ltm_pp", LTM_FRAME_NUM_BUFFER);
+    cJSON_AddNumberToObject(root, "telem_proto", DB_SERIAL_PROTOCOL);
+    cJSON_AddNumberToObject(root, "ltm_pp", DB_LTM_FRAME_NUM_BUFFER);
     cJSON_AddStringToObject(root, "ap_ip", DEFAULT_AP_IP);
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
@@ -371,6 +443,15 @@ esp_err_t start_rest_server(const char *base_path) {
             .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_connections_get);
+
+    /* URI handler for adding a new udp client connection */
+    httpd_uri_t system_udp_connections_post = {
+            .uri = "/api/system/addudp",
+            .method = HTTP_POST,
+            .handler = udp_conn_add_post_handler,
+            .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &system_udp_connections_post);
 
     /* URI handler for fetching system info */
     httpd_uri_t system_stats_get_uri = {
