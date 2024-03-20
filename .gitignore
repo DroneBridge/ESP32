@@ -13,3 +13,5 @@ cmake-build-release*
 managed_components/espressif__mdns/.component_hash
 DroneBridge_ESP32_vXX.zip
 managed_components/espressif__mdns/.component_hash
+/managed_components
+dependencies.lock
