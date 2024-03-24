@@ -92,6 +92,7 @@ void parse_msp_ltm(int tcp_clients[], struct udp_conn_list_t *udp_connection, ui
                 if (db_msp_ltm_port->parse_state == MSP_PACKET_RECEIVED) {
                     *serial_read_bytes = 0;
                     send_to_all_clients(tcp_clients, udp_connection, msp_message_buffer, *serial_read_bytes);
+                    ESP_LOGI(TAG, "Sent MSP message(s) to telemetry port!");
                 } else if (db_msp_ltm_port->parse_state == LTM_PACKET_RECEIVED) {
                     memcpy(&ltm_frame_buffer[ltm_frames_in_buffer_pnt], db_msp_ltm_port->ltm_frame_buffer,
                            (db_msp_ltm_port->ltm_payload_cnt + 4));
@@ -100,7 +101,7 @@ void parse_msp_ltm(int tcp_clients[], struct udp_conn_list_t *udp_connection, ui
                     if (ltm_frames_in_buffer == LTM_FRAME_NUM_BUFFER &&
                         (LTM_FRAME_NUM_BUFFER <= MAX_LTM_FRAMES_IN_BUFFER)) {
                         send_to_all_clients(tcp_clients, udp_connection, ltm_frame_buffer, *serial_read_bytes);
-                        ESP_LOGV(TAG, "Sent %i LTM message(s) to telemetry port!", LTM_FRAME_NUM_BUFFER);
+                        ESP_LOGI(TAG, "Sent %i LTM message(s) to telemetry port!", LTM_FRAME_NUM_BUFFER);
                         ltm_frames_in_buffer = 0;
                         ltm_frames_in_buffer_pnt = 0;
                         *serial_read_bytes = 0;

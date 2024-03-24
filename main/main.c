@@ -5,17 +5,18 @@
 
 static const char *TAG = "DB_ESP32";
 
-uint8_t DB_NETIF_MODE = DB_WIFI_MODE_STA;  // 1=Wifi AP mode, 2=Wifi client mode, 3=ESP-NOW LR Mode, 4=Ethernet mode
+uint8_t DB_NETIF_MODE = DB_ETH_MODE;  // 1=Wifi AP mode, 2=Wifi client mode, 3=ESP-NOW LR Mode, 4=Ethernet mode
 uint8_t DEFAULT_SSID[32] = "Amurka";
 uint8_t DEFAULT_PWD[64] = "HiAmurka44";
-char DEFAULT_AP_IP[32] = "192.168.2.1";
-char CURRENT_CLIENT_IP[32] = "192.168.2.1";
+char DEFAULT_AP_IP[32] = "192.168.144.200";
+char DEFAULT_AP_GW[32] = "192.168.144.12";
+char CURRENT_CLIENT_IP[32] = "192.168.144.200";
 uint8_t DEFAULT_CHANNEL = 6;
 uint8_t SERIAL_PROTOCOL = 4;  // 1=MSP, 4=MAVLink/transparent
 
 // initially set both pins to 0 to allow the start of the system on all boards. User has to set the correct pins
-uint8_t DB_UART_PIN_TX = GPIO_NUM_0;
-uint8_t DB_UART_PIN_RX = GPIO_NUM_0;
+uint8_t DB_UART_PIN_TX = GPIO_NUM_16;
+uint8_t DB_UART_PIN_RX = GPIO_NUM_17;
 
 int32_t DB_UART_BAUD_RATE = 115200;
 uint16_t TRANSPARENT_BUF_SIZE = 64;
@@ -94,7 +95,7 @@ static void netif_event_handler(void *arg, esp_event_base_t event_base, int32_t 
             ESP_LOGI(TAG, "%s - Stopped", event_base);
         }
     } else if (event_base == IP_EVENT) {
-        if (event_id == IP_EVENT_AP_STAIPASSIGNED || event_id == IP_EVENT_ETH_GOT_IP) {
+        if (event_id == IP_EVENT_AP_STAIPASSIGNED) {
             ip_event_ap_staipassigned_t *event = (ip_event_ap_staipassigned_t *)event_data;
             ESP_LOGI(TAG, "%s - New station IP:" IPSTR, event_base, IP2STR(&event->ip));
             ESP_LOGI(TAG, "%s - MAC: " MACSTR, event_base, MAC2STR(event->mac));
@@ -105,6 +106,10 @@ static void netif_event_handler(void *arg, esp_event_base_t event_base, int32_t 
             db_udp_client.udp_client.sin_addr.s_addr = event->ip.addr;
             memcpy(db_udp_client.mac, event->mac, sizeof(db_udp_client.mac));
             add_to_known_udp_clients(udp_conn_list, db_udp_client);
+        } else if (event_id == IP_EVENT_ETH_GOT_IP) {
+            ip_event_ap_staipassigned_t *event = (ip_event_ap_staipassigned_t *)event_data;
+            ESP_LOGI(TAG, "%s - New station IP:" IPSTR, event_base, IP2STR(&event->ip));
+            ESP_LOGI(TAG, "%s - MAC: " MACSTR, event_base, MAC2STR(event->mac));
         } else if (event_id == IP_EVENT_STA_GOT_IP) {
             ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
             sprintf(CURRENT_CLIENT_IP, IPSTR, IP2STR(&event->ip_info.ip));
@@ -341,33 +346,24 @@ void init_netif_ethernet_mode() {
     esp_eth_config_t config = ETH_DEFAULT_CONFIG(mac, phy);
     ESP_ERROR_CHECK(esp_eth_driver_install(&config, &eth_handle));
 
-    // // Enable external oscillator (pulled down at boot to allow IO0 strapping)
-    // ESP_ERROR_CHECK(gpio_set_direction(GPIO_NUM_16, GPIO_MODE_OUTPUT));
-    // ESP_ERROR_CHECK(gpio_set_level(GPIO_NUM_16, 1));
-
     ESP_LOGD(TAG, "Starting Ethernet interface...");
 
     // Attach Ethernet driver to TCP/IP stack
     ESP_ERROR_CHECK(esp_netif_attach(esp_default_netif, esp_eth_new_netif_glue(eth_handle)));
 
+    ESP_ERROR_CHECK(esp_event_handler_register(ETH_EVENT,
+                                               ESP_EVENT_ANY_ID,
+                                               &netif_event_handler,
+                                               NULL));
     esp_event_handler_instance_t instance_got_ip;
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT,
                                                IP_EVENT_ETH_GOT_IP,
                                                &netif_event_handler,
                                                &instance_got_ip));
-    // esp_netif_flags_t flags_before = esp_netif_get_flags(esp_default_netif);
-    // ESP_LOGD(TAG, "flags before: %d", flags_before);
+
     ESP_ERROR_CHECK(esp_eth_start(eth_handle));
     ESP_LOGI(TAG, "Ethernet interface started");
 
-    // esp_netif_flags_t flags_after = esp_netif_get_flags(esp_default_netif);
-    // if (flags_after & ESP_NETIF_DHCP_CLIENT) {
-    //     ESP_LOGD(TAG, "DHCP client!");
-    //     ESP_ERROR_CHECK(esp_netif_dhcpc_stop(esp_default_netif));
-
-    // } else if (flags_after & ESP_NETIF_DHCP_SERVER) {
-    //     ESP_LOGD(TAG, "DHCP server!");
-    // }
     // If DHCP is already started, stop it
     ESP_ERROR_CHECK_WITHOUT_ABORT(esp_netif_dhcps_stop(esp_default_netif));
     ESP_ERROR_CHECK_WITHOUT_ABORT(esp_netif_dhcpc_stop(esp_default_netif));
@@ -377,9 +373,8 @@ void init_netif_ethernet_mode() {
     memset(&ip, 0, sizeof(esp_netif_ip_info_t));
     ip.ip.addr = ipaddr_addr(DEFAULT_AP_IP);
     ip.netmask.addr = ipaddr_addr("255.255.255.0");
-    ip.gw.addr = ipaddr_addr(DEFAULT_AP_IP);
+    ip.gw.addr = ipaddr_addr(DEFAULT_AP_GW);
     ESP_ERROR_CHECK(esp_netif_set_ip_info(esp_default_netif, &ip));
-    // ESP_ERROR_CHECK(esp_netif_dhcps_start(esp_default_netif));
     ESP_ERROR_CHECK(esp_netif_set_hostname(esp_default_netif, "DBESP32"));
     strncpy(CURRENT_CLIENT_IP, DEFAULT_AP_IP, sizeof(CURRENT_CLIENT_IP));
 }
@@ -465,27 +460,28 @@ void app_main() {
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
-    ret = read_settings_nvs();
-    if (ret != ESP_OK) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ESP_ERROR_CHECK(nvs_flash_init());
-        write_settings_to_nvs();
-    }
+    // ret = read_settings_nvs();
+    // if (ret != ESP_OK) {
+    //     ESP_ERROR_CHECK(nvs_flash_erase());
+    //     ESP_ERROR_CHECK(nvs_flash_init());
+    //     write_settings_to_nvs();
+    // }
+    DB_NETIF_MODE = DB_ETH_MODE;
 
-    // init_netif_ethernet_mode();
+    init_netif_ethernet_mode();
     // if (DB_NETIF_MODE == DB_WIFI_MODE_AP || DB_NETIF_MODE == DB_WIFI_MODE_AP_LR) {
     //     init_netif_wifi_apmode(DB_NETIF_MODE);
     // } else {
-    if (init_netif_wifi_clientmode() < 0) {
-        ESP_LOGW(TAG, "Switching to failsafe: Enabling access point mode");
-        // De-Init all Wi-Fi and enable the AP-Mode temporarily
-        ESP_ERROR_CHECK(esp_event_loop_delete_default());
-        esp_netif_destroy_default_wifi(esp_default_netif);
-        ESP_ERROR_CHECK(esp_wifi_stop());
-        strncpy((char *)DEFAULT_SSID, "Failsafe DroneBridge ESP32", sizeof(DEFAULT_SSID));
-        strncpy((char *)DEFAULT_PWD, "dronebridge", sizeof(DEFAULT_PWD));
-        init_netif_wifi_apmode(DB_WIFI_MODE_AP);
-    }
+    // if (init_netif_wifi_clientmode() < 0) {
+    //     ESP_LOGW(TAG, "Switching to failsafe: Enabling access point mode");
+    //     // De-Init all Wi-Fi and enable the AP-Mode temporarily
+    //     ESP_ERROR_CHECK(esp_event_loop_delete_default());
+    //     esp_netif_destroy_default_wifi(esp_default_netif);
+    //     ESP_ERROR_CHECK(esp_wifi_stop());
+    //     strncpy((char *)DEFAULT_SSID, "Failsafe DroneBridge ESP32", sizeof(DEFAULT_SSID));
+    //     strncpy((char *)DEFAULT_PWD, "dronebridge", sizeof(DEFAULT_PWD));
+    //     init_netif_wifi_apmode(DB_WIFI_MODE_AP);
+    // }
     // }
 
     mavlink_parse_start();
