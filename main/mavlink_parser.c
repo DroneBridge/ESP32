@@ -30,14 +30,14 @@ void mavlink_parser_task(void *pvParameters) {
                         case MAVLINK_MSG_ID_GLOBAL_POSITION_INT: {
                             int32_t longitude = mavlink_msg_global_position_int_get_lon(&msg);
                             int32_t latitude = mavlink_msg_global_position_int_get_lat(&msg);
-                            ESP_LOGI(TAG, "Current coordinates: (%ld, %ld)", longitude, latitude);
+                            // ESP_LOGI(TAG, "Current coordinates: (%ld, %ld)", longitude, latitude);
                             break;
                         }
                         case MAVLINK_MSG_ID_GPS_RAW_INT: {
                             int32_t longitude = mavlink_msg_gps_raw_int_get_lon(&msg);
                             int32_t latitude = mavlink_msg_gps_raw_int_get_lat(&msg);
                             uint8_t satellites_visible = mavlink_msg_gps_raw_int_get_satellites_visible(&msg);
-                            ESP_LOGI(TAG, "Current coordinates: (%ld, %ld); Sattelites: %d", longitude, latitude, satellites_visible);
+                            // ESP_LOGI(TAG, "Current coordinates: (%ld, %ld); Sattelites: %d", longitude, latitude, satellites_visible);
                             break;
                         }
                         default:
