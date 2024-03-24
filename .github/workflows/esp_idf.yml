@@ -13,27 +13,9 @@ jobs:
       uses: actions/checkout@v2
       with:
         submodules: 'recursive'
-    - name: ESP-IDF v5.1 build esp32
+    - name: ESP-IDF v5.2 build esp32
       uses: espressif/esp-idf-ci-action@v1
       with:
-        esp_idf_version: release-v5.1
+        esp_idf_version: release-v5.2
         target: esp32
         command: 'idf.py set-target esp32 build'
-    - name: ESP-IDF v5.1 build esp32s2
-      uses: espressif/esp-idf-ci-action@v1
-      with:
-        esp_idf_version: release-v5.1
-        target: esp32s2
-        command: 'idf.py set-target esp32s2 build'
-    - name: ESP-IDF v5.1 build esp32s3
-      uses: espressif/esp-idf-ci-action@v1
-      with:
-        esp_idf_version: release-v5.1
-        target: esp32s3
-        command: 'idf.py set-target esp32s3 build'
-    - name: ESP-IDF v5.1 build esp32c3
-      uses: espressif/esp-idf-ci-action@v1
-      with:
-        esp_idf_version: release-v5.1
-        target: esp32c3
-        command: 'idf.py set-target esp32c3 build'

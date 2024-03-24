@@ -1,22 +1,23 @@
 #include "http_server.h"
-#include <string.h>
+
+#include <cJSON.h>
+#include <esp_chip_info.h>
+#include <esp_http_server.h>
+#include <esp_log.h>
+#include <esp_system.h>
+#include <esp_vfs.h>
 #include <fcntl.h>
 #include <lwip/sockets.h>
-#include <esp_chip_info.h>
-#include "esp_http_server.h"
-#include "esp_system.h"
-#include "esp_log.h"
-#include "esp_vfs.h"
-#include "cJSON.h"
+#include <string.h>
+
 #include "globals.h"
 #include "main.h"
+#include "udp_server.h"
 
 static const char *REST_TAG = "DB_HTTP_REST";
 #define REST_CHECK(a, str, goto_tag, ...)                                              \
-    do                                                                                 \
-    {                                                                                  \
-        if (!(a))                                                                      \
-        {                                                                              \
+    do {                                                                               \
+        if (!(a)) {                                                                    \
             ESP_LOGE(REST_TAG, "%s(%d): " str, __FUNCTION__, __LINE__, ##__VA_ARGS__); \
             goto goto_tag;                                                             \
         }                                                                              \
@@ -65,7 +66,7 @@ static esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filepa
 static esp_err_t rest_common_get_handler(httpd_req_t *req) {
     char filepath[FILE_PATH_MAX];
 
-    rest_server_context_t *rest_context = (rest_server_context_t *) req->user_ctx;
+    rest_server_context_t *rest_context = (rest_server_context_t *)req->user_ctx;
     strlcpy(filepath, rest_context->base_path, sizeof(filepath));
     if (req->uri[strlen(req->uri) - 1] == '/') {
         strlcat(filepath, "/index.html", sizeof(filepath));
@@ -118,7 +119,7 @@ static esp_err_t rest_common_get_handler(httpd_req_t *req) {
 static esp_err_t settings_change_post_handler(httpd_req_t *req) {
     int total_len = req->content_len;
     int cur_len = 0;
-    char *buf = ((rest_server_context_t *) (req->user_ctx))->scratch;
+    char *buf = ((rest_server_context_t *)(req->user_ctx))->scratch;
     int received = 0;
     if (total_len >= SCRATCH_BUFSIZE) {
         /* Respond with 500 Internal Server Error */
@@ -143,16 +144,15 @@ static esp_err_t settings_change_post_handler(httpd_req_t *req) {
 
     json = cJSON_GetObjectItem(root, "wifi_ssid");
     if (json && strlen(json->valuestring) < 32 && strlen(json->valuestring) > 0)
-        strncpy((char *) DEFAULT_SSID, json->valuestring, sizeof(DEFAULT_SSID) - 1);
+        strncpy((char *)DEFAULT_SSID, json->valuestring, sizeof(DEFAULT_SSID) - 1);
     else if (json)
         ESP_LOGE(REST_TAG, "Invalid SSID length (1-31)");
 
     json = cJSON_GetObjectItem(root, "wifi_pass");
     if (json && strlen(json->valuestring) < 64 && strlen(json->valuestring) > 7)
-        strncpy((char *) DEFAULT_PWD, json->valuestring, sizeof(DEFAULT_PWD) - 1);
+        strncpy((char *)DEFAULT_PWD, json->valuestring, sizeof(DEFAULT_PWD) - 1);
     else if (json)
         ESP_LOGE(REST_TAG, "Invalid password length (8-63)");
-
 
     json = cJSON_GetObjectItem(root, "ap_channel");
     if (json && json->valueint > 0 && json->valueint < 14) {
@@ -196,10 +196,11 @@ static esp_err_t settings_change_post_handler(httpd_req_t *req) {
     write_settings_to_nvs();
     ESP_LOGI(REST_TAG, "Settings changed!");
     cJSON_Delete(root);
-    httpd_resp_sendstr(req, "{\n"
-                            "    \"status\": \"success\",\n"
-                            "    \"msg\": \"Settings changed!\"\n"
-                            "  }");
+    httpd_resp_sendstr(req,
+                       "{\n"
+                       "    \"status\": \"success\",\n"
+                       "    \"msg\": \"Settings changed!\"\n"
+                       "  }");
     return ESP_OK;
 }
 
@@ -219,7 +220,7 @@ static esp_err_t system_info_get_handler(httpd_req_t *req) {
     cJSON_AddNumberToObject(root, "minor_version", MINOR_VERSION);
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
-    free((void *) sys_info);
+    free((void *)sys_info);
     cJSON_Delete(root);
     return ESP_OK;
 }
@@ -240,7 +241,7 @@ static esp_err_t system_stats_get_handler(httpd_req_t *req) {
     cJSON_AddNumberToObject(root, "rssi", station_rssi);
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
-    free((void *) sys_info);
+    free((void *)sys_info);
     cJSON_Delete(root);
     return ESP_OK;
 }
@@ -253,25 +254,25 @@ static esp_err_t system_stats_get_handler(httpd_req_t *req) {
 static esp_err_t system_connections_get_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "application/json");
     cJSON *root = cJSON_CreateObject();
-//    cJSON *tcp_clients = cJSON_CreateArray();
-//    for (int i = 0; i < udp_conn_list->size; i++) {
-//        //TODO: Save the TCP IPs and port during accept and put them here into a JSON
-//    }
-//    cJSON_AddItemToObject(root, "tcp_clients", tcp_clients);
+    //    cJSON *tcp_clients = cJSON_CreateArray();
+    //    for (int i = 0; i < udp_conn_list->size; i++) {
+    //        //TODO: Save the TCP IPs and port during accept and put them here into a JSON
+    //    }
+    //    cJSON_AddItemToObject(root, "tcp_clients", tcp_clients);
 
     cJSON *udp_clients = cJSON_CreateArray();
     for (int i = 0; i < udp_conn_list->size; i++) {
         char ip_string[INET_ADDRSTRLEN];
-        char ip_port_string[INET_ADDRSTRLEN+10];
+        char ip_port_string[INET_ADDRSTRLEN + 10];
         inet_ntop(AF_INET, &(udp_conn_list->db_udp_clients[i].udp_client.sin_addr), ip_string, INET_ADDRSTRLEN);
-        sprintf(ip_port_string, "%s:%d", ip_string, htons (udp_conn_list->db_udp_clients[i].udp_client.sin_port));
+        sprintf(ip_port_string, "%s:%d", ip_string, htons(udp_conn_list->db_udp_clients[i].udp_client.sin_port));
         cJSON_AddItemToArray(udp_clients, cJSON_CreateString(ip_port_string));
     }
     cJSON_AddItemToObject(root, "udp_clients", udp_clients);
 
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
-    free((void *) sys_info);
+    free((void *)sys_info);
     cJSON_Delete(root);
     return ESP_OK;
 }
@@ -287,7 +288,7 @@ static esp_err_t system_reboot_get_handler(httpd_req_t *req) {
     cJSON_AddStringToObject(root, "msg", "Rebooting!");
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
-    free((void *) sys_info);
+    free((void *)sys_info);
     cJSON_Delete(root);
     esp_restart();
 }
@@ -301,8 +302,8 @@ static esp_err_t settings_data_get_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "application/json");
     cJSON *root = cJSON_CreateObject();
     cJSON_AddNumberToObject(root, "esp32_mode", DB_NETIF_MODE);
-    cJSON_AddStringToObject(root, "wifi_ssid", (char *) DEFAULT_SSID);
-    cJSON_AddStringToObject(root, "wifi_pass", (char *) DEFAULT_PWD);
+    cJSON_AddStringToObject(root, "wifi_ssid", (char *)DEFAULT_SSID);
+    cJSON_AddStringToObject(root, "wifi_pass", (char *)DEFAULT_PWD);
     cJSON_AddNumberToObject(root, "ap_channel", DEFAULT_CHANNEL);
     cJSON_AddNumberToObject(root, "trans_pack_size", TRANSPARENT_BUF_SIZE);
     cJSON_AddNumberToObject(root, "tx_pin", DB_UART_PIN_TX);
@@ -314,7 +315,7 @@ static esp_err_t settings_data_get_handler(httpd_req_t *req) {
     cJSON_AddStringToObject(root, "ap_ip", DEFAULT_AP_IP);
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
-    free((void *) sys_info);
+    free((void *)sys_info);
     cJSON_Delete(root);
     return ESP_OK;
 }
@@ -334,69 +335,62 @@ esp_err_t start_rest_server(const char *base_path) {
 
     /* URI handler for fetching system info */
     httpd_uri_t system_info_get_uri = {
-            .uri = "/api/system/info",
-            .method = HTTP_GET,
-            .handler = system_info_get_handler,
-            .user_ctx = rest_context
-    };
+        .uri = "/api/system/info",
+        .method = HTTP_GET,
+        .handler = system_info_get_handler,
+        .user_ctx = rest_context};
     httpd_register_uri_handler(server, &system_info_get_uri);
 
     /* URI handler for fetching client connection info */
     httpd_uri_t system_connections_get = {
-            .uri = "/api/system/conns",
-            .method = HTTP_GET,
-            .handler = system_connections_get_handler,
-            .user_ctx = rest_context
-    };
+        .uri = "/api/system/conns",
+        .method = HTTP_GET,
+        .handler = system_connections_get_handler,
+        .user_ctx = rest_context};
     httpd_register_uri_handler(server, &system_connections_get);
 
     /* URI handler for fetching system info */
     httpd_uri_t system_stats_get_uri = {
-            .uri = "/api/system/stats",
-            .method = HTTP_GET,
-            .handler = system_stats_get_handler,
-            .user_ctx = rest_context
-    };
+        .uri = "/api/system/stats",
+        .method = HTTP_GET,
+        .handler = system_stats_get_handler,
+        .user_ctx = rest_context};
     httpd_register_uri_handler(server, &system_stats_get_uri);
 
     /* URI handler for triggering system reboot */
     httpd_uri_t system_reboot_get_uri = {
-            .uri = "/api/system/reboot",
-            .method = HTTP_GET,
-            .handler = system_reboot_get_handler,
-            .user_ctx = rest_context
-    };
+        .uri = "/api/system/reboot",
+        .method = HTTP_GET,
+        .handler = system_reboot_get_handler,
+        .user_ctx = rest_context};
     httpd_register_uri_handler(server, &system_reboot_get_uri);
 
     /* URI handler for fetching settings data */
     httpd_uri_t temperature_data_get_uri = {
-            .uri = "/api/settings/request",
-            .method = HTTP_GET,
-            .handler = settings_data_get_handler,
-            .user_ctx = rest_context
-    };
+        .uri = "/api/settings/request",
+        .method = HTTP_GET,
+        .handler = settings_data_get_handler,
+        .user_ctx = rest_context};
     httpd_register_uri_handler(server, &temperature_data_get_uri);
 
     httpd_uri_t settings_change_post_uri = {
-            .uri = "/api/settings/change",
-            .method = HTTP_POST,
-            .handler = settings_change_post_handler,
-            .user_ctx = rest_context
-    };
+        .uri = "/api/settings/change",
+        .method = HTTP_POST,
+        .handler = settings_change_post_handler,
+        .user_ctx = rest_context};
     httpd_register_uri_handler(server, &settings_change_post_uri);
 
     /* URI handler for getting web server files */
     httpd_uri_t common_get_uri = {
-            .uri = "/*",
-            .method = HTTP_GET,
-            .handler = rest_common_get_handler,
-            .user_ctx = rest_context
-    };
+        .uri = "/*",
+        .method = HTTP_GET,
+        .handler = rest_common_get_handler,
+        .user_ctx = rest_context};
     httpd_register_uri_handler(server, &common_get_uri);
 
     return ESP_OK;
-    err_start:
+err_start:
     free(rest_context);
-    err:
+err:
     return ESP_FAIL;
 }

@@ -1,4 +1,4 @@
-idf_component_register(SRCS main.c db_esp32_control.c
+idf_component_register(SRCS main.c db_esp32_control.c mavlink_parser.c
                             db_esp32_comm.c http_server.c db_comm.c
                        INCLUDE_DIRS ".")
 
