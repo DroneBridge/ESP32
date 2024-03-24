@@ -25,8 +25,6 @@ DroneBridge for ESP32 is a telemetry/low data rate only solution. There is no su
 -   Reliable, low latency, light weight
 -   Upload mission etc.
 
-<img src="https://media-cdn.seeedstudio.com/media/catalog/product/cache/bb49d3ec4ee05b6f018e93f896b8a25d/1/-/1-113991054-seeed-studio-xiao-esp32c3-45font_1.jpg" width="350">
-
 ![DroneBridge for ESP32 block diagram blackbox](wiki/DroneBridgeForESP32Blackbox.png)
 
 Blackbox concept. UDP & TCP connections possible. Automatic UDP uni-cast of messages to port 14550 to all 
@@ -47,8 +45,9 @@ Or compile using esp-idf v5.1:
 Do the project and yourself a favour and use one of the officially supported and tested boards below.   
 These boards are very low in price, have everything you need and are also very small. Perfect for use on any drone.   
 
-* [Official board for DroneBridge for ESP32](https://www.ebay.de/itm/116111278197) - spares from first batch, pre-installed and ready for use  
+* **[Official board for DroneBridge for ESP32](https://www.ebay.de/itm/116111278197)** - spares from first batch, pre-installed and ready for use  
 currently shipping to EU only - contact seller for non-EU shipping options
+<img src="https://github.com/DroneBridge/ESP32/assets/24637325/e3b2975d-7de4-41af-b052-e4fa024d905e" alt="Official Boadrd DroneBridge for ESP32" width="450">  
 
 Other official options
 * [Seeed Studio XIAO ESP32C3](https://www.seeedstudio.com/Seeed-XIAO-ESP32C3-p-5431.html) + [External antenna](https://www.seeedstudio.com/2-4GHz-2-81dBi-Antenna-for-XIAO-ESP32C3-p-5475.html) for more range.
