@@ -1,3 +1,4 @@
+#include <sys/cdefs.h>
 /*
  *   This file is part of DroneBridge: https://github.com/DroneBridge/ESP32
  *
@@ -26,6 +27,7 @@
 #include <freertos/timers.h>
 #include <string.h>
 #include <esp_crc.h>
+#include <mbedtls/gcm.h>
 #include "db_esp_now.h"
 #include "globals.h"
 #include "main.h"
@@ -33,75 +35,129 @@
 #define TAG "DB_ESPNOW"
 
 static uint8_t s_example_broadcast_mac[ESP_NOW_ETH_ALEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-static uint16_t s_example_espnow_seq[DB_ESPNOW_DATA_MAX] = {0, 0};
-static QueueHandle_t s_db_espnow_queue;
+static QueueHandle_t db_espnow_send_recv_callback_queue;    // Queue that contains ESP-NOW callback results
+
+mbedtls_gcm_context aes;
 
 /**
- * Parse received ESPNOW data.
+ * Steps to process received ESPNOW data. ESP firmware ensures that only correct packets are forwared to us
+ * 1. Check sequence number
+ * 2. Decrypt payload
+ * ToDo: Do some FEC
+ * 3. Write payload to uart-queue so it can be processed by the control_espnow task
+ *
  * @param data
  * @param data_len
- * @param state
- * @param seq
- * @param magic
  * @return
  */
-int db_espnow_data_parse(uint8_t *data, uint16_t data_len, uint8_t *state, uint16_t *seq, int *magic) {
-    db_espnow_data_t *buf = (db_espnow_data_t *) data;
-    uint16_t crc, crc_cal = 0;
-
-    if (data_len < sizeof(db_espnow_data_t)) {
-        ESP_LOGE(TAG, "Receive ESPNOW data too short, len:%d", data_len);
+int db_espnow_process_rcv_data(uint8_t *data, uint16_t data_len) {
+    db_esp_now_packet_t *db_esp_now_packet = (db_esp_now_packet_t *) data;
+    if (data_len < sizeof(db_esp_now_packet_t)) {
+        ESP_LOGE(TAG, "Receive ESP-NOW data too short, len:%d", data_len);
         return -1;
     }
-
-    *state = buf->state;
-    *seq = buf->seq_num;
-    *magic = buf->magic;
-    crc = buf->crc;
-    buf->crc = 0;
-    crc_cal = esp_crc16_le(UINT16_MAX, (uint8_t const *) buf, data_len);
-
-    if (crc_cal == crc) {
-        return buf->type;
-    }
-
     return -1;
 }
 
-/**
- * Prepare ESPNOW data to be sent.
- *
- * @param send_param
- */
-void db_espnow_data_prepare(db_espnow_send_param_t *send_param) {
-    db_espnow_data_t *buf = (db_espnow_data_t *) send_param->buffer;
-
-    assert(send_param->len >= sizeof(db_espnow_data_t));
-
-    buf->type = IS_BROADCAST_ADDR(send_param->dest_mac) ? DB_ESPNOW_DATA_BROADCAST : DB_ESPNOW_DATA_UNICAST;
-    buf->state = send_param->state;
-    buf->seq_num = s_example_espnow_seq[buf->type]++;
-    buf->crc = 0;
-    buf->magic = send_param->magic;
-    /* Fill all remaining bytes after the data with random values */
-    esp_fill_random(buf->payload, send_param->len - sizeof(db_espnow_data_t));
-    buf->crc = esp_crc16_le(UINT16_MAX, (uint8_t const *) buf, send_param->len);
-}
-
 static void db_espnow_deinit(db_espnow_send_param_t *send_param) {
-    free(send_param->buffer);
     free(send_param);
-    vSemaphoreDelete(s_db_espnow_queue);
+    vSemaphoreDelete(db_espnow_send_recv_callback_queue);
+    vSemaphoreDelete(db_espnow_send_queue); // ToDo: Check if that is a good idea - used by other task
     esp_now_deinit();
 }
 
-void db_esp_now_send(uint8_t data[], uint32_t data_length) {
-    // TODO: Encrypt with AES
-    // TODO: Set peer addr based on mode
-    esp_err_t esp_err = esp_now_send(peer_addr, data, data_length);
+/**
+ * Beware we are using the same key for both communication directions.
+ *
+ * @param input_buff
+ * @param input_length
+ * @param output_buff Can be the same as input buffer according to mbedtls_gcm_crypt_and_tag
+ * @param padded_output_length
+ * @param iv
+ * @param tag
+ * @return
+ */
+int db_encrypt_payload(uint8_t *input_buff, uint8_t input_length, uint8_t *output_buff, uint8_t *padded_output_length,
+                    uint8_t iv[DB_ESPNOW_AES_IV_LEN], uint8_t tag[DB_ESPNOW_AES_TAG_LEN], uint8_t *add_auth_data, uint8_t add_data_auth_len) {
+//    // create padding to make input data a multiple of 16
+//    int padded_input_len = 0;
+//    int modulo16 = input_length % 16;
+//    if (input_length < 16) {
+//        padded_input_len = 16;
+//    } else {
+//        padded_input_len = (strlen(input_buff) / 16 + 1) * 16;   // ToDo: Check - We are not using strings!
+//    }
+//    // ToDo: Check implementation - we might not want to malloc
+//    char *padded_input = (char *) malloc(padded_input_len);
+//    if (!padded_input) {
+//        ESP_LOGE(TAG, "Failed to allocate memory for encryption");
+//        return -1;
+//    }
+//    memcpy(padded_input, input_buff, strlen(input_buff));
+//    uint8_t pkc5_value = (17 - modulo16);
+//    for (int i = input_length; i < padded_input_len; i++) {
+//        padded_input[i] = pkc5_value;
+//    }
+//
+//    esp_fill_random(iv, 16); // fill/generate random IV of 16 bytes
+//    mbedtls_aes_crypt_cbc(&aes,
+//                          MBEDTLS_AES_ENCRYPT,
+//                          padded_input_len,
+//                          iv,
+//                          (unsigned char *) padded_input,
+//                          output_buff);
+    int ret = mbedtls_gcm_crypt_and_tag(&aes, MBEDTLS_GCM_ENCRYPT, input_length, iv, DB_ESPNOW_AES_IV_LEN, add_auth_data, add_data_auth_len, input_buff, output_buff, DB_ESPNOW_AES_TAG_LEN, tag);
+    if (ret == 0) {
+        return 1;
+    } else {
+        if (ret == MBEDTLS_ERR_GCM_BAD_INPUT) ESP_LOGE(TAG, "mbedtls_gcm_crypt_and_tag returned MBEDTLS_ERR_GCM_BAD_INPUT");
+        return ESP_FAIL;
+    }
+}
+
+/**
+ * Tries to read one entry from the ESP-NOW send queue (filled by the UART task) and sends the data via broadcast.
+ * Only call this function when the last ESP-NOW send callback has returned! Otherwise order of packets is not guaranteed
+ *
+ * @return false if no packet was sent, true if packet was sent (actual sending will be confirmed by the send-callback)
+ */
+bool db_read_uart_queue_and_send() {
+    db_esp_now_send_event_t evt;
+    if (xQueueReceive(db_espnow_send_queue, &evt, 0) == pdTRUE) {
+        static db_esp_now_packet_t db_esp_now_packet = {.db_esp_now_packet_header.seq_num = 0,
+                                                        .db_esp_now_packet_header.packet_type = 0};   // make static so it is gets instanced only once
+        if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND) {
+            db_esp_now_packet.db_esp_now_packet_header.origin = DB_ESPNOW_ORIGIN_GND;
+        } else {
+            db_esp_now_packet.db_esp_now_packet_header.origin = DB_ESPNOW_ORIGIN_AIR;
+        }
+        static uint8_t padded_output_length = 0;
+        // that call can only be made because db_esp_now_send_event_t is byte-equal to db_esp_now_packet_payload_t
+        db_encrypt_payload((uint8_t *) &evt,
+                           sizeof(db_esp_now_send_event_t),
+                        (uint8_t *) &db_esp_now_packet.db_esp_now_packet_payload,
+                        &padded_output_length,
+                        db_esp_now_packet.aes_iv,
+                        db_esp_now_packet.tag,
+                        (uint8_t *) &db_esp_now_packet.db_esp_now_packet_header,
+                        DB_ESPNOW_PACKET_HEADER_LENGTH);
+        // peer addr set to NULL so all peers in the peer-list get the packet
+        if (esp_now_send(NULL, (const uint8_t *) &db_esp_now_packet, padded_output_length + DB_ESPNOW_PACKET_HEADER_LENGTH) != ESP_OK) {
+            ESP_LOGE(TAG, "Error sending ESP-NOW data!");
+            return false;
+        } else {
+            if (db_esp_now_packet.db_esp_now_packet_header.seq_num < UINT32_MAX)
+                db_esp_now_packet.db_esp_now_packet_header.seq_num++;    // packet is static so just increase number once we sent it
+            else
+                db_esp_now_packet.db_esp_now_packet_header.seq_num = 0;  // catch overflow in case someone got crazy
+            return true;
+        }
+    }
+    return false;
 }
 
 void db_esp_now_receive() {
+    mbedtls_gcm_auth_decrypt();
     // TODO: Decrypt AES payload
 }
 
@@ -130,7 +186,7 @@ static void db_esp_now_send_callback(const uint8_t *mac_addr, esp_now_send_statu
     evt.id = DB_ESPNOW_SEND_CB;
     memcpy(send_cb->mac_addr, mac_addr, ESP_NOW_ETH_ALEN);
     send_cb->status = status;
-    if (xQueueSend(s_db_espnow_queue, &evt, ESPNOW_MAXDELAY) != pdTRUE) {
+    if (xQueueSend(db_espnow_send_recv_callback_queue, &evt, ESPNOW_MAXDELAY) != pdTRUE) {
         ESP_LOGW(TAG, "Send to send queue fail");
     }
 }
@@ -174,95 +230,91 @@ static void db_esp_now_receive_callback(const esp_now_recv_info_t *recv_info, co
     }
     memcpy(recv_cb->data, data, len);
     recv_cb->data_len = len;
-    if (xQueueSend(s_db_espnow_queue, &evt, ESPNOW_MAXDELAY) != pdTRUE) {
+    if (xQueueSend(db_espnow_send_recv_callback_queue, &evt, ESPNOW_MAXDELAY) != pdTRUE) {
         ESP_LOGW(TAG, "Send to receive queue fail");
         free(recv_cb->data);
     }
 }
 
 /**
- * Called in the control loop task. Handles the more work intensive stuff. Takes the packets from the queue and processes
- * it accordingly.
+ *  Task that handles all ESP-NOW releated data processing. Reads ESP-NOW Callback-Queue, Reads ESP-NOW send queue and
+ *  writes to UART-WRITE Queue.
  *
- * @param send_param
  */
-void process_espnow_data(db_espnow_send_param_t *send_param) {
+_Noreturn void process_espnow_data() {
     db_espnow_event_t evt;
-    uint8_t recv_state = 0;
     uint16_t recv_seq = 0;
-    int recv_magic = 0;
-    bool is_broadcast = false;
+    bool ready_to_send = false; // indicator that the last ESP-NOW send callback returned -> we can send the next packet
     int ret;
+    // ToDo: Send something initially via ESP-NOW so we end up in the loop
 
-    vTaskDelay(5000 / portTICK_PERIOD_MS);
-    ESP_LOGI(TAG, "Start sending broadcast data");
-
-    /* Start sending broadcast ESPNOW data. */
-    if (esp_now_send(send_param->dest_mac, send_param->buffer, send_param->len) != ESP_OK) {
-        ESP_LOGE(TAG, "Send error");
-        db_espnow_deinit(send_param);
-        vTaskDelete(NULL);
-    }
-
-    while (xQueueReceive(s_db_espnow_queue, &evt, portMAX_DELAY) == pdTRUE) {
-        switch (evt.id) {
-            case DB_ESPNOW_SEND_CB: {
-                // send next packet - the last sending callback has returned so we keep the order
-                db_espnow_event_send_cb_t *send_cb = &evt.info.send_cb;
-                is_broadcast = IS_BROADCAST_ADDR(send_cb->mac_addr);
-
-                ESP_LOGD(TAG, "Send data to "MACSTR", status1: %d", MAC2STR(send_cb->mac_addr), send_cb->status);
-
-                if (is_broadcast && (send_param->broadcast == false)) {
+    while(1) {
+        while (xQueueReceive(db_espnow_send_recv_callback_queue, &evt, 0) == pdTRUE) {
+            switch (evt.id) {
+                case DB_ESPNOW_SEND_CB: {
+                    db_espnow_event_send_cb_t *send_cb = &evt.info.send_cb;
+                    ESP_LOGD(TAG, "Send data to "MACSTR", status: %d", MAC2STR(send_cb->mac_addr), send_cb->status);
+                    // indicate that we can send next packet - the last sending callback has returned, so we keep the order
+                    // of packets. ESP-NOW by default does not guarantee the order when many packets are sent in quick succession
+                    ready_to_send = true;
+                    // try to immediately send the next packet if available and set ready_to_send accordingly
+                    ready_to_send = !db_read_uart_queue_and_send();
                     break;
                 }
+                case DB_ESPNOW_RECV_CB: {
+                    db_espnow_event_recv_cb_t *recv_cb = &evt.info.recv_cb;
 
-                ESP_LOGI(TAG, "send data to "MACSTR"", MAC2STR(send_cb->mac_addr));
-
-                memcpy(send_param->dest_mac, send_cb->mac_addr, ESP_NOW_ETH_ALEN);
-                db_espnow_data_prepare(send_param);
-
-                /* Send the next data after the previous data is sent. */
-                if (esp_now_send(send_param->dest_mac, send_param->buffer, send_param->len) != ESP_OK) {
-                    ESP_LOGE(TAG, "Send error");
-                    db_espnow_deinit(send_param);
-                    vTaskDelete(NULL);
+                    ret = db_espnow_process_rcv_data(recv_cb->data, recv_cb->data_len);
+                    free(recv_cb->data);
+                    if (ret == DB_ESPNOW_DATA_BROADCAST) {
+                        ESP_LOGD(TAG, "Receive %dth broadcast data from: "MACSTR", len: %d", recv_seq,
+                                 MAC2STR(recv_cb->mac_addr), recv_cb->data_len);
+                    } else if (ret == DB_ESPNOW_DATA_UNICAST) {
+                        ESP_LOGD(TAG, "Receive %dth unicast data from: "MACSTR", len: %d", recv_seq,
+                                 MAC2STR(recv_cb->mac_addr), recv_cb->data_len);
+                    } else {
+                        ESP_LOGW(TAG, "Receive error data from: "MACSTR"", MAC2STR(recv_cb->mac_addr));
+                    }
+                    break;
                 }
-                break;
+                default:
+                    ESP_LOGE(TAG, "Callback type error: %d", evt.id);
+                    break;
             }
-            case DB_ESPNOW_RECV_CB:
-            {
-                db_espnow_event_recv_cb_t *recv_cb = &evt.info.recv_cb;
-
-                ret = db_espnow_data_parse(recv_cb->data, recv_cb->data_len, &recv_state, &recv_seq, &recv_magic);
-                free(recv_cb->data);
-                if (ret == DB_ESPNOW_DATA_BROADCAST) {
-                    ESP_LOGI(TAG, "Receive %dth broadcast data from: "MACSTR", len: %d", recv_seq, MAC2STR(recv_cb->mac_addr), recv_cb->data_len);
-                }
-                else if (ret == DB_ESPNOW_DATA_UNICAST) {
-                    ESP_LOGI(TAG, "Receive %dth unicast data from: "MACSTR", len: %d", recv_seq, MAC2STR(recv_cb->mac_addr), recv_cb->data_len);
-
-                    /* If receive unicast ESPNOW data, also stop sending broadcast ESPNOW data. */
-                    send_param->broadcast = false;
-                }
-                else {
-                    ESP_LOGI(TAG, "Receive error data from: "MACSTR"", MAC2STR(recv_cb->mac_addr));
-                }
-                break;
-            }
-            default:
-                ESP_LOGE(TAG, "Callback type error: %d", evt.id);
-                break;
+        }
+        // process UART -> ESP-NOW
+        if (ready_to_send) {
+            // send the next packet if available and set ready_to_send accordingly
+            ready_to_send = !db_read_uart_queue_and_send();
         }
     }
+}
+
+void derive_aes_key(unsigned char aes_key[DB_ESPNOW_AES_KEY_LEN/8]) {
+    // ToDo: Create an AES key based of the given WiFi password
+}
+
+int init_gcm_encryption_module() {
+    unsigned char aes_key[DB_ESPNOW_AES_KEY_LEN/8];
+    derive_aes_key(aes_key);
+    mbedtls_gcm_init(&aes);
+    int ret = mbedtls_gcm_setkey(&aes, MBEDTLS_CIPHER_ID_AES, aes_key, DB_ESPNOW_AES_KEY_LEN);
+    return ret;
+}
+
+void deinit_espnow_all(){
+    mbedtls_gcm_free(&aes);
+    vSemaphoreDelete(db_espnow_send_recv_callback_queue);
+    vSemaphoreDelete(db_espnow_send_queue); // ToDo: Check if that is a good idea
+    esp_now_deinit();
 }
 
 esp_err_t db_espnow_init() {
     ESP_LOGI(TAG, "Initializing up ESP-NOW parameters");
     db_espnow_send_param_t *send_param;
 
-    s_db_espnow_queue = xQueueCreate(ESPNOW_QUEUE_SIZE, sizeof(db_espnow_event_t));
-    if (s_db_espnow_queue == NULL) {
+    db_espnow_send_recv_callback_queue = xQueueCreate(ESPNOW_QUEUE_SIZE, sizeof(db_espnow_event_t));
+    if (db_espnow_send_recv_callback_queue == NULL) {
         ESP_LOGE(TAG, "Create mutex fail");
         return ESP_FAIL;
     }
@@ -276,8 +328,7 @@ esp_err_t db_espnow_init() {
     esp_now_peer_info_t *peer = malloc(sizeof(esp_now_peer_info_t));
     if (peer == NULL) {
         ESP_LOGE(TAG, "Malloc peer information fail");
-        vSemaphoreDelete(s_db_espnow_queue);
-        esp_now_deinit();
+        deinit_espnow_all();
         return ESP_FAIL;
     }
     memset(peer, 0, sizeof(esp_now_peer_info_t));
@@ -288,39 +339,22 @@ esp_err_t db_espnow_init() {
     ESP_ERROR_CHECK(esp_now_add_peer(peer));
     free(peer);
 
-    /* Initialize sending parameters. */
-    send_param = malloc(sizeof(db_espnow_send_param_t));
-    if (send_param == NULL) {
-        ESP_LOGE(TAG, "Malloc send parameter fail");
-        vSemaphoreDelete(s_db_espnow_queue);
-        esp_now_deinit();
-        return ESP_FAIL;
-    }
-    memset(send_param, 0, sizeof(db_espnow_send_param_t));
-    send_param->unicast = false;
-    send_param->broadcast = true;
-    send_param->state = 0;
-    send_param->magic = esp_random();
-    send_param->count = CONFIG_ESPNOW_SEND_COUNT;
-    send_param->delay = DB_ESPNOW_SEND_DELAY;
-    //TODO: MSP/LTM with their variable packet size are not supported - only transparent mode
-    if (DB_TRANS_BUF_SIZE > 240) {
-        send_param->len = 240;  // ESP-NOW max payload size is 250 bytes
-    } else if(DB_TRANS_BUF_SIZE % 16 == 0) {
+    if (DB_TRANS_BUF_SIZE > 224) {
+        send_param->len = 224;  // ESP-NOW max payload size is 250 bytes
+    } else if (DB_TRANS_BUF_SIZE % 16 == 0) {
         send_param->len = DB_TRANS_BUF_SIZE;   // Because of AES encryption we can only accept multiples of 16.
     } else {
         send_param->len = 64;   // Default value in case someone fucked up the config
     }
-    send_param->buffer = malloc(CONFIG_ESPNOW_SEND_LEN);
-    if (send_param->buffer == NULL) {
-        ESP_LOGE(TAG, "Malloc send buffer fail");
-        free(send_param);
-        vSemaphoreDelete(s_db_espnow_queue);
-        esp_now_deinit();
+
+    memcpy(send_param->dest_mac, s_example_broadcast_mac, ESP_NOW_ETH_ALEN);
+
+    int ret = init_gcm_encryption_module();
+    if (ret != 0) {
+        ESP_LOGE(TAG, "mbedtls_gcm_setkey returned an error: %i", ret);
+        deinit_espnow_all();
         return ESP_FAIL;
     }
-    memcpy(send_param->dest_mac, s_example_broadcast_mac, ESP_NOW_ETH_ALEN);
-    db_espnow_data_prepare(send_param);
 
     return ESP_OK;
 }

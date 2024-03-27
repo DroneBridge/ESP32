@@ -27,6 +27,15 @@
 #define UDP_BUF_SIZE    2048
 #define UART_BUF_SIZE   (1024)
 
+static QueueHandle_t db_espnow_send_queue;    // Queue that contains data to be sent via ESP-NOW
+static QueueHandle_t db_uart_write_queue;    // Queue that contains data to be written to UART
+
+// Must resemble db_esp_now_packet_payload_t from the byte structure -> db_read_uart_queue_and_send() expects that for now
+typedef struct {
+    uint8_t data_length;
+    uint8_t *send_buf;
+} __attribute__((packed)) db_esp_now_send_event_t;  // Queue element of the db_espnow_send_queue
+
 // per client structure of connected devices in softAP mode
 struct db_udp_client_t {
     uint8_t mac[6];     // MAC address of connected client
