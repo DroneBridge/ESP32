@@ -28,6 +28,8 @@
 #include <string.h>
 #include <esp_crc.h>
 #include <mbedtls/gcm.h>
+#include <mbedtls/md.h>
+#include <mbedtls/pkcs5.h>
 #include "db_esp_now.h"
 #include "globals.h"
 #include "main.h"
@@ -38,6 +40,8 @@ static uint8_t s_example_broadcast_mac[ESP_NOW_ETH_ALEN] = {0xFF, 0xFF, 0xFF, 0x
 static QueueHandle_t db_espnow_send_recv_callback_queue;    // Queue that contains ESP-NOW callback results
 
 mbedtls_gcm_context aes;
+uint8_t const size_packet_header = sizeof(db_esp_now_packet_header_t);
+uint8_t const size_protected_data = sizeof(db_esp_now_packet_protected_data_t);
 
 /**
  * Steps to process received ESPNOW data. ESP firmware ensures that only correct packets are forwared to us
@@ -59,6 +63,62 @@ int db_espnow_process_rcv_data(uint8_t *data, uint16_t data_len) {
     return -1;
 }
 
+/**
+ * Genrates a AES key from a password using pkcs5 - pbkdf2 and mbedTLS
+ *
+ * @param password
+ * @param key Output buffer for the key
+ * @param keylen Length of the aes key to be generated
+ */
+void generate_pkcs5_key(const char* password, unsigned char* key, size_t keylen) {
+    mbedtls_md_context_t mdctx;
+    const mbedtls_md_info_t* md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256); // Use SHA-256 for key derivation
+
+    // Initialize the context
+    mbedtls_md_init(&mdctx);
+    int ret = mbedtls_md_setup(&mdctx, md_info, 0);
+    switch (ret) {
+        case 0:
+            // success
+            break;
+        case MBEDTLS_ERR_MD_BAD_INPUT_DATA:
+            ESP_LOGW(TAG, "mbedtls_md_setup returned MBEDTLS_ERR_MD_BAD_INPUT_DATA");
+            break;
+        case MBEDTLS_ERR_MD_ALLOC_FAILED:
+            ESP_LOGW(TAG, "mbedtls_md_setup returned MBEDTLS_ERR_MD_ALLOC_FAILED");
+            break;
+        default:
+            ESP_LOGW(TAG, "mbedtls_md_setup returned unknown error: %i", ret);
+            break;
+    }
+    static unsigned char generic_salt[] = "GenSalt147894562";    // Generic on purpose. No need for salt in this application
+    ret = mbedtls_pkcs5_pbkdf2_hmac_ext(MBEDTLS_MD_SHA256,
+                                        (const unsigned char *)password, strlen(password),
+                                        generic_salt, strlen((char*) generic_salt), 10000, keylen, key);
+    switch (ret) {
+        case 0:
+            // success
+            break;
+        case MBEDTLS_ERR_PKCS5_BAD_INPUT_DATA:
+            ESP_LOGW(TAG, "MBEDTLS_ERR_PKCS5_BAD_INPUT_DATA");
+            break;
+        case MBEDTLS_ERR_PKCS5_INVALID_FORMAT:
+            ESP_LOGW(TAG, "MBEDTLS_ERR_PKCS5_INVALID_FORMAT");
+            break;
+        case MBEDTLS_ERR_PKCS5_FEATURE_UNAVAILABLE:
+            ESP_LOGW(TAG, "MBEDTLS_ERR_PKCS5_FEATURE_UNAVAILABLE");
+            break;
+        case MBEDTLS_ERR_PKCS5_PASSWORD_MISMATCH:
+            ESP_LOGW(TAG, "MBEDTLS_ERR_PKCS5_PASSWORD_MISMATCH");
+            break;
+        default:
+            ESP_LOGW(TAG, "mbedtls_pkcs5_pbkdf2_hmac returned unknown error: %02x", ret);
+            break;
+    }
+    // Clean up
+    mbedtls_md_free(&mdctx);
+}
+
 static void db_espnow_deinit(db_espnow_send_param_t *send_param) {
     free(send_param);
     vSemaphoreDelete(db_espnow_send_recv_callback_queue);
@@ -67,52 +127,65 @@ static void db_espnow_deinit(db_espnow_send_param_t *send_param) {
 }
 
 /**
+ * Encrypts and authenticates a DroneBridge for ESP32 ESP-NOW packet with its payload using AES-GCM 256
  * Beware we are using the same key for both communication directions.
- *
- * @param input_buff
- * @param input_length
- * @param output_buff Can be the same as input buffer according to mbedtls_gcm_crypt_and_tag
- * @param padded_output_length
- * @param iv
- * @param tag
- * @return
+ * @param db_esp_now_packet Packet containing payload data and header info. AES IV & TAG will be filled
+ * @return 0 on success - payload is encrypted and part of the db_esp_now_packet
  */
-int db_encrypt_payload(uint8_t *input_buff, uint8_t input_length, uint8_t *output_buff, uint8_t *padded_output_length,
-                    uint8_t iv[DB_ESPNOW_AES_IV_LEN], uint8_t tag[DB_ESPNOW_AES_TAG_LEN], uint8_t *add_auth_data, uint8_t add_data_auth_len) {
-//    // create padding to make input data a multiple of 16
-//    int padded_input_len = 0;
-//    int modulo16 = input_length % 16;
-//    if (input_length < 16) {
-//        padded_input_len = 16;
-//    } else {
-//        padded_input_len = (strlen(input_buff) / 16 + 1) * 16;   // ToDo: Check - We are not using strings!
-//    }
-//    // ToDo: Check implementation - we might not want to malloc
-//    char *padded_input = (char *) malloc(padded_input_len);
-//    if (!padded_input) {
-//        ESP_LOGE(TAG, "Failed to allocate memory for encryption");
-//        return -1;
-//    }
-//    memcpy(padded_input, input_buff, strlen(input_buff));
-//    uint8_t pkc5_value = (17 - modulo16);
-//    for (int i = input_length; i < padded_input_len; i++) {
-//        padded_input[i] = pkc5_value;
-//    }
-//
-//    esp_fill_random(iv, 16); // fill/generate random IV of 16 bytes
-//    mbedtls_aes_crypt_cbc(&aes,
-//                          MBEDTLS_AES_ENCRYPT,
-//                          padded_input_len,
-//                          iv,
-//                          (unsigned char *) padded_input,
-//                          output_buff);
-    int ret = mbedtls_gcm_crypt_and_tag(&aes, MBEDTLS_GCM_ENCRYPT, input_length, iv, DB_ESPNOW_AES_IV_LEN, add_auth_data, add_data_auth_len, input_buff, output_buff, DB_ESPNOW_AES_TAG_LEN, tag);
+int db_encrypt_payload(db_esp_now_packet_t* db_esp_now_packet) {
+    // Generate random IV
+    esp_fill_random(db_esp_now_packet->db_esp_now_packet_header.aes_iv, DB_ESPNOW_AES_IV_LEN);
+    int ret = mbedtls_gcm_crypt_and_tag(
+            &aes,
+            MBEDTLS_GCM_ENCRYPT,
+            size_protected_data,    // ToDo: Make ESP-NOW packet length variable
+            db_esp_now_packet->db_esp_now_packet_header.aes_iv, DB_ESPNOW_AES_IV_LEN,
+            (uint8_t*) &db_esp_now_packet->db_esp_now_packet_header, size_packet_header,
+            (uint8_t*) &db_esp_now_packet->db_esp_now_packet_protected_data,
+            (uint8_t*) &db_esp_now_packet->db_esp_now_packet_protected_data,
+            DB_ESPNOW_AES_TAG_LEN, db_esp_now_packet->tag
+    );
+
     if (ret == 0) {
-        return 1;
+        return 0;
     } else {
-        if (ret == MBEDTLS_ERR_GCM_BAD_INPUT) ESP_LOGE(TAG, "mbedtls_gcm_crypt_and_tag returned MBEDTLS_ERR_GCM_BAD_INPUT");
-        return ESP_FAIL;
+        if (ret == MBEDTLS_ERR_GCM_BAD_INPUT) {
+            ESP_LOGW(TAG, "mbedtls_gcm_crypt_and_tag returned MBEDTLS_ERR_GCM_BAD_INPUT");
+        } else {
+            ESP_LOGW(TAG, "mbedtls_gcm_crypt_and_tag returned unknown error");
+        }
+        return -1;
     }
+}
+
+/**
+ * Decrypt the DroneBridge ESP-NOW packet payload and authenticate its content using AES-GCM 256
+ * @param db_esp_now_packet
+ * @param decrypt_out_buffer payload length and payload as an array of bytes
+ * @return returns result of mbedtls_gcm_auth_decrypt e.g. 0 on success and valid data
+ */
+int db_decrypt_payload(db_esp_now_packet_t* db_esp_now_packet, db_esp_now_packet_protected_data_t* decrypt_out_buffer) {
+    int ret_decrypt = mbedtls_gcm_auth_decrypt(
+            &aes,
+            size_protected_data,    // ToDo: Make ESP-NOW packet length variable
+            db_esp_now_packet->db_esp_now_packet_header.aes_iv, DB_ESPNOW_AES_IV_LEN,
+            (uint8_t*) &db_esp_now_packet->db_esp_now_packet_header, size_packet_header,
+            db_esp_now_packet->tag, DB_ESPNOW_AES_TAG_LEN,
+            (uint8_t*) &db_esp_now_packet->db_esp_now_packet_protected_data,
+            (uint8_t*) decrypt_out_buffer
+    );
+    switch (ret_decrypt) {
+        case 0:
+            // Successfully decrypted and authenticated
+            break;
+        case MBEDTLS_ERR_GCM_AUTH_FAILED:
+            ESP_LOGW(TAG, "MBEDTLS_ERR_GCM_AUTH_FAILED: Authenticated decryption failed."); break;
+        case MBEDTLS_ERR_GCM_BAD_INPUT:
+            ESP_LOGW(TAG, "MBEDTLS_ERR_GCM_BAD_INPUT: Bad input parameters to function."); break;
+        default:
+            ESP_LOGW(TAG, "Unknown mbedtls_gcm_auth_decrypt error %i", ret_decrypt); break;
+    }
+    return ret_decrypt;
 }
 
 /**
@@ -124,6 +197,7 @@ int db_encrypt_payload(uint8_t *input_buff, uint8_t input_length, uint8_t *outpu
 bool db_read_uart_queue_and_send() {
     db_esp_now_send_event_t evt;
     if (xQueueReceive(db_espnow_send_queue, &evt, 0) == pdTRUE) {
+        static const uint8_t PACKET_LEN = sizeof(db_esp_now_packet_t); // ToDO: Make ESP-NOW packet length variable
         static db_esp_now_packet_t db_esp_now_packet = {.db_esp_now_packet_header.seq_num = 0,
                                                         .db_esp_now_packet_header.packet_type = 0};   // make static so it is gets instanced only once
         if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND) {
@@ -131,18 +205,13 @@ bool db_read_uart_queue_and_send() {
         } else {
             db_esp_now_packet.db_esp_now_packet_header.origin = DB_ESPNOW_ORIGIN_AIR;
         }
-        static uint8_t padded_output_length = 0;
-        // that call can only be made because db_esp_now_send_event_t is byte-equal to db_esp_now_packet_payload_t
-        db_encrypt_payload((uint8_t *) &evt,
-                           sizeof(db_esp_now_send_event_t),
-                        (uint8_t *) &db_esp_now_packet.db_esp_now_packet_payload,
-                        &padded_output_length,
-                        db_esp_now_packet.aes_iv,
-                        db_esp_now_packet.tag,
-                        (uint8_t *) &db_esp_now_packet.db_esp_now_packet_header,
-                        DB_ESPNOW_PACKET_HEADER_LENGTH);
+        // ToDo: Make sure the payload is padded properly
+
+        db_esp_now_packet.db_esp_now_packet_protected_data.payload_length_decrypted = evt.data_length;
+        memcpy(db_esp_now_packet.db_esp_now_packet_protected_data.payload, evt.send_buf, evt.data_length);  //ToDo: Check if memcpy can be removed
+        db_encrypt_payload(&db_esp_now_packet);
         // peer addr set to NULL so all peers in the peer-list get the packet
-        if (esp_now_send(NULL, (const uint8_t *) &db_esp_now_packet, padded_output_length + DB_ESPNOW_PACKET_HEADER_LENGTH) != ESP_OK) {
+        if (esp_now_send(NULL, (const uint8_t *) &db_esp_now_packet, PACKET_LEN) != ESP_OK) {
             ESP_LOGE(TAG, "Error sending ESP-NOW data!");
             return false;
         } else {
@@ -152,13 +221,10 @@ bool db_read_uart_queue_and_send() {
                 db_esp_now_packet.db_esp_now_packet_header.seq_num = 0;  // catch overflow in case someone got crazy
             return true;
         }
+    } else {
+        // nothing to do - Queue is empty
     }
     return false;
-}
-
-void db_esp_now_receive() {
-    mbedtls_gcm_auth_decrypt();
-    // TODO: Decrypt AES payload
 }
 
 /**
@@ -286,18 +352,16 @@ _Noreturn void process_espnow_data() {
         if (ready_to_send) {
             // send the next packet if available and set ready_to_send accordingly
             ready_to_send = !db_read_uart_queue_and_send();
+        } else {
+            // do nothing - we are not ready for sending another packet
         }
     }
 }
 
-void derive_aes_key(unsigned char aes_key[DB_ESPNOW_AES_KEY_LEN/8]) {
-    // ToDo: Create an AES key based of the given WiFi password
-}
-
 int init_gcm_encryption_module() {
-    unsigned char aes_key[DB_ESPNOW_AES_KEY_LEN/8];
-    derive_aes_key(aes_key);
     mbedtls_gcm_init(&aes);
+    uint8_t aes_key[AES_256_KEY_BYTES];
+    generate_pkcs5_key((const char*) DB_WIFI_PWD, aes_key, AES_256_KEY_BYTES);
     int ret = mbedtls_gcm_setkey(&aes, MBEDTLS_CIPHER_ID_AES, aes_key, DB_ESPNOW_AES_KEY_LEN);
     return ret;
 }
@@ -311,8 +375,6 @@ void deinit_espnow_all(){
 
 esp_err_t db_espnow_init() {
     ESP_LOGI(TAG, "Initializing up ESP-NOW parameters");
-    db_espnow_send_param_t *send_param;
-
     db_espnow_send_recv_callback_queue = xQueueCreate(ESPNOW_QUEUE_SIZE, sizeof(db_espnow_event_t));
     if (db_espnow_send_recv_callback_queue == NULL) {
         ESP_LOGE(TAG, "Create mutex fail");
@@ -339,15 +401,13 @@ esp_err_t db_espnow_init() {
     ESP_ERROR_CHECK(esp_now_add_peer(peer));
     free(peer);
 
-    if (DB_TRANS_BUF_SIZE > 224) {
-        send_param->len = 224;  // ESP-NOW max payload size is 250 bytes
+    if (DB_TRANS_BUF_SIZE > DB_ESPNOW_PAYLOAD_MAXSIZE) {
+        DB_TRANS_BUF_SIZE = DB_ESPNOW_PAYLOAD_MAXSIZE;  // Limit payload size to the max we can do
     } else if (DB_TRANS_BUF_SIZE % 16 == 0) {
-        send_param->len = DB_TRANS_BUF_SIZE;   // Because of AES encryption we can only accept multiples of 16.
+        // All good do nothing, we can only accept multiples of 16.
     } else {
-        send_param->len = 64;   // Default value in case someone fucked up the config
+        DB_TRANS_BUF_SIZE = 64;   // Default value in case someone fucked up the config
     }
-
-    memcpy(send_param->dest_mac, s_example_broadcast_mac, ESP_NOW_ETH_ALEN);
 
     int ret = init_gcm_encryption_module();
     if (ret != 0) {

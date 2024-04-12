@@ -28,13 +28,12 @@
 #define DB_ESPNOW_AES_IV_LEN       16
 #define DB_ESPNOW_AES_TAG_LEN      16
 #define DB_ESPNOW_AES_KEY_LEN      256  // in bits 128 & 192 are supported by ESP32
-#define DB_ESPNOW_HEADER_LEN       sizeof(db_esp_now_packet_header_t)
+#define DB_ESPNOW_PAYLOAD_MAXSIZE  (ESP_NOW_MAX_DATA_LEN-DB_ESPNOW_AES_IV_LEN-DB_ESPNOW_AES_TAG_LEN-6-1-4) // (origin, packet_type, seq_num) = 6 bytes, payload_length_decrypted = 1 byte, padding = 4 bytes (to make db_esp_now_packet_protected_data_t multiple of 16)
 
 
 #define DB_ESPNOW_SEND_DELAY    0 //Delay between sending two ESPNOW data, unit: ms
 
 #define IS_BROADCAST_ADDR(addr) (memcmp(addr, s_example_broadcast_mac, ESP_NOW_ETH_ALEN) == 0)
-#define DB_ESPNOW_PACKET_HEADER_LENGTH (sizeof(db_esp_now_packet_t) - sizeof(db_esp_now_packet_payload_t))
 
 typedef enum {
     DB_ESPNOW_SEND_CB,
@@ -75,23 +74,23 @@ enum {
 };
 
 typedef struct {
-    uint8_t payload_length_decrypted;   // length of unencrypted payload without encryption padding if length was not multiple of 16
-    uint8_t payload[208];   // ESP_NOW_MAX_DATA_LEN-DB_ESPNOW_AES_IV_LEN-DB_ESPNOW_AES_TAG_LEN-1-3 & multiple of 16
-} __attribute__((packed)) db_esp_now_packet_payload_t;          // ENCRYPTED by AES - must be a multiple of 16 (AES requirement)
+    uint8_t origin;                         // type: db_espnow_data_origin_t: 0=packet sent by GCS - 1=packet sent by drone
+    uint8_t packet_type;                    // FEC packet type or non FEC protected data ToDo: Check if really necessary
+    uint32_t seq_num;                       // Sequence number of the packet
+    uint8_t aes_iv[DB_ESPNOW_AES_IV_LEN];   // Initialization vector for AES
+} __attribute__((__packed__)) db_esp_now_packet_header_t;             // authenticated but NOT encrypted by AES-GCM
 
 typedef struct {
-    uint8_t origin;                     // type: db_espnow_data_origin_t: 0=packet sent by GCS - 1=packet sent by drone
-    uint8_t packet_type;                // FEC packet type or non FEC protected data ToDo: Check if really necessary
-    uint32_t seq_num;
-} __attribute__((packed)) db_esp_now_packet_header_t;
+    uint8_t payload_length_decrypted;           // length of unencrypted payload without encryption padding if length was not multiple of 16
+    uint8_t payload[DB_ESPNOW_PAYLOAD_MAXSIZE]; // actual payload data
+} __attribute__((__packed__)) db_esp_now_packet_protected_data_t; // encrypted & authenticated by AES-GCM - size must be multiple of 16 for AES
 
 /* DroneBridge for ESP32 ESP-NOW packet */
 typedef struct {
     db_esp_now_packet_header_t db_esp_now_packet_header;
-    uint8_t aes_iv[DB_ESPNOW_AES_IV_LEN];   // Initialization vector for AES
-    db_esp_now_packet_payload_t db_esp_now_packet_payload;
     uint8_t tag[DB_ESPNOW_AES_TAG_LEN];     // AES-GCM Tag
-} __attribute__((packed)) db_esp_now_packet_t;  // total size must be <=250bytes (ESP-NOW requirement)
+    db_esp_now_packet_protected_data_t db_esp_now_packet_protected_data;    // shall be last in struct, so we can cut off when payload is smaller
+} __attribute__((__packed__)) db_esp_now_packet_t;  // total size must be <=250bytes (ESP-NOW requirement)
 
 /* Parameters of sending ESPNOW data. */
 typedef struct {
