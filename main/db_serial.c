@@ -82,7 +82,7 @@ esp_err_t open_serial_socket() {
  * @param data_buffer Payload to write to UART
  * @param data_length Size of payload to write to UART
  */
-void write_to_uart(const char data_buffer[], const unsigned int data_length) {
+void write_to_uart(const uint8_t data_buffer[], const unsigned int data_length) {
     int written = uart_write_bytes(UART_NUM, data_buffer, data_length);
     if (written > 0)
         ESP_LOGD(TAG, "Wrote %i bytes to UART", written);
@@ -138,14 +138,14 @@ void parse_msp_ltm(int tcp_clients[], struct udp_conn_list_t *udp_connection, ui
  * @param serial_buffer Buffer that gets filled with data and then sent via TCP and UDP
  * @param serial_read_bytes Number of bytes already read for the current packet
  */
-void parse_transparent(int tcp_clients[], struct udp_conn_list_t *udp_connection, __uint8_t serial_buffer[],
+void parse_transparent(int tcp_clients[], struct udp_conn_list_t *udp_connection, uint8_t serial_buffer[],
                        unsigned int *serial_read_bytes) {
     __uint16_t read;
     // read from UART directly into TCP & UDP send buffer
     if ((read = uart_read_bytes(UART_NUM, &serial_buffer[*serial_read_bytes], (DB_TRANS_BUF_SIZE - *serial_read_bytes), 0)) > 0) {
         uart_byte_count += read;    // increase total bytes read via UART
         *serial_read_bytes += read; // set new buffer position
-        // TODO: Support UART data streams that are not continuos. Use timer to check how long we waited for data already
+        // TODO: Support UART data streams that are not continuous. Use timer to check how long we waited for data already
         // TODO: Move below if out of the surrounding if statement
         if (*serial_read_bytes >= DB_TRANS_BUF_SIZE) {
             send_to_all_clients(tcp_clients, udp_connection, serial_buffer, *serial_read_bytes);

@@ -332,7 +332,7 @@ int init_wifi_clientmode() {
 }
 
 /**
- * Initialize WiFi & ESP-NOW mode
+ * Initialize WiFi for ESP-NOW mode
  */
 void init_wifi_espnow() {
     ESP_LOGI(TAG, "Setting up Wi-Fi for ESP-NOW");
@@ -346,8 +346,7 @@ void init_wifi_espnow() {
     ESP_ERROR_CHECK(esp_wifi_start());
     ESP_ERROR_CHECK(esp_wifi_set_channel(DB_WIFI_CHANNEL, WIFI_SECOND_CHAN_NONE));
     ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B|WIFI_PROTOCOL_LR) );
-    ESP_ERROR_CHECK(db_espnow_init());
-    ESP_LOGI(TAG, "Enabled ESP-NOW Mode! LR Mode is set. This device will be invisible to non-ESP32 devices!");
+    ESP_LOGI(TAG, "Enabled ESP-NOW WiFi Mode! LR Mode is set. This device will be invisible to non-ESP32 devices!");
 }
 
 /**
@@ -457,6 +456,7 @@ void app_main() {
         init_wifi_apmode(DB_WIFI_MODE);
     } else if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_AIR || DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND) {
         init_wifi_espnow();
+        db_espnow_module();
     } else {
         // Wi-Fi client mode with LR mode enabled
         if (init_wifi_clientmode() < 0) {

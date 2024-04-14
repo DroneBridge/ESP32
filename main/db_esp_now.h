@@ -22,18 +22,19 @@
 #define DB_ESP32_DB_ESP_NOW_H
 
 #include <stdint.h>
+#include <esp_now.h>
 
 #define ESPNOW_QUEUE_SIZE   6
 #define ESPNOW_MAXDELAY     512
-#define DB_ESPNOW_AES_IV_LEN       16
+#define DB_ESPNOW_AES_IV_LEN       12   // 96 bit
 #define DB_ESPNOW_AES_TAG_LEN      16
 #define DB_ESPNOW_AES_KEY_LEN      256  // in bits 128 & 192 are supported by ESP32
-#define DB_ESPNOW_PAYLOAD_MAXSIZE  (ESP_NOW_MAX_DATA_LEN-DB_ESPNOW_AES_IV_LEN-DB_ESPNOW_AES_TAG_LEN-6-1-4) // (origin, packet_type, seq_num) = 6 bytes, payload_length_decrypted = 1 byte, padding = 4 bytes (to make db_esp_now_packet_protected_data_t multiple of 16)
-
-
-#define DB_ESPNOW_SEND_DELAY    0 //Delay between sending two ESPNOW data, unit: ms
+#define DB_ESPNOW_PAYLOAD_MAXSIZE  (ESP_NOW_MAX_DATA_LEN-DB_ESPNOW_AES_IV_LEN-DB_ESPNOW_AES_TAG_LEN-6-1) // (origin, packet_type, seq_num) = 6 bytes, payload_length_decrypted = 1 byte
 
 #define IS_BROADCAST_ADDR(addr) (memcmp(addr, s_example_broadcast_mac, ESP_NOW_ETH_ALEN) == 0)
+
+extern QueueHandle_t db_espnow_send_queue;    // Queue that contains data to be sent via ESP-NOW (filled by control task)
+extern QueueHandle_t db_uart_write_queue;    // Queue that contains data to be written to UART (filled by ESP-NOW task)
 
 typedef enum {
     DB_ESPNOW_SEND_CB,
@@ -62,11 +63,11 @@ typedef struct {
     db_espnow_event_info_t info;
 } db_espnow_event_t;
 
-enum {
-    DB_ESPNOW_DATA_BROADCAST,
-    DB_ESPNOW_DATA_UNICAST,
-    DB_ESPNOW_DATA_MAX,
-};
+/* Element of db_espnow_send_queue or db_uart_write_queue */
+typedef struct {
+    uint8_t data_len;
+    uint8_t *data;
+} __attribute__((__packed__)) db_espnow_UART_event_t;
 
 enum {
     DB_ESPNOW_ORIGIN_GND = 0,
@@ -92,13 +93,7 @@ typedef struct {
     db_esp_now_packet_protected_data_t db_esp_now_packet_protected_data;    // shall be last in struct, so we can cut off when payload is smaller
 } __attribute__((__packed__)) db_esp_now_packet_t;  // total size must be <=250bytes (ESP-NOW requirement)
 
-/* Parameters of sending ESPNOW data. */
-typedef struct {
-    int len;                              //Length of ESPNOW data to be sent, unit: byte.
-    uint8_t dest_mac[ESP_NOW_ETH_ALEN];   //MAC address of destination device.
-} db_espnow_send_param_t;
-
-esp_err_t db_espnow_init();
+void db_espnow_module();
 
 _Noreturn void process_espnow_data();
 

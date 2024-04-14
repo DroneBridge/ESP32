@@ -1,3 +1,4 @@
+#include <sys/cdefs.h>
 /*
  *   This file is part of DroneBridge: https://github.com/DroneBridge/ESP32
  *
@@ -35,6 +36,7 @@
 #include "db_esp32_control.h"
 #include "main.h"
 #include "db_serial.h"
+#include "db_esp_now.h"
 
 #define TAG "DB_CONTROL"
 
@@ -100,8 +102,16 @@ void send_to_all_clients(int tcp_clients[], struct udp_conn_list_t *n_udp_conn_l
         send_to_all_tcp_clients(tcp_clients, data, data_length);
         send_to_all_udp_clients(n_udp_conn_list, data, data_length);
     } else {
-        // TODO: Send via ESP-Now by pushing the data to the send queue. We initially have to send something to enter
-        //  the send loop that only sends once the last packet was sent
+        db_espnow_UART_event_t evt;
+        evt.data = malloc(data_length);
+        memcpy(evt.data, data, data_length);
+        evt.data_len = data_length;
+        if (xQueueSend(db_espnow_send_queue, &evt, ESPNOW_MAXDELAY) != pdTRUE) {
+            ESP_LOGW(TAG, "Send to db_espnow_send_queue queue fail");
+            free(evt.data);
+        } else {
+            // all good
+        }
     }
 }
 
@@ -247,7 +257,7 @@ void read_process_uart(int *tcp_clients, uint *transparent_buff_pos, uint *msp_l
  * Thread that manages all incoming and outgoing ESP-NOW and serial (UART) connections.
  * Called only when ESP-NOW mode is selected
  */
-void control_module_esp_now(){
+_Noreturn void control_module_esp_now(){
     ESP_LOGI(TAG, "Starting control module (ESP-NOW)");
     // only open serial socket/UART if PINs are not matching - matching PIN nums mean they still need to be defined by
     // the user no pre-defined pins as of this release since ESP32 boards have wildly different pin configurations
@@ -262,11 +272,18 @@ void control_module_esp_now(){
     uint8_t msp_message_buffer[UART_BUF_SIZE];
     uint8_t serial_buffer[DB_TRANS_BUF_SIZE];
     msp_ltm_port_t db_msp_ltm_port;
+    db_espnow_UART_event_t db_uart_evt;
+
     ESP_LOGI(TAG, "Started control module (ESP-NOW)");
     while (1) {
-        // TODO: Process ESP-NOW data and clients
         read_process_uart(NULL, &transparent_buff_pos, &msp_ltm_buff_pos, msp_message_buffer, serial_buffer,
                           &db_msp_ltm_port);
+        if (xQueueReceive(db_uart_write_queue, &db_uart_evt, 0) == pdTRUE) {
+            write_to_uart(db_uart_evt.data, db_uart_evt.data_len);
+            free(db_uart_evt.data);
+        } else {
+            // no new data available do nothing
+        }
     }
     vTaskDelete(NULL);
 }
@@ -275,7 +292,7 @@ void control_module_esp_now(){
  * Thread that manages all incoming and outgoing TCP, UDP and serial (UART) connections.
  * Called when Wi-Fi modes are selected
  */
-void control_module_udp_tcp() {
+_Noreturn void control_module_udp_tcp() {
     ESP_LOGI(TAG, "Starting control module (Wi-Fi)");
     int uart_socket = open_serial_socket();
     if (uart_socket == ESP_FAIL) {
@@ -295,13 +312,13 @@ void control_module_udp_tcp() {
     }
 
     udp_conn_list->udp_socket = open_udp_socket();
-    char udp_buffer[UDP_BUF_SIZE];
+    uint8_t udp_buffer[UDP_BUF_SIZE];
     struct db_udp_client_t new_db_udp_client = {0};
     socklen_t udp_socklen = sizeof(new_db_udp_client.udp_client);
 
     uint transparent_buff_pos = 0;
     uint msp_ltm_buff_pos = 0;
-    char tcp_client_buffer[TCP_BUFF_SIZ];
+    uint8_t tcp_client_buffer[TCP_BUFF_SIZ];
     memset(tcp_client_buffer, 0, TCP_BUFF_SIZ);
     uint8_t msp_message_buffer[UART_BUF_SIZE];
     uint8_t serial_buffer[DB_TRANS_BUF_SIZE];
