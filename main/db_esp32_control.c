@@ -273,6 +273,7 @@ _Noreturn void control_module_esp_now(){
     uint8_t serial_buffer[DB_TRANS_BUF_SIZE];
     msp_ltm_port_t db_msp_ltm_port;
     db_espnow_UART_event_t db_uart_evt;
+    uint delay_timer_cnt = 0;
 
     ESP_LOGI(TAG, "Started control module (ESP-NOW)");
     while (1) {
@@ -283,6 +284,14 @@ _Noreturn void control_module_esp_now(){
             free(db_uart_evt.data);
         } else {
             // no new data available do nothing
+        }
+        if (delay_timer_cnt == 5000) {
+            /* all actions are non-blocking so allow some delay so that the IDLE task of FreeRTOS and the watchdog can run
+            read: https://esp32developer.com/programming-in-c-c/tasks/tasks-vs-co-routines for reference */
+            vTaskDelay(10 / portTICK_PERIOD_MS);
+            delay_timer_cnt = 0;
+        } else {
+            delay_timer_cnt++;
         }
     }
     vTaskDelete(NULL);

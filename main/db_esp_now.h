@@ -31,7 +31,7 @@
 #define DB_ESPNOW_AES_KEY_LEN      256  // in bits 128 & 192 are supported by ESP32
 #define DB_ESPNOW_PAYLOAD_MAXSIZE  (ESP_NOW_MAX_DATA_LEN-DB_ESPNOW_AES_IV_LEN-DB_ESPNOW_AES_TAG_LEN-6-1) // (origin, packet_type, seq_num) = 6 bytes, payload_length_decrypted = 1 byte
 
-#define IS_BROADCAST_ADDR(addr) (memcmp(addr, s_example_broadcast_mac, ESP_NOW_ETH_ALEN) == 0)
+#define IS_BROADCAST_ADDR(addr) (memcmp(addr, BROADCAST_MAC, ESP_NOW_ETH_ALEN) == 0)
 
 extern QueueHandle_t db_espnow_send_queue;    // Queue that contains data to be sent via ESP-NOW (filled by control task)
 extern QueueHandle_t db_uart_write_queue;    // Queue that contains data to be written to UART (filled by ESP-NOW task)
@@ -82,9 +82,9 @@ typedef struct {
 } __attribute__((__packed__)) db_esp_now_packet_header_t;             // authenticated but NOT encrypted by AES-GCM
 
 typedef struct {
-    uint8_t payload_length_decrypted;           // length of unencrypted payload without encryption padding if length was not multiple of 16
+    uint8_t payload_length_decrypted;           // length of unencrypted payload
     uint8_t payload[DB_ESPNOW_PAYLOAD_MAXSIZE]; // actual payload data
-} __attribute__((__packed__)) db_esp_now_packet_protected_data_t; // encrypted & authenticated by AES-GCM - size must be multiple of 16 for AES
+} __attribute__((__packed__)) db_esp_now_packet_protected_data_t; // encrypted & authenticated by AES-GCM
 
 /* DroneBridge for ESP32 ESP-NOW packet */
 typedef struct {

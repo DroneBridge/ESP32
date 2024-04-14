@@ -1,4 +1,3 @@
-#include <sys/cdefs.h>
 /*
  *   This file is part of DroneBridge: https://github.com/DroneBridge/ESP32
  *
@@ -18,6 +17,7 @@
  *
  */
 
+#include <sys/cdefs.h>
 #include <esp_err.h>
 #include <esp_log.h>
 #include <esp_mac.h>
@@ -32,10 +32,11 @@
 #include "db_esp_now.h"
 #include "globals.h"
 #include "main.h"
+#include "espnow.h"
 
 #define TAG "DB_ESPNOW"
 
-static uint8_t s_example_broadcast_mac[ESP_NOW_ETH_ALEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+const uint8_t BROADCAST_MAC[ESP_NOW_ETH_ALEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 static QueueHandle_t db_espnow_send_recv_callback_queue;    // Queue that contains ESP-NOW callback results
 QueueHandle_t db_espnow_send_queue;    // Queue that contains data to be sent via ESP-NOW (filled by control task)
 QueueHandle_t db_uart_write_queue;    // Queue that contains data to be written to UART (filled by ESP-NOW task)
@@ -178,22 +179,24 @@ int db_decrypt_payload(db_esp_now_packet_t* db_esp_now_packet, db_esp_now_packet
  */
 bool db_read_uart_queue_and_send() {
     static db_espnow_UART_event_t evt;
+    static db_esp_now_packet_t db_esp_now_packet = {
+            .db_esp_now_packet_header.seq_num = 0,
+            .db_esp_now_packet_header.packet_type = 0
+    };   // make static so it is gets instanced only once
     if (xQueueReceive(db_espnow_send_queue, &evt, 0) == pdTRUE) {
-        static db_esp_now_packet_t db_esp_now_packet = {.db_esp_now_packet_header.seq_num = 0,
-                                                        .db_esp_now_packet_header.packet_type = 0};   // make static so it is gets instanced only once
         if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND) {
             db_esp_now_packet.db_esp_now_packet_header.origin = DB_ESPNOW_ORIGIN_GND;
         } else {
             db_esp_now_packet.db_esp_now_packet_header.origin = DB_ESPNOW_ORIGIN_AIR;
         }
         db_esp_now_packet.db_esp_now_packet_protected_data.payload_length_decrypted = evt.data_len;
-        memcpy(db_esp_now_packet.db_esp_now_packet_protected_data.payload, evt.data, evt.data_len);
-        free(evt.data);
+        memcpy(db_esp_now_packet.db_esp_now_packet_protected_data.payload, evt.data, evt.data_len); // ToDo can be made obsolete since esp_now_send() does not need an instance of buffer after sending
         static int ret;
         ret = db_encrypt_payload(&db_esp_now_packet, db_esp_now_packet.db_esp_now_packet_protected_data.payload_length_decrypted+1);
+        free(evt.data);
         if (ret == 0) {
             static esp_err_t err;
-            err = esp_now_send(NULL, (const uint8_t *) &db_esp_now_packet, (size_packet_header+DB_ESPNOW_AES_TAG_LEN+db_esp_now_packet.db_esp_now_packet_protected_data.payload_length_decrypted+1));
+            err = esp_now_send(ESPNOW_ADDR_BROADCAST, (const uint8_t *) &db_esp_now_packet, (size_packet_header+DB_ESPNOW_AES_TAG_LEN+db_esp_now_packet.db_esp_now_packet_protected_data.payload_length_decrypted+1));
             if (err != ESP_OK) {
                 ESP_LOGE(TAG, "Error (%s) sending ESP-NOW data!", esp_err_to_name(err));
                 return false;
@@ -330,54 +333,14 @@ static void db_esp_now_receive_callback(const esp_now_recv_info_t *recv_info, co
 }
 
 /**
- *  Task that handles all ESP-NOW related data processing. Reads ESP-NOW Callback-Queue, Reads ESP-NOW send queue and
- *  writes to UART-WRITE Queue.
- *
+ * Init mbedtls aes gcm mode and set encryption key based on the WiFi password specified by the user
+ * @return result of mbedtls_gcm_setkey
  */
-_Noreturn void process_espnow_data() {
-    db_espnow_event_t evt;
-    // indicator that the last ESP-NOW send callback returned -> we can send the next packet
-    bool ready_to_send = true; // initially true
-    while(1) {
-        while (xQueueReceive(db_espnow_send_recv_callback_queue, &evt, 0) == pdTRUE) {
-            switch (evt.id) {
-                case DB_ESPNOW_SEND_CB: {
-                    db_espnow_event_send_cb_t *send_cb = &evt.info.send_cb;
-                    ESP_LOGD(TAG, "Send data to "MACSTR", status: %d", MAC2STR(send_cb->mac_addr), send_cb->status);
-                    // indicate that we can send next packet - the last sending callback has returned, so we keep the order
-                    // of packets. ESP-NOW by default does not guarantee the order when many packets are sent in quick succession
-                    ready_to_send = true;
-                    // try to immediately send the next packet if available and set ready_to_send accordingly
-                    ready_to_send = !db_read_uart_queue_and_send();
-                    break;
-                }
-                case DB_ESPNOW_RECV_CB: {
-                    db_espnow_event_recv_cb_t *recv_cb = &evt.info.recv_cb;
-                    db_espnow_process_rcv_data(recv_cb->data, recv_cb->data_len, recv_cb->mac_addr);
-                    free(recv_cb->data);
-                    break;
-                }
-                default:
-                    ESP_LOGE(TAG, "Callback type error: %d", evt.id);
-                    break;
-            }
-        }
-        // process UART -> ESP-NOW
-        if (ready_to_send) {
-            // send the next packet if available and set ready_to_send accordingly
-            ready_to_send = !db_read_uart_queue_and_send();
-        } else {
-            // do nothing - we are not ready for sending another packet
-        }
-    }
-    vTaskDelete(NULL);
-}
-
 int init_gcm_encryption_module() {
     mbedtls_gcm_init(&aes);
     uint8_t aes_key[AES_256_KEY_BYTES];
     generate_pkcs5_key((const char*) DB_WIFI_PWD, aes_key, AES_256_KEY_BYTES);
-    ESP_LOGI(TAG, "Derived AES Key: ");
+    ESP_LOGI(TAG, "Derived AES Key:");
     for (int i = 0; i < sizeof(aes_key); ++i) {
         printf("%02x", aes_key[i]);
     }
@@ -394,6 +357,10 @@ void deinit_espnow_all(){
     esp_now_deinit();
 }
 
+/**
+ * Init all relevant structures and Queues for ESP-NOW communication
+ * @return ESP_FAIL on failure or ESP_OK on success
+ */
 esp_err_t db_espnow_init() {
     ESP_LOGI(TAG, "Initializing ESP-NOW parameters");
     /* Init Queue for ESP-NOW internal callbacks when packet is finally sent or received */
@@ -420,20 +387,19 @@ esp_err_t db_espnow_init() {
     ESP_ERROR_CHECK(esp_now_register_send_cb(db_esp_now_send_callback));
     ESP_ERROR_CHECK(esp_now_register_recv_cb(db_esp_now_receive_callback));
 
-    /* Add broadcast peer information to peer list. */
-    esp_now_peer_info_t *peer = malloc(sizeof(esp_now_peer_info_t));
-    if (peer == NULL) {
-        ESP_LOGE(TAG, "Malloc peer information fail");
-        deinit_espnow_all();
-        return ESP_FAIL;
-    }
-    memset(peer, 0, sizeof(esp_now_peer_info_t));
-    peer->channel = DB_WIFI_CHANNEL;
-    peer->ifidx = WIFI_IF_STA;
-    peer->encrypt = false;
-    memcpy(peer->peer_addr, s_example_broadcast_mac, ESP_NOW_ETH_ALEN);
-    ESP_ERROR_CHECK(esp_now_add_peer(peer));
-    free(peer);
+//    esp_now_peer_info_t *peer = malloc(sizeof(esp_now_peer_info_t));
+//    if (peer == NULL) {
+//        ESP_LOGE(TAG, "Malloc peer information fail");
+//        deinit_espnow_all();
+//        return ESP_FAIL;
+//    }
+//    memset(peer, 0, sizeof(esp_now_peer_info_t));
+//    peer->channel = DB_WIFI_CHANNEL;
+//    peer->ifidx = WIFI_IF_STA;
+//    peer->encrypt = false;
+//    memcpy(peer->peer_addr, BROADCAST_MAC, ESP_NOW_ETH_ALEN);
+//    ESP_ERROR_CHECK(esp_now_add_peer(peer));
+//    free(peer);
 
     /* Limit payload size to the max we can do */
     if (DB_TRANS_BUF_SIZE > DB_ESPNOW_PAYLOAD_MAXSIZE) {
@@ -449,18 +415,82 @@ esp_err_t db_espnow_init() {
         deinit_espnow_all();
         return ESP_FAIL;
     }
-
+    ESP_LOGI(TAG, "ESP-NOW for DroneBridge init done");
     return ESP_OK;
+}
+
+/**
+ *  Task that handles all ESP-NOW related data processing. Reads ESP-NOW Callback-Queue, Reads ESP-NOW send queue and
+ *  writes to UART-WRITE Queue.
+ */
+_Noreturn void process_espnow_data() {
+    esp_err_t err = db_espnow_init();
+    if (err == ESP_OK) {
+        // all good. continue
+    } else {
+        ESP_LOGE(TAG, "Failed to init espnow (db_espnow_init()) aborting start of db_espnow task");
+        vTaskDelete(NULL);
+    }
+    /* Add broadcast peer information to peer list. */
+    const esp_now_peer_info_t broadcast_peer = {
+            .channel = DB_WIFI_CHANNEL,
+            .encrypt = false,
+            .ifidx = WIFI_IF_STA,
+            .peer_addr = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+    };
+    ESP_ERROR_CHECK(esp_now_add_peer(&broadcast_peer));
+
+    db_espnow_event_t evt;
+    // indicator that the last ESP-NOW send callback returned -> we can send the next packet
+    bool ready_to_send = true; // initially true
+    int delay_timer_cnt = 0;
+    while(1) {
+        if(xQueueReceive(db_espnow_send_recv_callback_queue, &evt, 0) == pdTRUE) {
+            switch (evt.id) {
+                case DB_ESPNOW_SEND_CB: {
+                    db_espnow_event_send_cb_t *send_cb = &evt.info.send_cb;
+                    ESP_LOGD(TAG, "Send data to "MACSTR", status: %d", MAC2STR(send_cb->mac_addr), send_cb->status);
+                    // indicate that we can send next packet - the last sending callback has returned, so we keep the order
+                    // of packets. ESP-NOW by default does not guarantee the order when many packets are sent in quick succession
+                    ready_to_send = true;
+                    // try to immediately send the next packet if available and set ready_to_send accordingly
+                    ready_to_send = !db_read_uart_queue_and_send();
+                    break;
+                }
+                case DB_ESPNOW_RECV_CB: {
+                    db_espnow_event_recv_cb_t *recv_cb = &evt.info.recv_cb;
+                    db_espnow_process_rcv_data(recv_cb->data, recv_cb->data_len, recv_cb->mac_addr);
+                    free(recv_cb->data);
+                    break;
+                }
+                default:
+                    ESP_LOGE(TAG, "Callback type error: %d", evt.id);
+                    break;
+            }
+        }
+        /* process UART -> ESP-NOW */
+        if (ready_to_send) {
+            // send the next packet if available and set ready_to_send accordingly
+            ready_to_send = !db_read_uart_queue_and_send();
+        } else {
+            // do nothing - we are not ready for sending another packet
+        }
+
+        if (delay_timer_cnt == 5000) {
+            /* all actions are non-blocking so allow some delay so that the IDLE task of FreeRTOS and the watchdog can run
+            read: https://esp32developer.com/programming-in-c-c/tasks/tasks-vs-co-routines for reference */
+            vTaskDelay(10 / portTICK_PERIOD_MS);
+            delay_timer_cnt = 0;
+        } else {
+            delay_timer_cnt++;
+        }
+    }
+    vTaskDelete(NULL);
 }
 
 /**
  * Start task that handles ESP-NOW data
  */
 void db_espnow_module() {
-    esp_err_t err = db_espnow_init();
-    if (err == ESP_OK) {
-        xTaskCreate(&process_espnow_data, "db_espnow", 40960, NULL, 5, NULL);
-    } else {
-        ESP_LOGE(TAG, "Failed to init espnow (db_espnow_init()) aborting start of db_espnow task");
-    }
+    xTaskCreate(&process_espnow_data, "db_espnow", 40960, NULL, 5, NULL);
 }
