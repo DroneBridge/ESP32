@@ -107,7 +107,7 @@ void generate_pkcs5_key(const char* password, unsigned char* key, size_t keylen)
  * Calls mbedtls_gcm_crypt_and_tag()
  *
  * @param db_esp_now_packet Packet containing payload data and header info. AES IV & TAG will be filled
- * @param encrypt_payload_len Length of the to be encrypted data (db_esp_now_packet_protected_data) - Multiple of 16!
+ * @param encrypt_payload_len Length of the to be encrypted data (db_esp_now_packet_protected_data)
  * @return 0 on success, -1 in case of unknown error of mbedtls_gcm_crypt_and_tag or return value of mbedtls_gcm_crypt_and_tag
  * payload is encrypted and part of the db_esp_now_packet
  */
@@ -190,21 +190,24 @@ bool db_read_uart_queue_and_send() {
             db_esp_now_packet.db_esp_now_packet_header.origin = DB_ESPNOW_ORIGIN_AIR;
         }
         db_esp_now_packet.db_esp_now_packet_protected_data.payload_length_decrypted = evt.data_len;
-        memcpy(db_esp_now_packet.db_esp_now_packet_protected_data.payload, evt.data, evt.data_len); // ToDo can be made obsolete since esp_now_send() does not need an instance of buffer after sending
+        memcpy(db_esp_now_packet.db_esp_now_packet_protected_data.payload, evt.data, evt.data_len); // ToDo esp_now_send() does not need an instance of buffer after sending
+        free(evt.data);
+
         static int ret;
         ret = db_encrypt_payload(&db_esp_now_packet, db_esp_now_packet.db_esp_now_packet_protected_data.payload_length_decrypted+1);
-        free(evt.data);
         if (ret == 0) {
             static esp_err_t err;
-            err = esp_now_send(ESPNOW_ADDR_BROADCAST, (const uint8_t *) &db_esp_now_packet, (size_packet_header+DB_ESPNOW_AES_TAG_LEN+db_esp_now_packet.db_esp_now_packet_protected_data.payload_length_decrypted+1));
+            err = esp_now_send(BROADCAST_MAC, (const uint8_t *) &db_esp_now_packet, (size_packet_header + DB_ESPNOW_AES_TAG_LEN + evt.data_len + 1));
             if (err != ESP_OK) {
-                ESP_LOGE(TAG, "Error (%s) sending ESP-NOW data!", esp_err_to_name(err));
+                ESP_LOGE(TAG, "Error (%s) sending ESP-NOW data - size %i !", esp_err_to_name(err), (size_packet_header + DB_ESPNOW_AES_TAG_LEN + evt.data_len + 1));
                 return false;
             } else {
-                if (db_esp_now_packet.db_esp_now_packet_header.seq_num < UINT32_MAX)
+                if (db_esp_now_packet.db_esp_now_packet_header.seq_num < UINT32_MAX) {
                     db_esp_now_packet.db_esp_now_packet_header.seq_num++;    // packet is static so just increase number once we sent it
-                else
+                } else {
                     db_esp_now_packet.db_esp_now_packet_header.seq_num = 0;  // catch overflow in case someone got crazy
+                }
+                ESP_LOGD(TAG, "Sent packet!");
                 return true;
             }
         } else {
@@ -233,8 +236,8 @@ void db_espnow_process_rcv_data(uint8_t *data, uint16_t data_len, uint8_t *src_a
     db_esp_now_packet_t *db_esp_now_packet = (db_esp_now_packet_t *) data;
     static uint32_t last_seq_num = 0;
 
-    db_espnow_UART_event_t db_uart_evt;
-    db_uart_evt.data = malloc(DB_ESPNOW_PAYLOAD_MAXSIZE);   // ToDo: must be freed when UART reads Queue
+    static db_espnow_UART_event_t db_uart_evt;
+    db_uart_evt.data = malloc(DB_ESPNOW_PAYLOAD_MAXSIZE);
     // cast from db_espnow_UART_event_t to db_esp_now_packet_protected_data_t possible because byte equal!
     if (db_decrypt_payload(db_esp_now_packet, (db_esp_now_packet_protected_data_t *) &db_uart_evt, data_len) == 0) {
         if (last_seq_num < db_esp_now_packet->db_esp_now_packet_header.seq_num) {
@@ -387,6 +390,12 @@ esp_err_t db_espnow_init() {
     ESP_ERROR_CHECK(esp_now_register_send_cb(db_esp_now_send_callback));
     ESP_ERROR_CHECK(esp_now_register_recv_cb(db_esp_now_receive_callback));
 
+    /* Add broadcast peer information to peer list. */
+    esp_now_peer_info_t peer;
+    memset(&peer, 0, sizeof(esp_now_peer_info_t));
+    memcpy(peer.peer_addr, BROADCAST_MAC, 6);
+    if (!esp_now_is_peer_exist(BROADCAST_MAC)) ESP_ERROR_CHECK(esp_now_add_peer(&peer));
+
 //    esp_now_peer_info_t *peer = malloc(sizeof(esp_now_peer_info_t));
 //    if (peer == NULL) {
 //        ESP_LOGE(TAG, "Malloc peer information fail");
@@ -431,15 +440,6 @@ _Noreturn void process_espnow_data() {
         ESP_LOGE(TAG, "Failed to init espnow (db_espnow_init()) aborting start of db_espnow task");
         vTaskDelete(NULL);
     }
-    /* Add broadcast peer information to peer list. */
-    const esp_now_peer_info_t broadcast_peer = {
-            .channel = DB_WIFI_CHANNEL,
-            .encrypt = false,
-            .ifidx = WIFI_IF_STA,
-            .peer_addr = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
-    };
-    ESP_ERROR_CHECK(esp_now_add_peer(&broadcast_peer));
-
     db_espnow_event_t evt;
     // indicator that the last ESP-NOW send callback returned -> we can send the next packet
     bool ready_to_send = true; // initially true

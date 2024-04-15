@@ -140,7 +140,7 @@ void parse_msp_ltm(int tcp_clients[], struct udp_conn_list_t *udp_connection, ui
  */
 void parse_transparent(int tcp_clients[], struct udp_conn_list_t *udp_connection, uint8_t serial_buffer[],
                        unsigned int *serial_read_bytes) {
-    __uint16_t read;
+    uint16_t read;
     // read from UART directly into TCP & UDP send buffer
     if ((read = uart_read_bytes(UART_NUM, &serial_buffer[*serial_read_bytes], (DB_TRANS_BUF_SIZE - *serial_read_bytes), 0)) > 0) {
         uart_byte_count += read;    // increase total bytes read via UART
