@@ -60,6 +60,7 @@ uint8_t DB_UART_PIN_RX = GPIO_NUM_0;
 uint8_t DB_UART_PIN_RTS = GPIO_NUM_0;
 uint8_t DB_UART_PIN_CTS = GPIO_NUM_0;
 uint8_t DB_UART_RTS_THRESH = 64;
+uint8_t DB_RESET_PIN = GPIO_NUM_0;  // used to reset ESP to defaults and force restart
 
 int32_t DB_UART_BAUD_RATE = 57600;
 uint16_t DB_TRANS_BUF_SIZE = 64;
@@ -435,6 +436,41 @@ void read_settings_nvs() {
 }
 
 /**
+ * Interrupt trigger called when RESET button is pressed. Will reset the config to DroneBridge for ESP32 defaults.
+ * @param arg
+ */
+static void IRAM_ATTR gpio_isr_handler(void* arg)
+{
+    uint32_t gpio_num = (uint32_t) arg;
+    if (gpio_num == DB_RESET_PIN) {
+        ESP_LOGW(TAG, "Reset triggered via GPIO %i. Resetting settings and rebooting", DB_RESET_PIN);
+        DB_WIFI_MODE = DB_WIFI_MODE_AP;
+        strncpy((char *) DB_WIFI_SSID, "DroneBridge for ESP32", sizeof(DB_WIFI_SSID) - 1);
+        strncpy((char *) DB_WIFI_PWD, "dronebridge", sizeof(DB_WIFI_PWD) - 1);
+        strncpy(DEFAULT_AP_IP, "192.168.2.1", sizeof(DEFAULT_AP_IP) - 1);
+        DB_WIFI_CHANNEL = 6;
+        DB_UART_PIN_TX = GPIO_NUM_0;
+        DB_UART_PIN_RX = GPIO_NUM_0;
+        DB_UART_PIN_CTS = GPIO_NUM_0;
+        DB_UART_PIN_RTS = GPIO_NUM_0;
+        DB_SERIAL_PROTOCOL = 4;
+        DB_TRANS_BUF_SIZE = 64;
+        DB_UART_RTS_THRESH = 64;
+        esp_restart();
+    }
+}
+
+/**
+ * Setup boot button GPIO to reset entire ESP32 settings and to force a reboot of the system
+ */
+void set_reset_trigger() {
+    // ToDo: Setup boot button GPIO to reset entire ESP32 settings and to force a reboot of the system
+    // gpio_set_intr_type(DB_RESET_PIN, GPIO_INTR_ANYEDGE);
+    // ESP_ERROR_CHECK(gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT));
+    // ESP_ERROR_CHECK(gpio_isr_handler_add(DB_RESET_PIN, gpio_isr_handler, (void *) DB_RESET_PIN));
+}
+
+/**
  * Client Mode: ESP32 connects to a known access point.
  *  If the ESP32 could not connect to the specified access point using WIFI_ESP_MAXIMUM_RETRY retries, the
  *  ESP32 will switch temporarily to access point mode to allow the user to check the configuration. On reboot of the
@@ -486,4 +522,5 @@ void app_main() {
         ESP_ERROR_CHECK(start_rest_server(CONFIG_WEB_MOUNT_POINT));
         communication_module();
     }
+    set_reset_trigger();
 }
