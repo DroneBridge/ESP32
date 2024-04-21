@@ -41,6 +41,7 @@
 #include "main.h"
 #include "mdns.h"
 #include "db_esp_now.h"
+#include "iot_button.h"
 
 #define NVS_NAMESPACE "settings"
 
@@ -60,7 +61,19 @@ uint8_t DB_UART_PIN_RX = GPIO_NUM_0;
 uint8_t DB_UART_PIN_RTS = GPIO_NUM_0;
 uint8_t DB_UART_PIN_CTS = GPIO_NUM_0;
 uint8_t DB_UART_RTS_THRESH = 64;
-uint8_t DB_RESET_PIN = GPIO_NUM_0;  // used to reset ESP to defaults and force restart
+
+/* used to reset ESP to defaults and force restart or to reset the mode to access point mode */
+#ifdef CONFIG_IDF_TARGET_ESP32C3
+    #define DB_RESET_PIN GPIO_NUM_9
+#elif CONFIG_IDF_TARGET_ESP32S2
+    #define DB_RESET_PIN GPIO_NUM_0
+#elif CONFIG_IDF_TARGET_ESP32S3
+    #define DB_RESET_PIN GPIO_NUM_0
+#elif CONFIG_IDF_TARGET_ESP32
+    #define DB_RESET_PIN GPIO_NUM_0
+#else
+    #define DB_RESET_PIN GPIO_NUM_0
+#endif
 
 int32_t DB_UART_BAUD_RATE = 57600;
 uint16_t DB_TRANS_BUF_SIZE = 64;
@@ -333,7 +346,10 @@ int init_wifi_clientmode() {
 }
 
 /**
- * Initialize WiFi for ESP-NOW mode
+ * Initialize WiFi for ESP-NOW mode.
+ * If someone uses ESP-NOW over WiFi it is because he wants range over everything else.
+ * LR mode makes it very inconvenient to change settings but gives the most range. No AP mode since AP will not be
+ * visible.
  */
 void init_wifi_espnow() {
     ESP_LOGI(TAG, "Setting up Wi-Fi for ESP-NOW");
@@ -436,45 +452,68 @@ void read_settings_nvs() {
 }
 
 /**
- * Interrupt trigger called when RESET button is pressed. Will reset the config to DroneBridge for ESP32 defaults.
+ * Callback for a short press (<CONFIG_BUTTON_SHORT_PRESS_TIME_MS) of the reset/boot button.
+ * Sets mode to WiFi access point mode with default password "dronebridge" so user can check/change the config
  * @param arg
  */
-static void IRAM_ATTR gpio_isr_handler(void* arg)
-{
-    uint32_t gpio_num = (uint32_t) arg;
-    if (gpio_num == DB_RESET_PIN) {
-        ESP_LOGW(TAG, "Reset triggered via GPIO %i. Resetting settings and rebooting", DB_RESET_PIN);
-        DB_WIFI_MODE = DB_WIFI_MODE_AP;
-        strncpy((char *) DB_WIFI_SSID, "DroneBridge for ESP32", sizeof(DB_WIFI_SSID) - 1);
-        strncpy((char *) DB_WIFI_PWD, "dronebridge", sizeof(DB_WIFI_PWD) - 1);
-        strncpy(DEFAULT_AP_IP, "192.168.2.1", sizeof(DEFAULT_AP_IP) - 1);
-        DB_WIFI_CHANNEL = 6;
-        DB_UART_PIN_TX = GPIO_NUM_0;
-        DB_UART_PIN_RX = GPIO_NUM_0;
-        DB_UART_PIN_CTS = GPIO_NUM_0;
-        DB_UART_PIN_RTS = GPIO_NUM_0;
-        DB_SERIAL_PROTOCOL = 4;
-        DB_TRANS_BUF_SIZE = 64;
-        DB_UART_RTS_THRESH = 64;
-        esp_restart();
-    }
+void short_press_callback(void *arg,void *usr_data) {
+    ESP_LOGW(TAG, "Short press detected setting wifi mode to access point with password: dronebridge");
+    DB_WIFI_MODE = DB_WIFI_MODE_AP;
+    strncpy((char *) DB_WIFI_PWD, "dronebridge", sizeof(DB_WIFI_PWD) - 1);
+    write_settings_to_nvs();
+    esp_restart();
+}
+
+/**
+ * Callback for a long press (>CONFIG_BUTTON_LONG_PRESS_TIME_MS) of the reset/boot button
+ * @param arg
+ */
+void long_press_callback(void *arg,void *usr_data) {
+    ESP_LOGW(TAG, "Reset triggered via GPIO %i. Resetting settings and rebooting", DB_RESET_PIN);
+    DB_WIFI_MODE = DB_WIFI_MODE_AP;
+    strncpy((char *) DB_WIFI_SSID, "DroneBridge for ESP32", sizeof(DB_WIFI_SSID) - 1);
+    strncpy((char *) DB_WIFI_PWD, "dronebridge", sizeof(DB_WIFI_PWD) - 1);
+    strncpy(DEFAULT_AP_IP, "192.168.2.1", sizeof(DEFAULT_AP_IP) - 1);
+    DB_WIFI_CHANNEL = 6;
+    DB_UART_PIN_TX = GPIO_NUM_0;
+    DB_UART_PIN_RX = GPIO_NUM_0;
+    DB_UART_PIN_CTS = GPIO_NUM_0;
+    DB_UART_PIN_RTS = GPIO_NUM_0;
+    DB_SERIAL_PROTOCOL = 4;
+    DB_TRANS_BUF_SIZE = 64;
+    DB_UART_RTS_THRESH = 64;
+    write_settings_to_nvs();
+    esp_restart();
 }
 
 /**
  * Setup boot button GPIO to reset entire ESP32 settings and to force a reboot of the system
  */
 void set_reset_trigger() {
-    // ToDo: Setup boot button GPIO to reset entire ESP32 settings and to force a reboot of the system
-    // gpio_set_intr_type(DB_RESET_PIN, GPIO_INTR_ANYEDGE);
-    // ESP_ERROR_CHECK(gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT));
-    // ESP_ERROR_CHECK(gpio_isr_handler_add(DB_RESET_PIN, gpio_isr_handler, (void *) DB_RESET_PIN));
+    button_config_t gpio_btn_cfg = {
+            .type = BUTTON_TYPE_GPIO,
+            .long_press_time = CONFIG_BUTTON_LONG_PRESS_TIME_MS,
+            .short_press_time = CONFIG_BUTTON_SHORT_PRESS_TIME_MS,
+            .gpio_button_config = {
+                    .gpio_num = DB_RESET_PIN,
+                    .active_level = 0,
+            },
+    };
+    button_handle_t gpio_btn = iot_button_create(&gpio_btn_cfg);
+    if(NULL == gpio_btn) {
+        ESP_LOGE(TAG, "Creating reset button failed");
+    } else {
+        iot_button_register_cb(gpio_btn, BUTTON_SINGLE_CLICK, short_press_callback,NULL);
+        iot_button_register_cb(gpio_btn, BUTTON_LONG_PRESS_UP, long_press_callback,NULL);
+    }
 }
 
 /**
+ * Main entry point.
  * Client Mode: ESP32 connects to a known access point.
- *  If the ESP32 could not connect to the specified access point using WIFI_ESP_MAXIMUM_RETRY retries, the
- *  ESP32 will switch temporarily to access point mode to allow the user to check the configuration. On reboot of the
- *  ESP32 the WiFi client mode will be re-enabled if not changed otherwise by the user.
+ * If the ESP32 could not connect to the specified access point using WIFI_ESP_MAXIMUM_RETRY retries, the
+ * ESP32 will switch temporarily to access point mode to allow the user to check the configuration. On reboot of the
+ * ESP32 the WiFi client mode will be re-enabled if not changed otherwise by the user.
  *
  * AP-Mode: ESP32 creates an WiFi access point of its own where the ground control stations can connect
  */

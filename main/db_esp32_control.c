@@ -279,10 +279,11 @@ _Noreturn void control_module_esp_now(){
     while (1) {
         read_process_uart(NULL, &transparent_buff_pos, &msp_ltm_buff_pos, msp_message_buffer, serial_buffer,
                           &db_msp_ltm_port);
-        if (xQueueReceive(db_uart_write_queue, &db_uart_evt, 0) == pdTRUE) {
+        if (db_uart_write_queue != NULL && xQueueReceive(db_uart_write_queue, &db_uart_evt, 0) == pdTRUE) {
             write_to_uart(db_uart_evt.data, db_uart_evt.data_len);
             free(db_uart_evt.data);
         } else {
+            if (db_uart_write_queue == NULL) ESP_LOGE(TAG, "db_uart_write_queue is NULL!");
             // no new data available do nothing
         }
         if (delay_timer_cnt == 5000) {

@@ -102,6 +102,26 @@ void generate_pkcs5_key(const char* password, unsigned char* key, size_t keylen)
 }
 
 /**
+ * NOT USED for now!
+ * Adds a ESPNOW peer for an encrypted point to point connection. The other esp32 has to add this device as peer as well
+ * Call only after ESPNOW was inited.
+ * @param mac The peers MAC address
+ * @param lmk The local 16 byte master key for encrypting the point to point connection. LMKs must match on both ESP32 devices.
+ */
+void db_add_espnow_peer(uint8_t *mac, uint8_t *lmk){
+    esp_now_peer_info_t peer;
+    memset(&peer, 0, sizeof(esp_now_peer_info_t));
+    memcpy(peer.peer_addr, mac, ESP_NOW_ETH_ALEN);
+    memcpy(peer.lmk, lmk, ESP_NOW_KEY_LEN);
+    peer.encrypt = true;
+    if (!esp_now_is_peer_exist(mac)) {
+        ESP_ERROR_CHECK(esp_now_add_peer(&peer));
+    } else {
+        ESP_LOGW(TAG, "Peer already exists. Not adding to list");
+    }
+}
+
+/**
  * Encrypts and authenticates a DroneBridge for ESP32 ESP-NOW packet with its payload using AES-GCM 256
  * Beware we are using the same key for both communication directions.
  * Calls mbedtls_gcm_crypt_and_tag()
@@ -146,7 +166,7 @@ int db_encrypt_payload(db_esp_now_packet_t* db_esp_now_packet, uint8_t encrypt_p
  * @param len_encrypted_data length of the buffer (db_esp_now_packet_protected_data)
  * @return returns result of mbedtls_gcm_auth_decrypt e.g. 0 on success and valid data
  */
-int db_decrypt_payload(db_esp_now_packet_t* db_esp_now_packet, db_esp_now_packet_protected_data_t* decrypt_out_buffer,
+int db_decrypt_payload(db_esp_now_packet_t* db_esp_now_packet, uint8_t* decrypt_out_buffer,
                        uint8_t len_encrypted_data) {
     int ret_decrypt = mbedtls_gcm_auth_decrypt(
             &aes,
@@ -155,7 +175,7 @@ int db_decrypt_payload(db_esp_now_packet_t* db_esp_now_packet, db_esp_now_packet
             (uint8_t*) &db_esp_now_packet->db_esp_now_packet_header, size_packet_header,
             db_esp_now_packet->tag, DB_ESPNOW_AES_TAG_LEN,
             (uint8_t*) &db_esp_now_packet->db_esp_now_packet_protected_data,
-            (uint8_t*) decrypt_out_buffer
+            decrypt_out_buffer
     );
     switch (ret_decrypt) {
         case 0:
@@ -183,7 +203,7 @@ bool db_read_uart_queue_and_send() {
             .db_esp_now_packet_header.seq_num = 0,
             .db_esp_now_packet_header.packet_type = 0
     };   // make static so it is gets instanced only once
-    if (xQueueReceive(db_espnow_send_queue, &evt, 0) == pdTRUE) {
+    if (db_espnow_send_queue != NULL && xQueueReceive(db_espnow_send_queue, &evt, 0) == pdTRUE) {
         if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND) {
             db_esp_now_packet.db_esp_now_packet_header.origin = DB_ESPNOW_ORIGIN_GND;
         } else {
@@ -215,7 +235,12 @@ bool db_read_uart_queue_and_send() {
             return false;
         }
     } else {
-        // nothing to do - Queue is empty
+        if (db_espnow_send_queue == NULL) {
+            ESP_LOGE(TAG, "db_espnow_send_queue is NULL!");
+        } else {
+            // nothing to do - Queue is empty
+        }
+
     }
     return false;
 }
@@ -235,11 +260,10 @@ bool db_read_uart_queue_and_send() {
 void db_espnow_process_rcv_data(uint8_t *data, uint16_t data_len, uint8_t *src_addr) {
     db_esp_now_packet_t *db_esp_now_packet = (db_esp_now_packet_t *) data;
     static uint32_t last_seq_num = 0;
+    uint8_t len_payload = data_len - DB_ESPNOW_AES_TAG_LEN - size_packet_header;
+    uint8_t db_decrypted_data[len_payload];
 
-    static db_espnow_UART_event_t db_uart_evt;
-    db_uart_evt.data = malloc(DB_ESPNOW_PAYLOAD_MAXSIZE);
-    // cast from db_espnow_UART_event_t to db_esp_now_packet_protected_data_t possible because byte equal!
-    if (db_decrypt_payload(db_esp_now_packet, (db_esp_now_packet_protected_data_t *) &db_uart_evt, data_len) == 0) {
+    if (db_decrypt_payload(db_esp_now_packet, db_decrypted_data, len_payload) == 0) {
         if (last_seq_num < db_esp_now_packet->db_esp_now_packet_header.seq_num) {
             // all good and as expected
         } else {
@@ -247,7 +271,12 @@ void db_espnow_process_rcv_data(uint8_t *data, uint16_t data_len, uint8_t *src_a
             // accept packet anyway for now to make for a more robust link
         }
         last_seq_num = db_esp_now_packet->db_esp_now_packet_header.seq_num;
+
         // Pass data to UART queue
+        db_espnow_UART_event_t db_uart_evt;
+        db_uart_evt.data = malloc(len_payload - 1);
+        // For some reason it seems we cannot directly decrypt to db_espnow_UART_event_t -> Queues get set to NULL
+        memcpy(db_uart_evt.data, db_decrypted_data, len_payload - 1);
         if (xQueueSend(db_uart_write_queue, &db_uart_evt, ESPNOW_MAXDELAY) != pdTRUE) {
             ESP_LOGW(TAG, "Send to db_uart_write_queue failed");
             free(db_uart_evt.data);
@@ -329,7 +358,7 @@ static void db_esp_now_receive_callback(const esp_now_recv_info_t *recv_info, co
     }
     memcpy(recv_cb->data, data, len);
     recv_cb->data_len = len;
-    if (xQueueSend(db_espnow_send_recv_callback_queue, &evt, ESPNOW_MAXDELAY) != pdTRUE) {
+    if (db_espnow_send_recv_callback_queue != NULL && xQueueSend(db_espnow_send_recv_callback_queue, &evt, ESPNOW_MAXDELAY) != pdTRUE) {
         ESP_LOGW(TAG, "Send to receive queue fail");
         free(recv_cb->data);
     }
@@ -337,14 +366,14 @@ static void db_esp_now_receive_callback(const esp_now_recv_info_t *recv_info, co
 
 /**
  * Init mbedtls aes gcm mode and set encryption key based on the WiFi password specified by the user
+ * @param aes_key buffer for saving the generated aes key of len AES_256_KEY_BYTES
  * @return result of mbedtls_gcm_setkey
  */
-int init_gcm_encryption_module() {
+int init_gcm_encryption_module(uint8_t *aes_key) {
     mbedtls_gcm_init(&aes);
-    uint8_t aes_key[AES_256_KEY_BYTES];
     generate_pkcs5_key((const char*) DB_WIFI_PWD, aes_key, AES_256_KEY_BYTES);
     ESP_LOGI(TAG, "Derived AES Key:");
-    for (int i = 0; i < sizeof(aes_key); ++i) {
+    for (int i = 0; i < AES_256_KEY_BYTES; ++i) {
         printf("%02x", aes_key[i]);
     }
     printf("\n");
@@ -353,6 +382,7 @@ int init_gcm_encryption_module() {
 }
 
 void deinit_espnow_all(){
+    ESP_LOGW(TAG, "De init ESPNOW incl. Queues & AES");
     mbedtls_gcm_free(&aes);
     vSemaphoreDelete(db_espnow_send_recv_callback_queue);
     vSemaphoreDelete(db_espnow_send_queue); // ToDo: Check if that is a good idea since control task might be using it
@@ -396,20 +426,6 @@ esp_err_t db_espnow_init() {
     memcpy(peer.peer_addr, BROADCAST_MAC, 6);
     if (!esp_now_is_peer_exist(BROADCAST_MAC)) ESP_ERROR_CHECK(esp_now_add_peer(&peer));
 
-//    esp_now_peer_info_t *peer = malloc(sizeof(esp_now_peer_info_t));
-//    if (peer == NULL) {
-//        ESP_LOGE(TAG, "Malloc peer information fail");
-//        deinit_espnow_all();
-//        return ESP_FAIL;
-//    }
-//    memset(peer, 0, sizeof(esp_now_peer_info_t));
-//    peer->channel = DB_WIFI_CHANNEL;
-//    peer->ifidx = WIFI_IF_STA;
-//    peer->encrypt = false;
-//    memcpy(peer->peer_addr, BROADCAST_MAC, ESP_NOW_ETH_ALEN);
-//    ESP_ERROR_CHECK(esp_now_add_peer(peer));
-//    free(peer);
-
     /* Limit payload size to the max we can do */
     if (DB_TRANS_BUF_SIZE > DB_ESPNOW_PAYLOAD_MAXSIZE) {
         DB_TRANS_BUF_SIZE = DB_ESPNOW_PAYLOAD_MAXSIZE;
@@ -418,12 +434,15 @@ esp_err_t db_espnow_init() {
     }
 
     /* Init AES GCM encryption module */
-    int ret = init_gcm_encryption_module();
+    uint8_t aes_key[AES_256_KEY_BYTES];
+    int ret = init_gcm_encryption_module(aes_key);
     if (ret != 0) {
         ESP_LOGE(TAG, "mbedtls_gcm_setkey returned an error: %i", ret);
         deinit_espnow_all();
         return ESP_FAIL;
     }
+    ESP_ERROR_CHECK(esp_now_set_pmk(aes_key));  // only first 16 bytes will be used
+
     ESP_LOGI(TAG, "ESP-NOW for DroneBridge init done");
     return ESP_OK;
 }
@@ -445,7 +464,8 @@ _Noreturn void process_espnow_data() {
     bool ready_to_send = true; // initially true
     int delay_timer_cnt = 0;
     while(1) {
-        if(xQueueReceive(db_espnow_send_recv_callback_queue, &evt, 0) == pdTRUE) {
+        if (db_espnow_send_recv_callback_queue == NULL) ESP_LOGE(TAG, "db_espnow_send_recv_callback_queue is NULL!");
+        if(db_espnow_send_recv_callback_queue != NULL && xQueueReceive(db_espnow_send_recv_callback_queue, &evt, 0) == pdTRUE) {
             switch (evt.id) {
                 case DB_ESPNOW_SEND_CB: {
                     db_espnow_event_send_cb_t *send_cb = &evt.info.send_cb;
