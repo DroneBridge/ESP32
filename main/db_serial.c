@@ -86,8 +86,8 @@ void write_to_uart(const uint8_t data_buffer[], const unsigned int data_length) 
     int written = uart_write_bytes(UART_NUM, data_buffer, data_length);
     if (written > 0) {
         ESP_LOGD(TAG, "Wrote %i bytes to UART", written);
-    } else if (written == 0) {
-        ESP_LOGW(TAG, "Wrote 0 bytes to UART (%s) - Check if UART is connected.", esp_err_to_name(errno));
+    } else if (written != data_length) {
+        ESP_LOGW(TAG, "Wrote 0 of %i bytes to UART.", data_length);
     } else {
         ESP_LOGE(TAG, "Error writing to UART %s", esp_err_to_name(errno));
     }

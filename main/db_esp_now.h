@@ -67,7 +67,7 @@ typedef struct {
 typedef struct {
     uint8_t data_len;
     uint8_t *data;
-} __attribute__((__packed__)) db_espnow_UART_event_t;
+} __attribute__((__packed__)) db_espnow_uart_event_t;
 
 enum {
     DB_ESPNOW_ORIGIN_GND = 0,

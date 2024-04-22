@@ -102,7 +102,7 @@ void send_to_all_clients(int tcp_clients[], struct udp_conn_list_t *n_udp_conn_l
         send_to_all_tcp_clients(tcp_clients, data, data_length);
         send_to_all_udp_clients(n_udp_conn_list, data, data_length);
     } else {
-        db_espnow_UART_event_t evt;
+        db_espnow_uart_event_t evt;
         evt.data = malloc(data_length);
         memcpy(evt.data, data, data_length);
         evt.data_len = data_length;
@@ -272,16 +272,16 @@ _Noreturn void control_module_esp_now(){
     uint8_t msp_message_buffer[UART_BUF_SIZE];
     uint8_t serial_buffer[DB_TRANS_BUF_SIZE];
     msp_ltm_port_t db_msp_ltm_port;
-    db_espnow_UART_event_t db_uart_evt;
+    db_espnow_uart_event_t db_espnow_uart_evt;
     uint delay_timer_cnt = 0;
 
     ESP_LOGI(TAG, "Started control module (ESP-NOW)");
     while (1) {
         read_process_uart(NULL, &transparent_buff_pos, &msp_ltm_buff_pos, msp_message_buffer, serial_buffer,
                           &db_msp_ltm_port);
-        if (db_uart_write_queue != NULL && xQueueReceive(db_uart_write_queue, &db_uart_evt, 0) == pdTRUE) {
-            write_to_uart(db_uart_evt.data, db_uart_evt.data_len);
-            free(db_uart_evt.data);
+        if (db_uart_write_queue != NULL && xQueueReceive(db_uart_write_queue, &db_espnow_uart_evt, 0) == pdTRUE) {
+            write_to_uart(db_espnow_uart_evt.data, db_espnow_uart_evt.data_len);
+            free(db_espnow_uart_evt.data);
         } else {
             if (db_uart_write_queue == NULL) ESP_LOGE(TAG, "db_uart_write_queue is NULL!");
             // no new data available do nothing
