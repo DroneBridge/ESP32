@@ -45,6 +45,7 @@ extern int DB_UART_BAUD_RATE;
 extern uint16_t DB_TRANS_BUF_SIZE;
 extern uint8_t DB_LTM_FRAME_NUM_BUFFER;    // Number of LTM frames per UDP packet (min = 1; max = 5)
 extern int station_rssi;                   // updated when ESP32 is in station mode and connected to an access point
+extern uint8_t LOCAL_MAC_ADDRESS[6];        // filled with the mac address during init of Wifi interface
 
 extern uint32_t uart_byte_count;                // Total bytes read from UART
 extern int8_t num_connected_tcp_clients;

@@ -79,6 +79,7 @@ int32_t DB_UART_BAUD_RATE = 57600;
 uint16_t DB_TRANS_BUF_SIZE = 64;
 uint8_t DB_LTM_FRAME_NUM_BUFFER = 2;
 int station_rssi = 0;
+uint8_t LOCAL_MAC_ADDRESS[6];
 
 struct udp_conn_list_t *udp_conn_list;
 
@@ -275,6 +276,7 @@ void init_wifi_apmode(int wifi_mode) {
 
     ESP_ERROR_CHECK(esp_netif_set_hostname(esp_default_netif, "DBESP32"));
     strncpy(CURRENT_CLIENT_IP, DEFAULT_AP_IP, sizeof(CURRENT_CLIENT_IP));
+    ESP_ERROR_CHECK(esp_read_mac(LOCAL_MAC_ADDRESS, ESP_MAC_WIFI_SOFTAP));
 }
 
 /**
@@ -342,6 +344,7 @@ int init_wifi_clientmode() {
         return -1;
     }
     ESP_LOGI(TAG, "WiFi client mode enabled and connected!");
+    ESP_ERROR_CHECK(esp_read_mac(LOCAL_MAC_ADDRESS, ESP_MAC_WIFI_STA));
     return 0;
 }
 
@@ -364,6 +367,7 @@ void init_wifi_espnow() {
     ESP_ERROR_CHECK(esp_wifi_set_channel(DB_WIFI_CHANNEL, WIFI_SECOND_CHAN_NONE));
     ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B|WIFI_PROTOCOL_LR) );
     ESP_LOGI(TAG, "Enabled ESP-NOW WiFi Mode! LR Mode is set. This device will be invisible to non-ESP32 devices!");
+    ESP_ERROR_CHECK(esp_read_mac(LOCAL_MAC_ADDRESS, ESP_MAC_WIFI_STA));
 }
 
 /**

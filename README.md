@@ -144,6 +144,18 @@ to
 http://dronebridge.local/api/settings/change
 ```
 
+**Manually add a UDP connection target:** Send a valid JSON
+```json
+{
+  "ip": "XXX.XXX.XXX.XXX",
+  "port": 452
+}
+```
+to
+```http request
+http://dronebridge.local/api/system/addudp
+```
+
  ### Testing
  To test the frontend without the ESP32 run 
 

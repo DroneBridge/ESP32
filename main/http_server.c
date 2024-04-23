@@ -225,12 +225,12 @@ static esp_err_t settings_change_post_handler(httpd_req_t *req) {
 }
 
 /**
- * Process incoming UDP connection add request. Only one IPv4 connection can be added
+ * Process incoming UDP connection add request. Only one IPv4 connection can be added at a time
  * Expecting JSON in the form of:
  * {
  *   "ip": "XXX.XXX.XXX.XXX",
  *   "port": 452
- *   }
+ * }
  * @param req
  * @return
  */
@@ -261,7 +261,8 @@ static esp_err_t udp_conn_add_post_handler(httpd_req_t *req) {
     int new_udp_port = 0;
     char new_ip[IP4ADDR_STRLEN_MAX];
     cJSON *json = cJSON_GetObjectItem(root, "ip");
-    if (json) strncpy(new_ip, json->valuestring, IP4ADDR_STRLEN_MAX);
+    if (json) strncpy(new_ip, json->valuestring, sizeof(new_ip));
+    new_ip[IP4ADDR_STRLEN_MAX-1] = '\0';    // to remove warning and to be sure
     json = cJSON_GetObjectItem(root, "port");
     if (json) new_udp_port = json->valueint;
 
@@ -270,11 +271,11 @@ static esp_err_t udp_conn_add_post_handler(httpd_req_t *req) {
     memset(&new_sockaddr, 0, sizeof(new_sockaddr));
     new_sockaddr.sin_family = AF_INET;
     inet_pton(AF_INET, new_ip, &new_sockaddr.sin_addr);
+    new_sockaddr.sin_port = htons(new_udp_port);
     struct db_udp_client_t new_udp_client = {
             .udp_client = new_sockaddr,
             .mac = {0, 0, 0, 0, 0, 0}   // dummy MAC
     };
-    new_sockaddr.sin_port = htons(new_udp_port);
     // udp_conn_list is initialized as the very first thing during startup - we expect it to be there
     bool success = add_to_known_udp_clients(udp_conn_list, new_udp_client);
 
@@ -309,6 +310,10 @@ static esp_err_t system_info_get_handler(httpd_req_t *req) {
     cJSON_AddNumberToObject(root, "db_build_version", BUILDVERSION);
     cJSON_AddNumberToObject(root, "major_version", MAJOR_VERSION);
     cJSON_AddNumberToObject(root, "minor_version", MINOR_VERSION);
+    char mac_str[18];
+    sprintf(mac_str, "%02X:%02X:%02X:%02X:%02X:%02X",
+            LOCAL_MAC_ADDRESS[0], LOCAL_MAC_ADDRESS[1], LOCAL_MAC_ADDRESS[2], LOCAL_MAC_ADDRESS[3], LOCAL_MAC_ADDRESS[4], LOCAL_MAC_ADDRESS[5]);
+    cJSON_AddStringToObject(root, "mac", mac_str);
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
     free((void *) sys_info);
