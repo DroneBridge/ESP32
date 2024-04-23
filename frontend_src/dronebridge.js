@@ -146,17 +146,17 @@ function get_stats() {
 		}
 
 		let tcp_clients = parseInt(json_data["tcp_connected"])
-		if (!isNaN(tcp_clients) && tcp_clients > 1) {
-			document.getElementById("tcp_connected").innerHTML = tcp_clients + " clients"
-		} else if (!isNaN(tcp_clients)) {
+		if (!isNaN(tcp_clients) && tcp_clients === 1) {
 			document.getElementById("tcp_connected").innerHTML = tcp_clients + " client"
+		} else if (!isNaN(tcp_clients)) {
+			document.getElementById("tcp_connected").innerHTML = tcp_clients + " clients"
 		}
 
 		let udp_clients = parseInt(json_data["udp_connected"])
-		if (!isNaN(udp_clients) && udp_clients > 1) {
-			document.getElementById("udp_connected").innerHTML = udp_clients + " clients"
-		} else if (!isNaN(udp_clients)) {
+		if (!isNaN(udp_clients) && udp_clients === 1) {
 			document.getElementById("udp_connected").innerHTML = udp_clients + " client"
+		} else if (!isNaN(udp_clients)) {
+			document.getElementById("udp_connected").innerHTML = udp_clients + " clients"
 		}
 
 		let rssi = parseInt(json_data["rssi"])
@@ -194,6 +194,28 @@ function get_settings() {
 	change_ap_ip_visibility();
 	change_msp_ltm_visibility();
 	return 0;
+}
+
+function add_new_udp_client() {
+	var ip = prompt("Please enter the IP address of the UDP receiver", "192.168.2.X");
+	var port = parseInt(prompt("Please enter the port number of the UDP receiver", "14550"));
+	const ippattern = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+
+	if (ip != null && port != null && ippattern.test(ip)) {
+		let myjson = {
+			ip: ip,
+			port: port
+		};
+		send_json("api/system/addudp", JSON.stringify(myjson)).then(send_response => {
+			console.log(send_response);
+			conn_status = 1
+			show_toast(send_response["msg"])
+		}).catch(error => {
+			show_toast(error.message);
+		});
+	} else {
+		show_toast("Error: Enter valid IP and port!")
+	}
 }
 
 function show_toast(msg) {
