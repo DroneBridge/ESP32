@@ -66,7 +66,12 @@ int open_udp_socket() {
         ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
         return -1;
     }
-    int err = bind(udp_socket, (struct sockaddr *) &server_addr, sizeof(server_addr));
+    int broadcastEnable=1;
+    int err = setsockopt(udp_socket, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
+    if (err < 0) {
+        ESP_LOGE(TAG, "Socket unable to set socket to accept broadcast messages: errno %d", errno);
+    }
+    err = bind(udp_socket, (struct sockaddr *) &server_addr, sizeof(server_addr));
     if (err < 0) {
         ESP_LOGE(TAG, "Socket unable to bind: errno %d", errno);
     }
