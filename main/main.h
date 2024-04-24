@@ -21,6 +21,8 @@
 #ifndef DB_ESP32_MAIN_H
 #define DB_ESP32_MAIN_H
 
+
+
 enum E_DB_WIFI_MODE {
     DB_WIFI_MODE_AP = 1,            // Wi-Fi access point mode with Wi-Fi B mode enabled
     DB_WIFI_MODE_STA = 2,           // Wi-Fi client mode with Wi-Fi B and LR mode enabled

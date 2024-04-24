@@ -182,7 +182,9 @@ function get_settings() {
 		for (const key in json_data) {
 			if (json_data.hasOwnProperty(key)) {
 				let elem = document.getElementById(key)
-				elem.value = json_data[key] + ""
+				if (elem != null) {
+					elem.value = json_data[key] + ""
+				}
 			}
 		}
 	}).catch(error => {

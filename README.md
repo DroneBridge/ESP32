@@ -15,7 +15,8 @@ DroneBridge for ESP32 is a telemetry/low data rate only solution. There is no su
 -   Bi-directional transparent serial to WiFi & ESP-NOW link
 -   Support for MAVLink, MSP, LTM or any other payload
 -   Affordable: ~7€
--   Up to 150m range using WiFi & (coming up!) up to 1km of range using ESP-NOW (sender & receiver must be ESP32 with LR-Mode enabled [(ESP32 C2 is not supported)](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#lr-compatibility))
+-   Up to 150m range using WiFi
+-   Up to 1km of range using ESP-NOW or Wi-Fi LR Mode (sender & receiver must be ESP32 with LR-Mode enabled [(ESP32 C2 is not supported)](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#lr-compatibility))
 -   Weight: <10 g
 -   Supported by: QGroundControl, DroneBridge for Android (app), mwptools, impload etc.
 -   Easy to set up: Power connection + UART connection to flight controller
@@ -102,27 +103,28 @@ The webinterface communicates with a REST:API on the ESP32. You can use that API
 via the web-interface (e.g. baud rate). It also allows you to easily integrate DroneBridge for ESP32.
 
 
-**To request the settings**
+#### Request settings
 ```http request
 http://dronebridge.local/api/settings/request
 ```
 
-**To request stats**
+#### Request stats
 ```http request
 http://dronebridge.local/api/system/stats
 ```
 
-**To request IP and port of active UDP connections**
+#### Request IP and port of active UDP connections**
 ```http request
 http://dronebridge.local/api/system/conns
 ```
 
-**Trigger a reboot**
+#### Trigger a reboot
 ```http request
 http://dronebridge.local/api/system/reboot
 ```
 
-**Trigger a settings change:** Send a valid JSON
+#### Trigger a general settings change:
+Send a valid JSON
 ```json
 {
   "esp32_mode": 1,
@@ -144,7 +146,8 @@ to
 http://dronebridge.local/api/settings/change
 ```
 
-**Manually add a UDP connection target:** Send a valid JSON
+#### Manually add a UDP connection target:
+Send a valid JSON
 ```json
 {
   "ip": "XXX.XXX.XXX.XXX",
@@ -153,7 +156,21 @@ http://dronebridge.local/api/settings/change
 ```
 to
 ```http request
-http://dronebridge.local/api/system/addudp
+http://dronebridge.local/api/settings/addudp
+```
+
+#### Assign a static IP to the ESP32 when in WiFi client mode:
+Send a valid JSON to set static IP, send the same JSON but with empty strings (``"client_ip": ""``) to remove static IP setting
+```json
+ {
+  "client_ip": "XXX.XXX.XXX.XXX",
+  "netmask": "XXX.XXX.XXX.XXX",
+  "gw_ip": "XXX.XXX.XXX.XXX"
+ }
+```
+to
+```http request
+http://dronebridge.local/api/settings/setstaticip
 ```
 
  ### Testing

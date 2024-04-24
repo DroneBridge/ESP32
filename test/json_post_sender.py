@@ -19,19 +19,59 @@
 
 import requests
 
-# Define the URL and the data payload
-url = "http://192.168.10.56/api/system/addudp"
-data = {
-    "ip": "192.168.10.53",
-    "port": 456
-}
 
-# Send the POST request
-response = requests.post(url, json=data)
+def add_custom_up():
+    url = "http://dronebridge.local/api/settings/addudp"
+    data = {
+        "ip": "192.168.10.53",
+        "port": 456
+    }
+    # Send the POST request
+    response = requests.post(url, json=data)
 
-# Check if the request was successful
-if response.status_code == 200:
-    print("Request successful.")
-else:
-    print(f"Request failed with status code: {response.status_code}")
-print(response.content.decode())
+    # Check if the request was successful
+    if response.status_code == 200:
+        print("Request successful.")
+    else:
+        print(f"Request failed with status code: {response.status_code}")
+    print(response.content.decode())
+
+
+def add_static_ip():
+    url = "http://dronebridge.local/api/settings/setstaticip"
+    data = {
+        "client_ip": "192.168.10.88",
+        "netmask": "255.255.255.0",
+        "gw_ip": "192.198.10.1"
+    }
+    # Send the POST request
+    response = requests.post(url, json=data)
+
+    # Check if the request was successful
+    if response.status_code == 200:
+        print("Request successful.")
+    else:
+        print(f"Request failed with status code: {response.status_code}")
+    print(response.content.decode())
+
+
+def reset_static_ip():
+    url = "http://dronebridge.local/api/settings/setstaticip"
+    data = {
+        "client_ip": "",
+        "netmask": "",
+        "gw_ip": ""
+    }
+    # Send the POST request
+    response = requests.post(url, json=data)
+
+    # Check if the request was successful
+    if response.status_code == 200:
+        print("Request successful.")
+    else:
+        print(f"Request failed with status code: {response.status_code}")
+    print(response.content.decode())
+
+
+add_custom_up()
+add_static_ip()
