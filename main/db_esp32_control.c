@@ -26,6 +26,8 @@
 #include <lwip/inet.h>
 #include <esp_timer.h>
 #include <esp_wifi.h>
+#include <stdint-gcc.h>
+#include <sys/types.h>
 #include "esp_log.h"
 #include "lwip/sockets.h"
 #include "driver/uart.h"
@@ -80,7 +82,7 @@ int open_udp_socket() {
     return udp_socket;
 }
 
-void send_to_all_udp_clients(struct udp_conn_list_t *n_udp_conn_list, const uint8_t *data, uint data_length) {
+void send_to_all_udp_clients(udp_conn_list_t *n_udp_conn_list, const uint8_t *data, uint data_length) {
     for (int i = 0; i < n_udp_conn_list->size; i++) {  // send to all UDP clients
         resend:;
         int sent = sendto(n_udp_conn_list->udp_socket, data, data_length, 0,
@@ -102,7 +104,7 @@ void send_to_all_udp_clients(struct udp_conn_list_t *n_udp_conn_list, const uint
  * @param data payload to send
  * @param data_length Length of payload to send
  */
-void send_to_all_clients(int tcp_clients[], struct udp_conn_list_t *n_udp_conn_list, uint8_t data[], uint data_length) {
+void send_to_all_clients(int tcp_clients[], udp_conn_list_t *n_udp_conn_list, uint8_t data[], uint data_length) {
     if (DB_WIFI_MODE != DB_WIFI_MODE_ESPNOW_AIR && DB_WIFI_MODE != DB_WIFI_MODE_ESPNOW_GND) {
         send_to_all_tcp_clients(tcp_clients, data, data_length);
         send_to_all_udp_clients(n_udp_conn_list, data, data_length);
@@ -150,8 +152,8 @@ void handle_tcp_master(const int tcp_master_socket, int tcp_clients[]) {
  *  Init/Create structure containing all UDP connection information
  * @return Structure containing all UDP connection information
  */
-struct udp_conn_list_t *udp_client_list_create() {
-    struct udp_conn_list_t *n_udp_conn_list = malloc(sizeof(struct udp_conn_list_t)); // Allocate memory for the list
+udp_conn_list_t *udp_client_list_create() {
+    udp_conn_list_t *n_udp_conn_list = malloc(sizeof(udp_conn_list_t)); // Allocate memory for the list
     if (n_udp_conn_list == NULL) { // Check if the allocation failed
         return NULL; // Return NULL to indicate an error
     }
@@ -163,7 +165,7 @@ struct udp_conn_list_t *udp_client_list_create() {
  *  Destroy structure containing all UDP connection information
  * @param n_udp_conn_list Structure containing all UDP connection information
  */
-void udp_client_list_destroy(struct udp_conn_list_t *n_udp_conn_list) {
+void udp_client_list_destroy(udp_conn_list_t *n_udp_conn_list) {
     if (n_udp_conn_list == NULL) { // Check if the list is NULL
         return; // Do nothing
     }
@@ -181,14 +183,14 @@ void udp_client_list_destroy(struct udp_conn_list_t *n_udp_conn_list) {
  *                          device cannot be removed later on.
  * @return 1 if added - 0 if not
  */
-bool add_to_known_udp_clients(struct udp_conn_list_t *n_udp_conn_list, struct db_udp_client_t new_db_udp_client) {
+bool add_to_known_udp_clients(udp_conn_list_t *n_udp_conn_list, struct db_udp_client_t new_db_udp_client) {
     if (n_udp_conn_list == NULL) { // Check if the list is NULL
         return false; // Do nothing
     }
     if (n_udp_conn_list->size == MAX_UDP_CLIENTS) { // Check if the list is full
         return false; // Do nothing
     }
-    for (int i = 0; i < udp_conn_list->size; i++) {
+    for (int i = 0; i < n_udp_conn_list->size; i++) {
         if ((n_udp_conn_list->db_udp_clients[i].udp_client.sin_port == new_db_udp_client.udp_client.sin_port) &&
             (n_udp_conn_list->db_udp_clients[i].udp_client.sin_addr.s_addr ==
              new_db_udp_client.udp_client.sin_addr.s_addr)) {
@@ -209,7 +211,7 @@ bool add_to_known_udp_clients(struct udp_conn_list_t *n_udp_conn_list, struct db
  * @param new_db_udp_client The UDP client to remove based on its MAC address
  * @return true if removed - false if nothing was removed
  */
-bool remove_from_known_udp_clients(struct udp_conn_list_t *n_udp_conn_list, struct db_udp_client_t new_db_udp_client) {
+bool remove_from_known_udp_clients(udp_conn_list_t *n_udp_conn_list, struct db_udp_client_t new_db_udp_client) {
     if (n_udp_conn_list == NULL) { // Check if the list is NULL
         return false; // Do nothing
     }
@@ -247,13 +249,15 @@ void read_process_uart(int *tcp_clients, uint *transparent_buff_pos, uint *msp_l
     switch (DB_SERIAL_PROTOCOL) {
         case 1:
         case 2:
-            parse_msp_ltm(tcp_clients, udp_conn_list, msp_message_buffer, msp_ltm_buff_pos, db_msp_ltm_port);
+            db_parse_msp_ltm(tcp_clients, udp_conn_list, msp_message_buffer, msp_ltm_buff_pos, db_msp_ltm_port);
             break;
-        default:
         case 3:
         case 4:
+            db_parse_mavlink(tcp_clients, udp_conn_list, serial_buffer, transparent_buff_pos);
+            break;
         case 5:
-            parse_transparent(tcp_clients, udp_conn_list, serial_buffer, transparent_buff_pos);
+        default:
+            db_parse_transparent(tcp_clients, udp_conn_list, serial_buffer, transparent_buff_pos);
             break;
     }
 }

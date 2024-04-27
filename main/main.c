@@ -56,7 +56,7 @@ char DB_STATIC_STA_IP_GW[IP4ADDR_STRLEN_MAX] = "";
 char DB_STATIC_STA_IP_NETMASK[IP4ADDR_STRLEN_MAX] = "";
 char CURRENT_CLIENT_IP[IP4ADDR_STRLEN_MAX] = "192.168.2.1";
 uint8_t DB_WIFI_CHANNEL = 6;
-uint8_t DB_SERIAL_PROTOCOL = 4;  // 1=MSP, 4=MAVLink/transparent
+uint8_t DB_SERIAL_PROTOCOL = 4;  // 1=MSP, 4=MAVLink, 5=Transparent
 
 // initially set pins to 0 to allow the start of the system on all boards. User has to set the correct pins
 uint8_t DB_UART_PIN_TX = GPIO_NUM_0;
@@ -84,7 +84,7 @@ uint8_t DB_LTM_FRAME_NUM_BUFFER = 2;
 int station_rssi = 0;
 uint8_t LOCAL_MAC_ADDRESS[6];
 
-struct udp_conn_list_t *udp_conn_list;
+udp_conn_list_t *udp_conn_list;
 
 // Wifi client mode vars
 int WIFI_ESP_MAXIMUM_RETRY = 25;          // max number of retries to connect to the ap before enabling temp. ap mode

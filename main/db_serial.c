@@ -17,13 +17,6 @@
  *
  */
 
-#include "main.h"
-#include "db_esp32_control.h"
-#include "tcp_server.h"
-#include "db_protocol.h"
-#include "msp_ltm_serial.h"
-#include "globals.h"
-#include "driver/uart.h"
 #include "lwip/sockets.h"
 #include "esp_log.h"
 #include <esp_wifi.h>
@@ -35,7 +28,16 @@
 #include <sys/param.h>
 #include <sys/fcntl.h>
 #include <sys/cdefs.h>
+#include <stdint-gcc.h>
+#include <c_library_v2/common/mavlink.h>
 #include "db_serial.h"
+#include "main.h"
+#include "db_esp32_control.h"
+#include "tcp_server.h"
+#include "db_protocol.h"
+#include "msp_ltm_serial.h"
+#include "globals.h"
+#include "driver/uart.h"
 
 #define TAG "DB_SERIAL"
 
@@ -97,9 +99,9 @@ void write_to_uart(const uint8_t data_buffer[], const unsigned int data_length) 
 /**
  * @brief Parses & sends complete MSP & LTM messages
  */
-void parse_msp_ltm(int tcp_clients[], struct udp_conn_list_t *udp_connection, uint8_t msp_message_buffer[],
-                   unsigned int *serial_read_bytes,
-                   msp_ltm_port_t *db_msp_ltm_port) {
+void db_parse_msp_ltm(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_t msp_message_buffer[],
+                      unsigned int *serial_read_bytes,
+                      msp_ltm_port_t *db_msp_ltm_port) {
     uint8_t serial_bytes[TRANS_RD_BYTES_NUM];
     unsigned int read;
     if ((read = uart_read_bytes(UART_NUM, serial_bytes, TRANS_RD_BYTES_NUM, 0)) > 0) {
@@ -133,17 +135,93 @@ void parse_msp_ltm(int tcp_clients[], struct udp_conn_list_t *udp_connection, ui
     }
 }
 
+void send_heartbeat(){
+    mavlink_message_t msg;
+    uint8_t buf[MAVLINK_MAX_PACKET_LEN];
+
+    // Initialize the required buffers
+    mavlink_system_t mavlink_system = {
+            1,    // System ID (1-255)
+            1     // Component ID (a MAV_COMPONENT value)
+    };
+
+    // Pack the message
+    mavlink_msg_heartbeat_pack(
+            mavlink_system.sysid, MAV_COMP_ID_TELEMETRY_RADIO, &msg,
+            MAV_TYPE_ENUM_END,       // Type of the vehicle
+            MAV_AUTOPILOT_INVALID,    // Autopilot type
+            MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,    // System mode
+            DB_WIFI_MODE,                        // Custom mode
+            MAV_STATE_ACTIVE          // System state
+    );
+
+    // Copy the message to the send buffer
+    uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+}
+
+/**
+ * Parses MAVLink messages and sends them via the radio link.
+ * This function reads data from UART, parses it for complete MAVLink messages, and sends those messages in a buffer.
+ * It ensures that only complete messages are sent and that the buffer does not exceed TRANS_BUFF_SIZE
+ *
+ * @param tcp_clients Array of connected TCP clients
+ * @param up_conns Structure containing all UDP connection data including the sockets
+ * @param serial_buffer Buffer that gets filled with data and then sent via radio
+ * @param serial_buff_pos Number of bytes already read for the current packet
+ */
+void db_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *serial_buffer, unsigned int *serial_buff_pos) {
+    uint8_t temp_buffer[DB_TRANS_BUF_SIZE];
+    mavlink_message_t msg;
+    mavlink_status_t status = {0};
+    mavlink_status_t* chan_state = mavlink_get_channel_status(MAVLINK_COMM_0);
+
+    // Read bytes from UART
+    int bytes_read = uart_read_bytes(UART_NUM, temp_buffer, DB_TRANS_BUF_SIZE, 0);
+
+    // Parse each byte received
+    for (int i = 0; i < bytes_read; ++i) {
+        if (mavlink_parse_char(MAVLINK_COMM_0, temp_buffer[i], &msg, &status)) {
+            // Check if we received a complete message
+            if (status.msg_received == MAVLINK_FRAMING_OK) {
+                // Calculate the space needed for the new message
+                size_t message_length = mavlink_msg_to_send_buffer(serial_buffer + *serial_buff_pos, &msg);
+
+                // Check if the new message will fit in the buffer
+                if (*serial_buff_pos + message_length > DB_TRANS_BUF_SIZE) {
+                    // Send the buffer if the new message won't fit
+                    send_to_all_clients(tcp_clients, udp_conns, serial_buffer, *serial_buff_pos);
+                    *serial_buff_pos = 0; // Reset buffer after sending
+                }
+
+                // Add the new message to the buffer
+                *serial_buff_pos += message_length;
+
+                // check if we received version 2 and request a switch.
+                if (!(mavlink_get_channel_status(MAVLINK_COMM_0)->flags & MAVLINK_STATUS_FLAG_IN_MAVLINK1)) {
+                    // this will only switch to proto version 2
+                    chan_state->flags &= ~(MAVLINK_STATUS_FLAG_OUT_MAVLINK1);
+                }
+            }
+        }
+    }
+
+    // Send any remaining complete messages in the buffer
+    if (*serial_buff_pos > 0) {
+        send_to_all_clients(tcp_clients, udp_conns, serial_buffer, *serial_buff_pos);
+    }
+}
+
 /**
  * Reads TRANS_RD_BYTES_NUM bytes from UART and checks if we already got enough bytes to send them out. Requires a
  * continuos stream of data.
  *
  * @param tcp_clients Array of connected TCP clients
  * @param udp_connection Structure containing all UDP connection data including the sockets
- * @param serial_buffer Buffer that gets filled with data and then sent via TCP and UDP
+ * @param serial_buffer Buffer that gets filled with data and then sent via radio
  * @param serial_read_bytes Number of bytes already read for the current packet
  */
-void parse_transparent(int tcp_clients[], struct udp_conn_list_t *udp_connection, uint8_t serial_buffer[],
-                       unsigned int *serial_read_bytes) {
+void db_parse_transparent(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_t serial_buffer[],
+                          unsigned int *serial_read_bytes) {
     uint16_t read;
     // read from UART directly into TCP & UDP send buffer
     if ((read = uart_read_bytes(UART_NUM, &serial_buffer[*serial_read_bytes], (DB_TRANS_BUF_SIZE - *serial_read_bytes), 0)) > 0) {

@@ -35,7 +35,7 @@ extern uint8_t DB_WIFI_PWD[64];
 extern char DEFAULT_AP_IP[IP4ADDR_STRLEN_MAX];
 extern char CURRENT_CLIENT_IP[IP4ADDR_STRLEN_MAX];  // IP address of the ESP32 when we are in client mode connected
 extern uint8_t DB_WIFI_CHANNEL;
-extern uint8_t DB_SERIAL_PROTOCOL;  // 1=MSP, 3=MAVLink/transparent
+extern uint8_t DB_SERIAL_PROTOCOL;  // 1=MSP, 4=MAVLink, 5=Transparent
 extern uint8_t DB_UART_PIN_TX;      // set TX & RX pin to the same number to indicate vanilla system
 extern uint8_t DB_UART_PIN_RX;
 extern uint8_t DB_UART_PIN_RTS;
@@ -53,7 +53,7 @@ extern uint8_t LOCAL_MAC_ADDRESS[6];        // filled with the mac address durin
 
 extern uint32_t uart_byte_count;                // Total bytes read from UART
 extern int8_t num_connected_tcp_clients;
-extern struct udp_conn_list_t *udp_conn_list;   // List of UDP clients that the ESP32 will send to
+extern udp_conn_list_t *udp_conn_list;   // List of UDP clients that the ESP32 will send to
 
 extern int WIFI_ESP_MAXIMUM_RETRY;
 

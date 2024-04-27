@@ -1,5 +1,6 @@
 ## IDF Component Manager Manifest File
 dependencies:
+  espressif/mavlink: "^1.0.0~1"
   espressif/button: "^3.2.0"
   espressif/esp-now: "^2.5.1"
   espressif/mdns: "^1.2.2"
