@@ -246,6 +246,7 @@ bool remove_from_known_udp_clients(udp_conn_list_t *n_udp_conn_list, struct db_u
  */
 void read_process_uart(int *tcp_clients, uint *transparent_buff_pos, uint *msp_ltm_buff_pos, uint8_t *msp_message_buffer,
                        uint8_t *serial_buffer, msp_ltm_port_t *db_msp_ltm_port) {
+    // ToDo: When to ESP32 for DroneBridge are used as sender and receiver - only one should be parsing the protocol
     switch (DB_SERIAL_PROTOCOL) {
         case 1:
         case 2:

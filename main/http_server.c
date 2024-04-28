@@ -198,11 +198,11 @@ static esp_err_t settings_change_post_handler(httpd_req_t *req) {
     if (json) DB_UART_BAUD_RATE = json->valueint;
 
     json = cJSON_GetObjectItem(root, "telem_proto");
-    if (json && (json->valueint == 1 || json->valueint == 4)) {
+    if (json && (json->valueint == 1 || json->valueint == 4 || json->valueint == 5)) {
         DB_SERIAL_PROTOCOL = json->valueint;
     } else if (json) {
-        ESP_LOGW(REST_TAG, "telem_proto is not 1 (LTM/MSP) or 4 (MAVLink/Transparent). Changing to transparent");
-        DB_SERIAL_PROTOCOL = 4;
+        ESP_LOGW(REST_TAG, "telem_proto is not 1 (LTM/MSP) or 4 (MAVLink) or 5 (Transparent). Changing to transparent");
+        DB_SERIAL_PROTOCOL = 5;
     }
 
     json = cJSON_GetObjectItem(root, "ltm_pp");

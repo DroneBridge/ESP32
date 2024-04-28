@@ -135,19 +135,11 @@ void db_parse_msp_ltm(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_
     }
 }
 
-void send_heartbeat(){
+void create_mav_heartbeat(uint8_t mav_system_id, uint8_t buf[MAVLINK_MAX_PACKET_LEN], uint16_t *len){
     mavlink_message_t msg;
-    uint8_t buf[MAVLINK_MAX_PACKET_LEN];
-
-    // Initialize the required buffers
-    mavlink_system_t mavlink_system = {
-            1,    // System ID (1-255)
-            1     // Component ID (a MAV_COMPONENT value)
-    };
-
     // Pack the message
     mavlink_msg_heartbeat_pack(
-            mavlink_system.sysid, MAV_COMP_ID_TELEMETRY_RADIO, &msg,
+            mav_system_id, MAV_COMP_ID_TELEMETRY_RADIO, &msg,
             MAV_TYPE_ENUM_END,       // Type of the vehicle
             MAV_AUTOPILOT_INVALID,    // Autopilot type
             MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,    // System mode
@@ -156,7 +148,7 @@ void send_heartbeat(){
     );
 
     // Copy the message to the send buffer
-    uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+    *len = mavlink_msg_to_send_buffer(buf, &msg);
 }
 
 /**
@@ -170,6 +162,7 @@ void send_heartbeat(){
  * @param serial_buff_pos Number of bytes already read for the current packet
  */
 void db_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *serial_buffer, unsigned int *serial_buff_pos) {
+    static int counter = 0;
     uint8_t temp_buffer[DB_TRANS_BUF_SIZE];
     mavlink_message_t msg;
     mavlink_status_t status = {0};
@@ -177,30 +170,36 @@ void db_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *ser
 
     // Read bytes from UART
     int bytes_read = uart_read_bytes(UART_NUM, temp_buffer, DB_TRANS_BUF_SIZE, 0);
-
+    uart_byte_count += bytes_read; // increase total bytes read via UART
     // Parse each byte received
     for (int i = 0; i < bytes_read; ++i) {
         if (mavlink_parse_char(MAVLINK_COMM_0, temp_buffer[i], &msg, &status)) {
-            // Check if we received a complete message
-            if (status.msg_received == MAVLINK_FRAMING_OK) {
-                // Calculate the space needed for the new message
-                size_t message_length = mavlink_msg_to_send_buffer(serial_buffer + *serial_buff_pos, &msg);
+            ESP_LOGI(TAG, "Parser detected a full message");
+            // Calculate the space needed for the new message
+            size_t message_length = mavlink_msg_to_send_buffer(serial_buffer + *serial_buff_pos, &msg);
 
-                // Check if the new message will fit in the buffer
-                if (*serial_buff_pos + message_length > DB_TRANS_BUF_SIZE) {
-                    // Send the buffer if the new message won't fit
-                    send_to_all_clients(tcp_clients, udp_conns, serial_buffer, *serial_buff_pos);
-                    *serial_buff_pos = 0; // Reset buffer after sending
+            // Check if the new message will fit in the buffer
+            if (*serial_buff_pos + message_length > DB_TRANS_BUF_SIZE) {
+                // Send the buffer if the new message won't fit
+                send_to_all_clients(tcp_clients, udp_conns, serial_buffer, *serial_buff_pos);
+                *serial_buff_pos = 0; // Reset buffer after sending
+                // send heartbeat every 10 mavlink messages via UDP
+                if (counter % 10) {
+                    counter = 0;
+                    uint8_t buf[MAVLINK_MAX_PACKET_LEN];
+                    uint16_t len = 0;
+                    create_mav_heartbeat(1,buf, &len);
+                    send_to_all_clients(tcp_clients, udp_conns, buf, len);
                 }
+            }
 
-                // Add the new message to the buffer
-                *serial_buff_pos += message_length;
+            // Add the new message to the buffer
+            *serial_buff_pos += message_length;
 
-                // check if we received version 2 and request a switch.
-                if (!(mavlink_get_channel_status(MAVLINK_COMM_0)->flags & MAVLINK_STATUS_FLAG_IN_MAVLINK1)) {
-                    // this will only switch to proto version 2
-                    chan_state->flags &= ~(MAVLINK_STATUS_FLAG_OUT_MAVLINK1);
-                }
+            // check if we received version 2 and request a switch.
+            if (!(mavlink_get_channel_status(MAVLINK_COMM_0)->flags & MAVLINK_STATUS_FLAG_IN_MAVLINK1)) {
+                // this will only switch to proto version 2
+                chan_state->flags &= ~(MAVLINK_STATUS_FLAG_OUT_MAVLINK1);
             }
         }
     }

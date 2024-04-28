@@ -208,7 +208,7 @@ function add_new_udp_client() {
 			ip: ip,
 			port: port
 		};
-		send_json("api/system/addudp", JSON.stringify(myjson)).then(send_response => {
+		send_json("api/settings/addudp", JSON.stringify(myjson)).then(send_response => {
 			console.log(send_response);
 			conn_status = 1
 			show_toast(send_response["msg"])

@@ -23,7 +23,7 @@ import requests
 def add_custom_up():
     url = "http://dronebridge.local/api/settings/addudp"
     data = {
-        "ip": "192.168.10.53",
+        "ip": "192.168.10.32",
         "port": 456
     }
     # Send the POST request
@@ -74,4 +74,5 @@ def reset_static_ip():
 
 
 add_custom_up()
-add_static_ip()
+#reset_static_ip()
+#add_static_ip()
