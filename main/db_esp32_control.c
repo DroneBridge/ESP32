@@ -254,7 +254,7 @@ void read_process_uart(int *tcp_clients, uint *transparent_buff_pos, uint *msp_l
             break;
         case 3:
         case 4:
-            db_parse_mavlink(tcp_clients, udp_conn_list, serial_buffer, transparent_buff_pos);
+            db_parse_mavlink(tcp_clients, udp_conn_list, msp_message_buffer, transparent_buff_pos);
             break;
         case 5:
         default:

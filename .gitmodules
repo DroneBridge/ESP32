@@ -1,0 +1,6 @@
+[submodule "main/mavlink"]
+	path = main/mavlink
+	url = https://github.com/mavlink/mavlink.git
+[submodule "main/fastmavlink"]
+	path = main/fastmavlink
+	url = https://github.com/olliw42/fastmavlink.git
