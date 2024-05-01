@@ -29,7 +29,6 @@
 #include <sys/fcntl.h>
 #include <sys/cdefs.h>
 #include <stdint-gcc.h>
-// #include <c_library_v2/common/mavlink.h>
 #include "mav_c_lib_v2/common/common.h"
 #include "mav_c_lib_v2/lib/fastmavlink_router.h"
 #include "db_serial.h"
@@ -42,8 +41,6 @@
 #include "driver/uart.h"
 
 #define TAG "DB_SERIAL"
-#define FASTMAVLINK_ROUTER_LINKS_MAX  4
-#define FASTMAVLINK_ROUTER_COMPONENTS_MAX  12
 
 uint32_t uart_byte_count = 0;
 uint8_t ltm_frame_buffer[MAX_LTM_FRAMES_IN_BUFFER * LTM_MAX_FRAME_SIZE];
@@ -144,22 +141,6 @@ void db_parse_msp_ltm(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_
     }
 }
 
-//void create_mav_heartbeat(uint8_t mav_system_id, uint8_t buf[MAVLINK_MAX_PACKET_LEN], uint16_t *len){
-//    mavlink_message_t msg;
-//    // Pack the message
-//    mavlink_msg_heartbeat_pack(
-//            mav_system_id, MAV_COMP_ID_TELEMETRY_RADIO, &msg,
-//            MAV_TYPE_ENUM_END,       // Type of the vehicle
-//            MAV_AUTOPILOT_INVALID,    // Autopilot type
-//            MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,    // System mode
-//            DB_WIFI_MODE,                        // Custom mode
-//            MAV_STATE_ACTIVE          // System state
-//    );
-//
-//    // Copy the message to the send buffer
-//    *len = mavlink_msg_to_send_buffer(buf, &msg);
-//}
-
 void handle_mavlink_message(fmav_message_t* new_msg) {
     switch (new_msg->msgid) {
         case FASTMAVLINK_MSG_ID_HEARTBEAT: {
@@ -168,12 +149,44 @@ void handle_mavlink_message(fmav_message_t* new_msg) {
             if (payload.autopilot == MAV_AUTOPILOT_INVALID && payload.type == MAV_TYPE_GCS) {
                 // ToDo: React to a HEARTBEAT received from a GCS
             } else if (payload.autopilot != MAV_AUTOPILOT_INVALID && new_msg->compid == MAV_COMP_ID_AUTOPILOT1) {
-                // ToDo: React to a HEARTBEAT received from an autopilot
+                // do not react to a HEARTBEAT received from an autopilot - Only a GCS may be interested in our infos
             } else {
                 // We do not react to any other heartbeat!
             }
         }
         break;
+    }
+}
+
+/**
+ * Based on the system architecture and configured wifi mode the ESP32 may have a different role and system id.
+ * Returns the best fitting component ID for the specific role.
+ * @return component ID for ESP32
+ */
+uint8_t db_get_mav_comp_id() {
+    if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND) {
+        return MAV_COMP_ID_TELEMETRY_RADIO;
+    } else if (DB_WIFI_MODE == DB_WIFI_MODE_AP) {
+        return MAV_COMP_ID_UDP_BRIDGE;
+    } else {
+        return MAV_COMP_ID_UART_BRIDGE;
+    }
+}
+
+/**
+ * Based on the system architecture and configured wifi mode the ESP32 may have a different role and system id.
+ * Returns the best fitting component ID for the specific role.
+ * @return system ID for ESP32
+ */
+uint8_t db_get_mav_sys_id() {
+    if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND) {
+        return 255;
+    } else if (DB_WIFI_MODE == DB_WIFI_MODE_AP) {
+        return 1;
+    } else if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_AIR) {
+        return 1;
+    } else {
+        return 255;
     }
 }
 
@@ -185,41 +198,50 @@ void handle_mavlink_message(fmav_message_t* new_msg) {
  *
  * @param tcp_clients Array of connected TCP clients
  * @param up_conns Structure containing all UDP connection data including the sockets
- * @param serial_buffer Buffer that gets filled with data and then sent via radio
+ * @param serial_buffer Buffer that gets filled with data and then sent via radio, shall be >x2 the max payload
  * @param serial_buff_pos Number of bytes already read for the current packet
  */
 void db_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *serial_buffer, unsigned int *serial_buff_pos) {
     static int counter = 0;
     uint8_t temp_buffer[DB_TRANS_BUF_SIZE];
-    static uint8_t rx_buf[296];
 
     // Read bytes from UART
     int bytes_read = uart_read_bytes(UART_NUM, temp_buffer, DB_TRANS_BUF_SIZE, 0);
     uart_byte_count += bytes_read; // increase total bytes read via UART
     // Parse each byte received
     for (int i = 0; i < bytes_read; ++i) {
-        fmav_result_t result;
-        uint8_t res;
+        fmav_result_t result = {0};
 
         if (fmav_parse_and_check_to_frame_buf(&result, &serial_buffer[*serial_buff_pos], &status, temp_buffer[i])) {
-            ESP_LOGI(TAG, "Parser detected a full message: buffer pos: %i, result.frame_len %i", *serial_buff_pos, result.frame_len);
-
+            ESP_LOGD(TAG, "Parser detected a full message (%i total): buffer pos: %i, result.frame_len %i", counter, *serial_buff_pos, result.frame_len);
+            counter++;
             // Check if the new message will fit in the buffer
-            if (*serial_buff_pos + result.frame_len > DB_TRANS_BUF_SIZE) {
+            if (*serial_buff_pos == 0 && result.frame_len > DB_TRANS_BUF_SIZE) {
+                // frame_len is bigger than DB_TRANS_BUF_SIZE -> Split into multiple messages since e.g. ESP-NOW can only handle 250 bytes which is less than MAVLink max msg length
+                uint16_t sent_bytes = 0;
+                uint16_t next_chuck_len = 0;
+                do {
+                    next_chuck_len = result.frame_len - sent_bytes;
+                    if (next_chuck_len > DB_TRANS_BUF_SIZE) {
+                        next_chuck_len = DB_TRANS_BUF_SIZE;
+                    } else {}
+                    ESP_LOGD(TAG, "Sending %i bytes to all clients (split big msg)", next_chuck_len);
+                    send_to_all_clients(tcp_clients, udp_conns, &serial_buffer[sent_bytes], next_chuck_len);
+                    sent_bytes += next_chuck_len;
+                } while (sent_bytes < result.frame_len);
+            } else if (*serial_buff_pos + result.frame_len > DB_TRANS_BUF_SIZE) {
                 // Send the buffer first if the new message won't fit
-                ESP_LOGI(TAG, "Sending %i bytes to all clients", *serial_buff_pos);
+                ESP_LOGD(TAG, "Sending %i bytes to all clients", *serial_buff_pos);
                 send_to_all_clients(tcp_clients, udp_conns, serial_buffer, *serial_buff_pos);
                 *serial_buff_pos = 0; // Reset buffer after sending
-            } else if (*serial_buff_pos == 0 && result.frame_len > DB_TRANS_BUF_SIZE) {
-                // ToDo: What if frame_len is bigger than DB_TRANS_BUF_SIZE? -> Send anyways but split into multiple messages since ESP-NOW can only handle 250 bytes which is less than MAVLink max msg length
             } else {
-                // ToDo: Check what to do. -> nothing?
+                // nothing to do here, just keep it in the buffer and wait for the next msg to add to the buffer
             }
 
             // Decode message and react to it if it was for us
             fmav_frame_buf_to_msg(&msg, &result, &serial_buffer[*serial_buff_pos]);
             if (result.res == FASTMAVLINK_PARSE_RESULT_OK) {
-                if (fmav_msg_is_for_me(my_sysid, my_compid, &msg)) {
+                if (fmav_msg_is_for_me(db_get_mav_sys_id(), db_get_mav_comp_id(), &msg)) {
                     handle_mavlink_message(&msg);
                 } else {
                     // message was not for us so ignore it
@@ -228,21 +250,18 @@ void db_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *ser
                 // message had a parsing error - we cannot decode it so skip
             }
 
-            // Add the new message to the buffer (msg is already inside buffer, but len pointer is not updated. Do it now)
-            *serial_buff_pos += result.frame_len;
+            if (*serial_buff_pos == 0 && result.frame_len > DB_TRANS_BUF_SIZE) {
+                // the buffer was already split and sent, so it is empty and ready for new messages
+            } else {
+                // Add the new message to the buffer (msg is already inside buffer, but len pointer is not updated. Do it now)
+                *serial_buff_pos += result.frame_len;
+            }
 
         } else {
             // do nothing since parser had a LENGTH_ERROR, CRC_ERROR or SIGNATURE_ERROR
         }
     }
-
-    // ToDo: Check if that code is necessary - we expect a continuous flow of data
-//    // Send any remaining complete messages in the buffer
-//    if (*serial_buff_pos > 0) {
-//        send_to_all_clients(tcp_clients, udp_conns, serial_buffer, *serial_buff_pos);
-//    } else {
-//        // ToDo
-//    }
+    // done parsing all received data via UART
 }
 
 
