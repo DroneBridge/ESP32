@@ -109,6 +109,7 @@ void send_to_all_clients(int tcp_clients[], udp_conn_list_t *n_udp_conn_list, ui
         send_to_all_tcp_clients(tcp_clients, data, data_length);
         send_to_all_udp_clients(n_udp_conn_list, data, data_length);
     } else {
+        // ESP-NOW mode
         db_espnow_uart_event_t evt;
         evt.data = malloc(data_length);
         memcpy(evt.data, data, data_length);

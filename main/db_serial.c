@@ -30,7 +30,6 @@
 #include <sys/cdefs.h>
 #include <stdint-gcc.h>
 #include "mav_c_lib_v2/common/common.h"
-#include "mav_c_lib_v2/lib/fastmavlink_router.h"
 #include "db_serial.h"
 #include "main.h"
 #include "db_esp32_control.h"
@@ -39,6 +38,10 @@
 #include "msp_ltm_serial.h"
 #include "globals.h"
 #include "driver/uart.h"
+
+#define FASTMAVLINK_ROUTER_LINKS_MAX  3
+#define FASTMAVLINK_ROUTER_COMPONENTS_MAX  5
+#include "mav_c_lib_v2/lib/fastmavlink_router.h"
 
 #define TAG "DB_SERIAL"
 
@@ -49,7 +52,7 @@ uint ltm_frames_in_buffer_pnt = 0;
 
 //mavlink_message_t mav_msg;
 //mavlink_status_t mav_status = {0};
-fmav_status_t status;
+fmav_status_t fmav_status;
 fmav_message_t msg;
 
 /**
@@ -202,19 +205,20 @@ uint8_t db_get_mav_sys_id() {
  * @param serial_buff_pos Number of bytes already read for the current packet
  */
 void db_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *serial_buffer, unsigned int *serial_buff_pos) {
-    static int counter = 0;
-    uint8_t temp_buffer[DB_TRANS_BUF_SIZE];
+    static int mav_msg_counter = 0;
+    static uint8_t mav_parser_rx_buf[296];  // at least 280 bytes which is the max len for a MAVLink v2 packet
+    uint8_t uart_read_buf[DB_TRANS_BUF_SIZE];
 
     // Read bytes from UART
-    int bytes_read = uart_read_bytes(UART_NUM, temp_buffer, DB_TRANS_BUF_SIZE, 0);
+    int bytes_read = uart_read_bytes(UART_NUM, uart_read_buf, DB_TRANS_BUF_SIZE, 0);
     uart_byte_count += bytes_read; // increase total bytes read via UART
     // Parse each byte received
     for (int i = 0; i < bytes_read; ++i) {
         fmav_result_t result = {0};
 
-        if (fmav_parse_and_check_to_frame_buf(&result, &serial_buffer[*serial_buff_pos], &status, temp_buffer[i])) {
-            ESP_LOGD(TAG, "Parser detected a full message (%i total): buffer pos: %i, result.frame_len %i", counter, *serial_buff_pos, result.frame_len);
-            counter++;
+        if (fmav_parse_and_check_to_frame_buf(&result, mav_parser_rx_buf, &fmav_status, uart_read_buf[i])) {
+            ESP_LOGD(TAG, "Parser detected a full message (%i total): result.frame_len %i", mav_msg_counter, result.frame_len);
+            mav_msg_counter++;
             // Check if the new message will fit in the buffer
             if (*serial_buff_pos == 0 && result.frame_len > DB_TRANS_BUF_SIZE) {
                 // frame_len is bigger than DB_TRANS_BUF_SIZE -> Split into multiple messages since e.g. ESP-NOW can only handle 250 bytes which is less than MAVLink max msg length
@@ -226,20 +230,19 @@ void db_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *ser
                         next_chuck_len = DB_TRANS_BUF_SIZE;
                     } else {}
                     ESP_LOGD(TAG, "Sending %i bytes to all clients (split big msg)", next_chuck_len);
-                    send_to_all_clients(tcp_clients, udp_conns, &serial_buffer[sent_bytes], next_chuck_len);
+                    send_to_all_clients(tcp_clients, udp_conns, &mav_parser_rx_buf[sent_bytes], next_chuck_len);
                     sent_bytes += next_chuck_len;
                 } while (sent_bytes < result.frame_len);
             } else if (*serial_buff_pos + result.frame_len > DB_TRANS_BUF_SIZE) {
-                // Send the buffer first if the new message won't fit
+                // New message won't fit into the buffer, send buffer first
                 ESP_LOGD(TAG, "Sending %i bytes to all clients", *serial_buff_pos);
                 send_to_all_clients(tcp_clients, udp_conns, serial_buffer, *serial_buff_pos);
-                *serial_buff_pos = 0; // Reset buffer after sending
             } else {
                 // nothing to do here, just keep it in the buffer and wait for the next msg to add to the buffer
             }
 
             // Decode message and react to it if it was for us
-            fmav_frame_buf_to_msg(&msg, &result, &serial_buffer[*serial_buff_pos]);
+            fmav_frame_buf_to_msg(&msg, &result, mav_parser_rx_buf);
             if (result.res == FASTMAVLINK_PARSE_RESULT_OK) {
                 if (fmav_msg_is_for_me(db_get_mav_sys_id(), db_get_mav_comp_id(), &msg)) {
                     handle_mavlink_message(&msg);
@@ -253,10 +256,10 @@ void db_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *ser
             if (*serial_buff_pos == 0 && result.frame_len > DB_TRANS_BUF_SIZE) {
                 // the buffer was already split and sent, so it is empty and ready for new messages
             } else {
-                // Add the new message to the buffer (msg is already inside buffer, but len pointer is not updated. Do it now)
+                // Add the new message to the buffer
+                memcpy(&serial_buffer[*serial_buff_pos], mav_parser_rx_buf, result.frame_len);
                 *serial_buff_pos += result.frame_len;
             }
-
         } else {
             // do nothing since parser had a LENGTH_ERROR, CRC_ERROR or SIGNATURE_ERROR
         }
