@@ -29,7 +29,7 @@
 #include <sys/fcntl.h>
 #include <sys/cdefs.h>
 #include <stdint-gcc.h>
-#include "mav_c_lib_v2/common/common.h"
+#include "common/common.h"
 #include "db_serial.h"
 #include "main.h"
 #include "db_esp32_control.h"
@@ -41,7 +41,7 @@
 
 #define FASTMAVLINK_ROUTER_LINKS_MAX  3
 #define FASTMAVLINK_ROUTER_COMPONENTS_MAX  5
-#include "mav_c_lib_v2/lib/fastmavlink_router.h"
+#include "lib/fastmavlink_router.h"
 
 #define TAG "DB_SERIAL"
 
@@ -50,8 +50,6 @@ uint8_t ltm_frame_buffer[MAX_LTM_FRAMES_IN_BUFFER * LTM_MAX_FRAME_SIZE];
 uint ltm_frames_in_buffer = 0;
 uint ltm_frames_in_buffer_pnt = 0;
 
-//mavlink_message_t mav_msg;
-//mavlink_status_t mav_status = {0};
 fmav_status_t fmav_status;
 fmav_message_t msg;
 
@@ -144,23 +142,6 @@ void db_parse_msp_ltm(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_
     }
 }
 
-void handle_mavlink_message(fmav_message_t* new_msg) {
-    switch (new_msg->msgid) {
-        case FASTMAVLINK_MSG_ID_HEARTBEAT: {
-            fmav_heartbeat_t payload;
-            fmav_msg_heartbeat_decode(&payload, new_msg);
-            if (payload.autopilot == MAV_AUTOPILOT_INVALID && payload.type == MAV_TYPE_GCS) {
-                // ToDo: React to a HEARTBEAT received from a GCS
-            } else if (payload.autopilot != MAV_AUTOPILOT_INVALID && new_msg->compid == MAV_COMP_ID_AUTOPILOT1) {
-                // do not react to a HEARTBEAT received from an autopilot - Only a GCS may be interested in our infos
-            } else {
-                // We do not react to any other heartbeat!
-            }
-        }
-        break;
-    }
-}
-
 /**
  * Based on the system architecture and configured wifi mode the ESP32 may have a different role and system id.
  * Returns the best fitting component ID for the specific role.
@@ -193,6 +174,36 @@ uint8_t db_get_mav_sys_id() {
     }
 }
 
+void handle_mavlink_message(fmav_message_t* new_msg) {
+    switch (new_msg->msgid) {
+        case FASTMAVLINK_MSG_ID_HEARTBEAT: {
+            fmav_heartbeat_t payload;
+            fmav_msg_heartbeat_decode(&payload, new_msg);
+            if (payload.autopilot == MAV_AUTOPILOT_INVALID && payload.type == MAV_TYPE_GCS) {
+                ESP_LOGI(TAG, "Got heartbeat from GCS (sysID: %i)", new_msg->sysid);
+            } else if (payload.autopilot != MAV_AUTOPILOT_INVALID && new_msg->compid == MAV_COMP_ID_AUTOPILOT1) {
+                ESP_LOGI(TAG, "Got heartbeat from flight controller (sysID: %i)", new_msg->sysid);
+                // This means we are connected to the FC since we only parse mavlink on UART and thus only see the
+                // device we are connected to via UART
+                uint8_t buff[296];
+//                payload.type = MAV_TYPE_ONBOARD_CONTROLLER;
+//                payload.autopilot = MAV_AUTOPILOT_INVALID;
+//                payload.base_mode = MAV_MODE_FLAG_CUSTOM_MODE_ENABLED;
+//                payload.custom_mode = DB_WIFI_MODE;
+//                payload.system_status = MAV_STATE_ACTIVE;
+//                uint16_t len = fmav_msg_heartbeat_encode_to_frame_buf(buff, 255, MAV_COMP_ID_TELEMETRY_RADIO, &payload, &fmav_status);
+                fmav_radio_status_t payload_r = {.fixed = 0, .noise = 0, .remnoise = 0, .remrssi=10, .rssi=5, .rxerrors=1, .txbuf=200};
+                uint16_t lenr = fmav_msg_radio_status_encode_to_frame_buf(buff, 255, MAV_COMP_ID_TELEMETRY_RADIO, &payload_r, &fmav_status);
+                int c[CONFIG_LWIP_MAX_ACTIVE_TCP] = {-1};
+                send_to_all_clients(c, udp_conn_list, buff, lenr);
+            } else {
+                // We do not react to any other heartbeat!
+            }
+        }
+        break;
+    }
+}
+
 /**
  * Parses MAVLink messages and sends them via the radio link.
  * This function reads data from UART, parses it for complete MAVLink messages, and sends those messages in a buffer.
@@ -205,7 +216,7 @@ uint8_t db_get_mav_sys_id() {
  * @param serial_buff_pos Number of bytes already read for the current packet
  */
 void db_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *serial_buffer, unsigned int *serial_buff_pos) {
-    static int mav_msg_counter = 0;
+    static uint mav_msg_counter = 0;
     static uint8_t mav_parser_rx_buf[296];  // at least 280 bytes which is the max len for a MAVLink v2 packet
     uint8_t uart_read_buf[DB_TRANS_BUF_SIZE];
 
@@ -229,16 +240,20 @@ void db_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *ser
                     if (next_chuck_len > DB_TRANS_BUF_SIZE) {
                         next_chuck_len = DB_TRANS_BUF_SIZE;
                     } else {}
-                    ESP_LOGD(TAG, "Sending %i bytes to all clients (split big msg)", next_chuck_len);
                     send_to_all_clients(tcp_clients, udp_conns, &mav_parser_rx_buf[sent_bytes], next_chuck_len);
                     sent_bytes += next_chuck_len;
                 } while (sent_bytes < result.frame_len);
             } else if (*serial_buff_pos + result.frame_len > DB_TRANS_BUF_SIZE) {
                 // New message won't fit into the buffer, send buffer first
-                ESP_LOGD(TAG, "Sending %i bytes to all clients", *serial_buff_pos);
                 send_to_all_clients(tcp_clients, udp_conns, serial_buffer, *serial_buff_pos);
+                *serial_buff_pos = 0;
+                // copy the new message to the uart send buffer and set buffer position
+                memcpy(&serial_buffer[*serial_buff_pos], mav_parser_rx_buf, result.frame_len);
+                *serial_buff_pos += result.frame_len;
             } else {
-                // nothing to do here, just keep it in the buffer and wait for the next msg to add to the buffer
+                // copy the new message to the uart send buffer and set buffer position
+                memcpy(&serial_buffer[*serial_buff_pos], mav_parser_rx_buf, result.frame_len);
+                *serial_buff_pos += result.frame_len;
             }
 
             // Decode message and react to it if it was for us
@@ -247,18 +262,12 @@ void db_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *ser
                 if (fmav_msg_is_for_me(db_get_mav_sys_id(), db_get_mav_comp_id(), &msg)) {
                     handle_mavlink_message(&msg);
                 } else {
+                    // ToDO: For testing and debugging we look at it anyways
+                    handle_mavlink_message(&msg);
                     // message was not for us so ignore it
                 }
             } else {
                 // message had a parsing error - we cannot decode it so skip
-            }
-
-            if (*serial_buff_pos == 0 && result.frame_len > DB_TRANS_BUF_SIZE) {
-                // the buffer was already split and sent, so it is empty and ready for new messages
-            } else {
-                // Add the new message to the buffer
-                memcpy(&serial_buffer[*serial_buff_pos], mav_parser_rx_buf, result.frame_len);
-                *serial_buff_pos += result.frame_len;
             }
         } else {
             // do nothing since parser had a LENGTH_ERROR, CRC_ERROR or SIGNATURE_ERROR
