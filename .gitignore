@@ -15,3 +15,4 @@ DroneBridge_ESP32_vXX.zip
 managed_components/espressif__mdns/.component_hash
 /managed_components
 dependencies.lock
+.openocd_setup.ps1
