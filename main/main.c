@@ -81,8 +81,8 @@ uint8_t DB_UART_RTS_THRESH = 64;
 int32_t DB_UART_BAUD_RATE = 57600;
 uint16_t DB_TRANS_BUF_SIZE = 64;
 uint8_t DB_LTM_FRAME_NUM_BUFFER = 2;
-int station_rssi = 0;
-int station_rssi_ap = 0;
+int station_rssi = -127;
+int station_rssi_ap = -127;
 wifi_sta_list_t wifi_sta_list = {.num = 0};
 uint8_t LOCAL_MAC_ADDRESS[6];
 
@@ -573,7 +573,6 @@ void app_main() {
     }
     ESP_ERROR_CHECK(ret);
     read_settings_nvs();
-    esp_log_level_set("*", ESP_LOG_INFO);
     if (DB_WIFI_MODE == DB_WIFI_MODE_AP || DB_WIFI_MODE == DB_WIFI_MODE_AP_LR) {
         init_wifi_apmode(DB_WIFI_MODE);
     } else if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_AIR || DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND) {

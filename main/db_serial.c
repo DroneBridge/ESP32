@@ -161,20 +161,11 @@ uint8_t db_get_mav_comp_id() {
 }
 
 /**
- * Based on the system architecture and configured wifi mode the ESP32 may have a different role and system id.
- * Returns the best fitting component ID for the specific role.
+ * Return the Mavlink system ID. Set by handle_mavlink_message()
  * @return system ID for ESP32
  */
 uint8_t db_get_mav_sys_id() {
-    if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND) {
-        return 255;
-    } else if (DB_WIFI_MODE == DB_WIFI_MODE_AP) {
-        return 1;
-    } else if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_AIR) {
-        return 1;
-    } else {
-        return 255;
-    }
+    return DB_MAV_SYS_ID;
 }
 
 /**
@@ -185,34 +176,83 @@ uint8_t db_get_mav_sys_id() {
  * @param tcp_clients List of connected tcp clients
  */
 void handle_mavlink_message(fmav_message_t* new_msg, int *tcp_clients) {
+    static uint8_t buff[296];   // buffer to handle the response messages - no need to init every time
     switch (new_msg->msgid) {
         case FASTMAVLINK_MSG_ID_HEARTBEAT: {
             fmav_heartbeat_t payload;
             fmav_msg_heartbeat_decode(&payload, new_msg);
             if (payload.autopilot == MAV_AUTOPILOT_INVALID && payload.type == MAV_TYPE_GCS) {
                 ESP_LOGI(TAG, "Got heartbeat from GCS (sysID: %i)", new_msg->sysid);
+                DB_MAV_SYS_ID = new_msg->sysid;
             } else if (payload.autopilot != MAV_AUTOPILOT_INVALID && new_msg->compid == MAV_COMP_ID_AUTOPILOT1) {
                 ESP_LOGI(TAG, "Got heartbeat from flight controller (sysID: %i)", new_msg->sysid);
                 // This means we are connected to the FC since we only parse mavlink on UART and thus only see the
                 // device we are connected to via UART
                 DB_MAV_SYS_ID = new_msg->sysid;
                 if (DB_WIFI_MODE == DB_WIFI_MODE_STA) {
-                    uint8_t buff[296];
-                    fmav_radio_status_t payload_r = {.fixed = 0, .noise = 0, .remnoise = 0, .remrssi=abs(station_rssi), .rssi=abs(station_rssi_ap), .rxerrors=0, .txbuf=0};
-                    uint16_t len = fmav_msg_radio_status_encode_to_frame_buf(buff, 255, db_get_mav_comp_id(), &payload_r, &fmav_status);
+                    fmav_radio_status_t payload_r = {.fixed = 0, .noise = 0, .remnoise = 0, .remrssi=station_rssi, .rssi=station_rssi_ap, .rxerrors=0, .txbuf=0};
+                    uint16_t len = fmav_msg_radio_status_encode_to_frame_buf(buff, db_get_mav_sys_id(), db_get_mav_comp_id(), &payload_r, &fmav_status);
                     send_to_all_clients(tcp_clients, udp_conn_list, buff, len);
                 } else if (DB_WIFI_MODE == DB_WIFI_MODE_AP && wifi_sta_list.num > 0) {
-                    uint8_t buff[296];
                     // ToDo: Beware: Only the RSSI of the first client is considered
-                    fmav_radio_status_t payload_r = {.fixed = 0, .noise = 0, .remnoise = 0, .remrssi=abs(wifi_sta_list.sta[0].rssi), .rssi=0, .rxerrors=0, .txbuf=0};
-                    uint16_t len = fmav_msg_radio_status_encode_to_frame_buf(buff, 255, db_get_mav_comp_id(), &payload_r, &fmav_status);
+                    fmav_radio_status_t payload_r = {.fixed = 0, .noise = 0, .remnoise = 0, .remrssi=wifi_sta_list.sta[0].rssi, .rssi=-127, .rxerrors=0, .txbuf=0};
+                    uint16_t len = fmav_msg_radio_status_encode_to_frame_buf(buff, db_get_mav_sys_id(), db_get_mav_comp_id(), &payload_r, &fmav_status);
                     send_to_all_clients(tcp_clients, udp_conn_list, buff, len);
+                } else if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_AIR) {
+                    // ToDo: Send radio status message via ESP-NOW
+                } else {
+                    // In AP LR mode the clients will send the info to the GCS
                 }
             } else {
                 // We do not react to any other heartbeat!
             }
+            // use this as a trigger to send our own heartbeat
+            // ToDo: Check if that is a good idea or push to extra thread
+            uint16_t length = fmav_msg_heartbeat_pack_to_frame_buf(
+                    buff, db_get_mav_sys_id(), db_get_mav_comp_id(),
+                    MAV_TYPE_GENERIC, MAV_AUTOPILOT_INVALID, MAV_MODE_FLAG_CUSTOM_MODE_ENABLED, 0, MAV_STATE_ACTIVE,
+                    &fmav_status);
+            if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_AIR || DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND) {
+                // ToDo send via ESP-NOW
+            } else {
+                send_to_all_clients(tcp_clients, udp_conn_list, buff, length);
+            }
         }
         break;
+        case FASTMAVLINK_MSG_ID_PARAM_REQUEST_LIST: {
+            // ToDo add more parameters
+            // ToDo send via UART when connected to GCS in AP LR or AIR mode
+            ESP_LOGI(TAG, "Received PARAM_REQUEST_LIST msg");
+            fmav_param_value_t fmav_param_value = {.param_id="esp32_mode", .param_value=DB_WIFI_MODE, .param_type=MAV_PARAM_TYPE_UINT8, .param_count = 2, .param_index=0};
+            uint16_t len = fmav_msg_param_value_encode_to_frame_buf(buff, db_get_mav_sys_id(), db_get_mav_comp_id(), &fmav_param_value, &fmav_status);
+            if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_AIR || DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND) {
+                // ToDo send via ESP-NOW
+            } else {
+                send_to_all_clients(tcp_clients, udp_conn_list, buff, len);
+            }
+
+            strcpy(fmav_param_value.param_id, "trans_pack_size");
+            fmav_param_value.param_value=DB_TRANS_BUF_SIZE;
+            fmav_param_value.param_type=MAV_PARAM_TYPE_UINT16;
+            fmav_param_value.param_count = 2;
+            fmav_param_value.param_index=1;
+            len = fmav_msg_param_value_encode_to_frame_buf(buff, db_get_mav_sys_id(), db_get_mav_comp_id(), &fmav_param_value, &fmav_status);
+            if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_AIR || DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND) {
+                // ToDo send via ESP-NOW
+            } else {
+                send_to_all_clients(tcp_clients, udp_conn_list, buff, len);
+            }
+
+        }
+        break;
+        case FASTMAVLINK_MSG_ID_PARAM_REQUEST_READ: {
+            fmav_param_request_read_t payload;
+            fmav_msg_param_request_read_decode(&payload, new_msg);
+            ESP_LOGI(TAG, "GCS request reading parameter: %s", payload.param_id);
+        }
+            break;
+        default:
+            break;
     }
 }
 
@@ -274,8 +314,6 @@ void db_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *ser
                 if (fmav_msg_is_for_me(db_get_mav_sys_id(), db_get_mav_comp_id(), &msg)) {
                     handle_mavlink_message(&msg, tcp_clients);
                 } else {
-                    // ToDO: For testing and debugging we look at it anyways
-                    handle_mavlink_message(&msg, tcp_clients);
                     // message was not for us so ignore it
                 }
             } else {
@@ -287,79 +325,6 @@ void db_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *ser
     }
     // done parsing all received data via UART
 }
-
-
-
-/**
- * Parses MAVLink messages and sends them via the radio link.
- * This function reads data from UART, parses it for complete MAVLink messages, and sends those messages in a buffer.
- * It ensures that only complete messages are sent and that the buffer does not exceed TRANS_BUFF_SIZE
- *
- * @param tcp_clients Array of connected TCP clients
- * @param up_conns Structure containing all UDP connection data including the sockets
- * @param serial_buffer Buffer that gets filled with data and then sent via radio
- * @param serial_buff_pos Number of bytes already read for the current packet
- */
-//void db_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *serial_buffer, unsigned int *serial_buff_pos) {
-//    static int counter = 0;
-//    uint8_t temp_buffer[DB_TRANS_BUF_SIZE];
-//    mavlink_status_t* chan_state = mavlink_get_channel_status(MAVLINK_COMM_0);
-//
-//    // Read bytes from UART
-//    int bytes_read = uart_read_bytes(UART_NUM, temp_buffer, DB_TRANS_BUF_SIZE, 0);
-//    uart_byte_count += bytes_read; // increase total bytes read via UART
-//    // Parse each byte received
-//    for (int i = 0; i < bytes_read; ++i) {
-//        if (mavlink_parse_char(MAVLINK_COMM_0, temp_buffer[i], &mav_msg, &mav_status)) {
-//            ESP_LOGI(TAG, "Parser detected a full message: buffer pos: %i, mav_msg.len %i", *serial_buff_pos, mav_msg.len);
-//            // Calculate the space needed for the new message
-//            // ToDo: Buffer Overflow here: we write to buffer and then check if it is full or not
-//            size_t message_length = mavlink_msg_to_send_buffer(serial_buffer + *serial_buff_pos, &mav_msg);
-//            ESP_LOGI(TAG, "message_length: %i", message_length);
-//
-//            // Check if the new message will fit in the buffer
-//            if (*serial_buff_pos + message_length > DB_TRANS_BUF_SIZE) {
-//                // Send the buffer if the new message won't fit
-//                ESP_LOGI(TAG, "Sending %i bytes to all clients", *serial_buff_pos);
-//                uint f = *serial_buff_pos;
-//                send_to_all_clients(tcp_clients, udp_conns, serial_buffer, f);
-//                *serial_buff_pos = 0; // Reset buffer after sending
-//                // send heartbeat every 10 mavlink messages via UDP
-//                if (counter % 10) {
-//                    counter = 0;
-//                    uint8_t buf[MAVLINK_MAX_PACKET_LEN];
-//                    uint16_t len = 0;
-//                    create_mav_heartbeat(1,buf, &len);
-//                    ESP_LOGI(TAG, "Sending heartbeat with length %i", len);
-//                    send_to_all_clients(tcp_clients, udp_conns, buf, len);
-//                } else {
-//                    counter++;
-//                }
-//            } else {
-//                // message does fit go on in cose
-//            }
-//
-//            // Add the new message to the buffer
-//            *serial_buff_pos += message_length;
-//
-//            // check if we received version 2 and request a switch.
-//            if (!(mavlink_get_channel_status(MAVLINK_COMM_0)->flags & MAVLINK_STATUS_FLAG_IN_MAVLINK1)) {
-//                // this will only switch to proto version 2
-//                chan_state->flags &= ~(MAVLINK_STATUS_FLAG_OUT_MAVLINK1);
-//                ESP_LOGI(TAG, "MAVLink switched to version 2 protocol");
-//            }
-//        } else {
-//            // ToDo: ?
-//        }
-//    }
-//
-//    // Send any remaining complete messages in the buffer
-//    if (*serial_buff_pos > 0) {
-//        send_to_all_clients(tcp_clients, udp_conns, serial_buffer, *serial_buff_pos);
-//    } else {
-//        // ToDo
-//    }
-//}
 
 /**
  * Reads TRANS_RD_BYTES_NUM bytes from UART and checks if we already got enough bytes to send them out. Requires a
