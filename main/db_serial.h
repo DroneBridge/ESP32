@@ -26,7 +26,7 @@
 #define UART_NUM UART_NUM_1
 
 int open_serial_socket();
-void write_to_uart(const uint8_t data_buffer[], const unsigned int data_length);
+void write_to_uart(const uint8_t data_buffer[], unsigned int data_length);
 void db_parse_msp_ltm(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_t msp_message_buffer[],
                       unsigned int *serial_read_bytes,
                       msp_ltm_port_t *db_msp_ltm_port);

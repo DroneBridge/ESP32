@@ -21,6 +21,7 @@
 #define DB_ESP32_GLOBALS_H
 
 #include <freertos/event_groups.h>
+#include <esp_wifi_types.h>
 #include "db_esp32_control.h"
 
 #define MAX_LTM_FRAMES_IN_BUFFER 5
@@ -48,8 +49,11 @@ extern char DB_STATIC_STA_IP[IP4ADDR_STRLEN_MAX];   // user can specify static I
 extern char DB_STATIC_STA_IP_GW[IP4ADDR_STRLEN_MAX];// if DB_STATIC_STA_IP is set then this must be set to the GW IP
 extern char DB_STATIC_STA_IP_NETMASK[IP4ADDR_STRLEN_MAX]; // netmask when settings static IP in Wi-Fi client mode
 
-extern int station_rssi;                   // updated when ESP32 is in station mode and connected to an access point
-extern uint8_t LOCAL_MAC_ADDRESS[6];        // filled with the mac address during init of Wifi interface
+extern int station_rssi;                   // RSSI of received data from AP. Updated when ESP32 is in station mode and connected to an access point
+extern int station_rssi_ap;                // AP told the rssi he is seeing when receiving our packets. Updated on every DroneBridge internal telemetry frame from access point
+extern wifi_sta_list_t wifi_sta_list;      // updated when ESP32 is in ap mode. Contains RSSI of every connected station
+extern uint8_t LOCAL_MAC_ADDRESS[6];       // filled with the mac address during init of WiFi interface
+extern uint8_t DB_MAV_SYS_ID;              // stores the local system ID - set by heartbeat that is received via UART (UART is the local connection)
 
 extern uint32_t uart_byte_count;                // Total bytes read from UART
 extern int8_t num_connected_tcp_clients;

@@ -47,25 +47,22 @@ uint16_t app_port_proxy = APP_PORT_PROXY;
 int8_t num_connected_tcp_clients = 0;
 
 /**
- * Opens non-blocking UDP socket
+ * Opens non-blocking UDP socket used for UART to serial communication. Socket can also accept broadcast messages
  * @return returns socket file descriptor
  */
-int open_udp_socket() {
-    char addr_str[128];
-    int addr_family;
-    int ip_protocol;
-
+int db_open_serial_udp_socket() {
     struct sockaddr_in server_addr;
     server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(APP_PORT_PROXY_UDP);
-    addr_family = AF_INET;
-    ip_protocol = IPPROTO_IP;
+    int addr_family = AF_INET;
+    int ip_protocol = IPPROTO_IP;
+    char addr_str[128];
     inet_ntoa_r(server_addr.sin_addr, addr_str, sizeof(addr_str) - 1);
 
     int udp_socket = socket(addr_family, SOCK_DGRAM, ip_protocol);
     if (udp_socket < 0) {
-        ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
+        ESP_LOGE(TAG, "Unable to create socket for serial communication: errno %d", errno);
         return -1;
     }
     int broadcastEnable=1;
@@ -75,10 +72,40 @@ int open_udp_socket() {
     }
     err = bind(udp_socket, (struct sockaddr *) &server_addr, sizeof(server_addr));
     if (err < 0) {
-        ESP_LOGE(TAG, "Socket unable to bind: errno %d", errno);
+        ESP_LOGE(TAG, "Socket unable to bind to %i errno %d", APP_PORT_PROXY_UDP, errno);
     }
     fcntl(udp_socket, F_SETFL, O_NONBLOCK);
     ESP_LOGI(TAG, "Opened UDP socket on port %i", APP_PORT_PROXY_UDP);
+    return udp_socket;
+}
+
+/**
+ * Opens non-blocking UDP socket used for internal DroneBridge telemetry. Socket shall only be opened when local ESP32
+ * is in client mode. Socket is used to receive internal Wifi telemetry from the ESP32 access point we are connected to.
+ * @return returns socket file descriptor
+ */
+int db_open_int_telemetry_udp_socket() {
+    struct sockaddr_in server_addr;
+    server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(DB_ESP32_INTERNAL_TELEMETRY_PORT);
+    int addr_family = AF_INET;
+    int ip_protocol = IPPROTO_IP;
+    char addr_str[128];
+    inet_ntoa_r(server_addr.sin_addr, addr_str, sizeof(addr_str) - 1);
+
+    int udp_socket = socket(addr_family, SOCK_DGRAM, ip_protocol);
+    if (udp_socket < 0) {
+        ESP_LOGE(TAG, "Unable to create socket for internal telemetry: errno %d", errno);
+        return -1;
+    }
+
+    int err = bind(udp_socket, (struct sockaddr *) &server_addr, sizeof(server_addr));
+    if (err < 0) {
+        ESP_LOGE(TAG, "Socket unable to bind: errno %d", errno);
+    }
+    fcntl(udp_socket, F_SETFL, O_NONBLOCK);
+    ESP_LOGI(TAG, "Opened UDP socket on port %i", DB_ESP32_INTERNAL_TELEMETRY_PORT);
     return udp_socket;
 }
 
@@ -310,6 +337,66 @@ _Noreturn void control_module_esp_now(){
 }
 
 /**
+ * Sends DroneBridge internal telemetry to tell every connected WiFi station how well we receive their data (rssi).
+ * Uses UDP connection list to map IP to MAC address of connected stations. Uses wifi_sta_list to get a mac to rssi mapping
+ * Internal telemetry uses DB_ESP32_INTERNAL_TELEMETRY_PORT port
+ *
+ * @param sta_list
+ * @param udp_conns
+ */
+void db_tell_stations_their_rssi(wifi_sta_list_t *sta_list, udp_conn_list_t *udp_conns) {
+    if (DB_WIFI_MODE == DB_WIFI_MODE_AP_LR && udp_conns->size > 0 && sta_list->num > 0) {
+        // determine udp client and its IP based on MAC
+        for (int i = 0; i < sta_list->num; i++) {
+            for (int v = 0; v < udp_conns->size; v++) {
+                if (sta_list->sta[i].mac[0] == udp_conns->db_udp_clients[v].mac[0] &&
+                        sta_list->sta[i].mac[1] == udp_conns->db_udp_clients[v].mac[1] &&
+                        sta_list->sta[i].mac[2] == udp_conns->db_udp_clients[v].mac[2] &&
+                        sta_list->sta[i].mac[3] == udp_conns->db_udp_clients[v].mac[3] &&
+                        sta_list->sta[i].mac[4] == udp_conns->db_udp_clients[v].mac[4] &&
+                        sta_list->sta[i].mac[5] == udp_conns->db_udp_clients[v].mac[5]) {
+                    // found a match between macs of station of wifi_sta_list and udp_conn_list
+                    // create target UDP based on udp_conn_list entry, overwriting target port
+                    struct sockaddr_in telem_udp_client;
+                    memcpy(&telem_udp_client, &udp_conns->db_udp_clients[v].udp_client, sizeof(telem_udp_client));
+                    telem_udp_client.sin_port = htons(DB_ESP32_INTERNAL_TELEMETRY_PORT);
+                    // send that IP the rssi value we are seeing when that IP sends us something. Send to DB_ESP32_INTERNAL_TELEMETRY_PORT
+                    int sent = sendto(udp_conns->udp_socket, &sta_list->sta[i].rssi, 1, 0,
+                                      (struct sockaddr *) &telem_udp_client,
+                                      sizeof(telem_udp_client));
+                    if (sent < 0) {
+                        // we really do not care about errors,
+                        ESP_LOGD(TAG, "Failed sending internal telemetry (%i)", sent);
+                    }
+                } else {
+                    // no match, keep looking
+                }
+            }
+        }
+    } else {
+        // in other modes we cannot do that. ESP-NOW uses a different function and way of telling
+    }
+}
+
+/**
+ * Receive and process internal telemetry (ESP32 to ESP32) sent by ESP32 LR access point.
+ * Matches with db_tell_stations_their_rssi()
+ * Sets station_rssi_ap based on the received value
+ *
+ * @param tel_sock Socket listening for internal telemetry
+ */
+void handle_internal_telemetry(int tel_sock, uint8_t *udp_buffer, socklen_t *sock_len, struct sockaddr_in *udp_client) {
+    if (tel_sock > 0) {
+        ssize_t recv_length = recvfrom(tel_sock, udp_buffer, UDP_BUF_SIZE, 0,
+                                       (struct sockaddr *) udp_client, sock_len);
+        if (recv_length > 0) {
+            station_rssi_ap = (uint8_t) udp_buffer[0];
+            ESP_LOGD(TAG, "Received %i bytes int. telem - AP receives our packets with RSSI: %i", recv_length, station_rssi_ap);
+        }
+    }
+}
+
+/**
  * Thread that manages all incoming and outgoing TCP, UDP and serial (UART) connections.
  * Called when Wi-Fi modes are selected
  */
@@ -332,7 +419,14 @@ _Noreturn void control_module_udp_tcp() {
         tcp_clients[i] = -1;
     }
 
-    udp_conn_list->udp_socket = open_udp_socket();
+    udp_conn_list->udp_socket = db_open_serial_udp_socket();
+    int db_internal_telem_udp_sock = -1;
+    if (DB_WIFI_MODE == DB_WIFI_MODE_STA) {
+        db_internal_telem_udp_sock = db_open_int_telemetry_udp_socket();
+    } else {
+        // other WiFi modes do not need this. Only WiFi stations will receive if connected to LR access point.
+        // ESP-NOW uses different sockets/systems
+    }
     uint8_t udp_buffer[UDP_BUF_SIZE];
     struct db_udp_client_t new_db_udp_client = {0};
     socklen_t udp_socklen = sizeof(new_db_udp_client.udp_client);
@@ -386,6 +480,10 @@ _Noreturn void control_module_udp_tcp() {
             add_to_known_udp_clients(udp_conn_list, new_db_udp_client);
         }
 
+        if (DB_WIFI_MODE == DB_WIFI_MODE_STA) {
+            handle_internal_telemetry(db_internal_telem_udp_sock, udp_buffer, &udp_socklen, &new_db_udp_client.udp_client);
+        }
+
         // Second check for incoming UART data and send it to TCP/UDP
         read_process_uart(tcp_clients, &transparent_buff_pos, &msp_ltm_buff_pos, msp_message_buffer, serial_buffer,
                           &db_msp_ltm_port);
@@ -395,11 +493,17 @@ _Noreturn void control_module_udp_tcp() {
             // read: https://esp32developer.com/programming-in-c-c/tasks/tasks-vs-co-routines for reference
             vTaskDelay(10 / portTICK_PERIOD_MS);
             delay_timer_cnt = 0;
+            // Use the opportunity to get some regular status information like rssi
             if (DB_WIFI_MODE == DB_WIFI_MODE_STA) {
                 // update rssi variable - set to 0 when not available
                 if (esp_wifi_sta_get_rssi(&station_rssi) != ESP_OK) {
                     station_rssi = 0;
                 }
+            } else if (DB_WIFI_MODE == DB_WIFI_MODE_AP || DB_WIFI_MODE == DB_WIFI_MODE_AP_LR) {
+                ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_ap_get_sta_list(&wifi_sta_list));
+                db_tell_stations_their_rssi(&wifi_sta_list, udp_conn_list);
+            } else {
+                // no way of getting RSSI here. Do nothing
             }
         } else {
             delay_timer_cnt++;

@@ -397,7 +397,7 @@ static esp_err_t system_info_get_handler(httpd_req_t *req) {
     char mac_str[18];
     sprintf(mac_str, "%02X:%02X:%02X:%02X:%02X:%02X",
             LOCAL_MAC_ADDRESS[0], LOCAL_MAC_ADDRESS[1], LOCAL_MAC_ADDRESS[2], LOCAL_MAC_ADDRESS[3], LOCAL_MAC_ADDRESS[4], LOCAL_MAC_ADDRESS[5]);
-    cJSON_AddStringToObject(root, "mac", mac_str);
+    cJSON_AddStringToObject(root, "esp_mac", mac_str);
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
     free((void *) sys_info);
@@ -417,8 +417,24 @@ static esp_err_t system_stats_get_handler(httpd_req_t *req) {
     cJSON_AddNumberToObject(root, "read_bytes", uart_byte_count);
     cJSON_AddNumberToObject(root, "tcp_connected", num_connected_tcp_clients);
     cJSON_AddNumberToObject(root, "udp_connected", udp_conn_list->size);
-    cJSON_AddStringToObject(root, "current_client_ip", CURRENT_CLIENT_IP);
-    cJSON_AddNumberToObject(root, "rssi", station_rssi);
+    if (DB_WIFI_MODE == DB_WIFI_MODE_STA) {
+        cJSON_AddStringToObject(root, "current_client_ip", CURRENT_CLIENT_IP);
+        cJSON_AddNumberToObject(root, "esp_rssi", station_rssi);
+    } else if (DB_WIFI_MODE == DB_WIFI_MODE_AP || DB_WIFI_MODE == DB_WIFI_MODE_AP_LR) {
+        cJSON *sta_array = cJSON_AddArrayToObject(root, "connected_sta");
+        for (int i = 0; i < wifi_sta_list.num; i++) {
+            cJSON *connected_stations_status = cJSON_CreateObject();
+            char mac_str[18];
+            sprintf(mac_str, "%02X:%02X:%02X:%02X:%02X:%02X",
+                    wifi_sta_list.sta[i].mac[0], wifi_sta_list.sta[i].mac[1], wifi_sta_list.sta[i].mac[2],
+                    wifi_sta_list.sta[i].mac[3], wifi_sta_list.sta[i].mac[4], wifi_sta_list.sta[i].mac[5]);
+            cJSON_AddStringToObject(connected_stations_status, "sta_mac", mac_str);
+            cJSON_AddNumberToObject(connected_stations_status, "sta_rssi", wifi_sta_list.sta[i].rssi);
+            cJSON_AddItemToArray(sta_array, connected_stations_status);
+        }
+    } else {
+        // other modes like ESP-NOW do not activate HTTP server so do nothing
+    }
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
     free((void *) sys_info);

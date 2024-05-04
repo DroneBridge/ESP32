@@ -71,7 +71,7 @@ void parse_comm_protocol(int client_socket, char *new_json_bytes) {
     cJSON_Delete(json_pointer);
 }
 
-/** Implements some basic calls from the DroneBridge Communication Protocol
+/** Implements some basic calls from the DroneBridge Communication Protocol - Implemented with DroneBridge for Rasperry Pi
  *
  */
 void communication_module_server(void *parameters) {

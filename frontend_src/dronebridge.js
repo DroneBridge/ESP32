@@ -159,12 +159,21 @@ function get_stats() {
 			document.getElementById("udp_connected").innerHTML = udp_clients + " clients"
 		}
 
-		let rssi = parseInt(json_data["rssi"])
-		if (!isNaN(rssi) && rssi < 0) {
-			document.getElementById("current_client_ip").innerHTML = "IP Address: " + json_data["current_client_ip"] + "<br />RSSI: " + rssi + "dBm"
-		} else if (!isNaN(rssi)) {
-			document.getElementById("current_client_ip").innerHTML = "IP Address: " + json_data["current_client_ip"]
+		if ('esp_rssi' in json_data) {
+			let rssi = parseInt(json_data["esp_rssi"])
+			if (!isNaN(rssi) && rssi < 0) {
+				document.getElementById("current_client_ip").innerHTML = "IP Address: " + json_data["current_client_ip"] + "<br />RSSI: " + rssi + "dBm"
+			} else if (!isNaN(rssi)) {
+				document.getElementById("current_client_ip").innerHTML = "IP Address: " + json_data["current_client_ip"]
+			}
+		} else if ('connected_sta' in json_data) {
+			let a = ""
+			json_data["connected_sta"].forEach((item) => {
+				a = a + "<br />Client: " + item.sta_mac + " RSSI: " + item.sta_rssi + "dBm"
+			});
+			document.getElementById("current_client_ip").innerHTML = "IP Address: " + json_data["current_client_ip"] + a
 		}
+
 	}).catch(error => {
 		conn_status = 0
 		error.message;

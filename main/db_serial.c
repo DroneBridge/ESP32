@@ -45,6 +45,8 @@
 
 #define TAG "DB_SERIAL"
 
+uint8_t DB_MAV_SYS_ID = 1;
+
 uint32_t uart_byte_count = 0;
 uint8_t ltm_frame_buffer[MAX_LTM_FRAMES_IN_BUFFER * LTM_MAX_FRAME_SIZE];
 uint ltm_frames_in_buffer = 0;
@@ -148,13 +150,14 @@ void db_parse_msp_ltm(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_
  * @return component ID for ESP32
  */
 uint8_t db_get_mav_comp_id() {
-    if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND) {
-        return MAV_COMP_ID_TELEMETRY_RADIO;
-    } else if (DB_WIFI_MODE == DB_WIFI_MODE_AP) {
-        return MAV_COMP_ID_UDP_BRIDGE;
-    } else {
-        return MAV_COMP_ID_UART_BRIDGE;
-    }
+    return MAV_COMP_ID_TELEMETRY_RADIO;
+//    if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND) {
+//        return MAV_COMP_ID_TELEMETRY_RADIO;
+//    } else if (DB_WIFI_MODE == DB_WIFI_MODE_AP) {
+//        return MAV_COMP_ID_UDP_BRIDGE;
+//    } else {
+//        return MAV_COMP_ID_UART_BRIDGE;
+//    }
 }
 
 /**
@@ -174,7 +177,14 @@ uint8_t db_get_mav_sys_id() {
     }
 }
 
-void handle_mavlink_message(fmav_message_t* new_msg) {
+/**
+ * Expects GCS to have system ID 255.
+ * Processes Mavlink messages and sends the radio status message to the GCS on every heartbeat from the flight controller
+ *
+ * @param new_msg Message to process
+ * @param tcp_clients List of connected tcp clients
+ */
+void handle_mavlink_message(fmav_message_t* new_msg, int *tcp_clients) {
     switch (new_msg->msgid) {
         case FASTMAVLINK_MSG_ID_HEARTBEAT: {
             fmav_heartbeat_t payload;
@@ -185,17 +195,19 @@ void handle_mavlink_message(fmav_message_t* new_msg) {
                 ESP_LOGI(TAG, "Got heartbeat from flight controller (sysID: %i)", new_msg->sysid);
                 // This means we are connected to the FC since we only parse mavlink on UART and thus only see the
                 // device we are connected to via UART
-                uint8_t buff[296];
-//                payload.type = MAV_TYPE_ONBOARD_CONTROLLER;
-//                payload.autopilot = MAV_AUTOPILOT_INVALID;
-//                payload.base_mode = MAV_MODE_FLAG_CUSTOM_MODE_ENABLED;
-//                payload.custom_mode = DB_WIFI_MODE;
-//                payload.system_status = MAV_STATE_ACTIVE;
-//                uint16_t len = fmav_msg_heartbeat_encode_to_frame_buf(buff, 255, MAV_COMP_ID_TELEMETRY_RADIO, &payload, &fmav_status);
-                fmav_radio_status_t payload_r = {.fixed = 0, .noise = 0, .remnoise = 0, .remrssi=10, .rssi=5, .rxerrors=1, .txbuf=200};
-                uint16_t lenr = fmav_msg_radio_status_encode_to_frame_buf(buff, 255, MAV_COMP_ID_TELEMETRY_RADIO, &payload_r, &fmav_status);
-                int c[CONFIG_LWIP_MAX_ACTIVE_TCP] = {-1};
-                send_to_all_clients(c, udp_conn_list, buff, lenr);
+                DB_MAV_SYS_ID = new_msg->sysid;
+                if (DB_WIFI_MODE == DB_WIFI_MODE_STA) {
+                    uint8_t buff[296];
+                    fmav_radio_status_t payload_r = {.fixed = 0, .noise = 0, .remnoise = 0, .remrssi=abs(station_rssi), .rssi=abs(station_rssi_ap), .rxerrors=0, .txbuf=0};
+                    uint16_t len = fmav_msg_radio_status_encode_to_frame_buf(buff, 255, db_get_mav_comp_id(), &payload_r, &fmav_status);
+                    send_to_all_clients(tcp_clients, udp_conn_list, buff, len);
+                } else if (DB_WIFI_MODE == DB_WIFI_MODE_AP && wifi_sta_list.num > 0) {
+                    uint8_t buff[296];
+                    // ToDo: Beware: Only the RSSI of the first client is considered
+                    fmav_radio_status_t payload_r = {.fixed = 0, .noise = 0, .remnoise = 0, .remrssi=abs(wifi_sta_list.sta[0].rssi), .rssi=0, .rxerrors=0, .txbuf=0};
+                    uint16_t len = fmav_msg_radio_status_encode_to_frame_buf(buff, 255, db_get_mav_comp_id(), &payload_r, &fmav_status);
+                    send_to_all_clients(tcp_clients, udp_conn_list, buff, len);
+                }
             } else {
                 // We do not react to any other heartbeat!
             }
@@ -260,10 +272,10 @@ void db_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *ser
             fmav_frame_buf_to_msg(&msg, &result, mav_parser_rx_buf);
             if (result.res == FASTMAVLINK_PARSE_RESULT_OK) {
                 if (fmav_msg_is_for_me(db_get_mav_sys_id(), db_get_mav_comp_id(), &msg)) {
-                    handle_mavlink_message(&msg);
+                    handle_mavlink_message(&msg, tcp_clients);
                 } else {
                     // ToDO: For testing and debugging we look at it anyways
-                    handle_mavlink_message(&msg);
+                    handle_mavlink_message(&msg, tcp_clients);
                     // message was not for us so ignore it
                 }
             } else {

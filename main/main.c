@@ -82,6 +82,8 @@ int32_t DB_UART_BAUD_RATE = 57600;
 uint16_t DB_TRANS_BUF_SIZE = 64;
 uint8_t DB_LTM_FRAME_NUM_BUFFER = 2;
 int station_rssi = 0;
+int station_rssi_ap = 0;
+wifi_sta_list_t wifi_sta_list = {.num = 0};
 uint8_t LOCAL_MAC_ADDRESS[6];
 
 udp_conn_list_t *udp_conn_list;
@@ -604,7 +606,8 @@ void app_main() {
     if (DB_WIFI_MODE != DB_WIFI_MODE_ESPNOW_AIR && DB_WIFI_MODE != DB_WIFI_MODE_ESPNOW_GND) {
         // no need to start these services - won`t be available anyway - safe the resources
         ESP_ERROR_CHECK(start_rest_server(CONFIG_WEB_MOUNT_POINT));
-        communication_module();
+        // Disable legacy support for DroneBridge communication module - no use case for DroneBridge for ESP32
+        // communication_module();
     }
     set_reset_trigger();
 }
