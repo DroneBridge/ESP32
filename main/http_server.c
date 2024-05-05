@@ -135,14 +135,15 @@ static esp_err_t rest_common_get_handler(httpd_req_t *req) {
  * @param req
  * @return ESP error code
  */
-static esp_err_t settings_change_post_handler(httpd_req_t *req) {
+static esp_err_t settings_post_handler(httpd_req_t *req) {
     int total_len = req->content_len;
     int cur_len = 0;
     char *buf = ((rest_server_context_t *) (req->user_ctx))->scratch;
     int received = 0;
     if (total_len >= SCRATCH_BUFSIZE) {
-        /* Respond with 500 Internal Server Error */
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
+        // This should be HTTPD_414_PAYLOAD_TOO_LARGE, but that's not
+        // implemented yet, so use 400 Bad Request instead.
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "content too long");
         return ESP_FAIL;
     }
     while (cur_len < total_len) {
@@ -234,14 +235,13 @@ static esp_err_t settings_change_post_handler(httpd_req_t *req) {
  * @param req
  * @return
  */
-static esp_err_t udp_conn_add_post_handler(httpd_req_t *req) {
+static esp_err_t settings_clients_udp_post(httpd_req_t *req) {
     int total_len = req->content_len;
     int cur_len = 0;
     char *buf = ((rest_server_context_t *) (req->user_ctx))->scratch;
     int received = 0;
     if (total_len >= SCRATCH_BUFSIZE) {
-        /* Respond with 500 Internal Server Error */
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "content too long");
         return ESP_FAIL;
     }
     while (cur_len < total_len) {
@@ -314,14 +314,13 @@ static esp_err_t udp_conn_add_post_handler(httpd_req_t *req) {
  * @param req
  * @return
  */
-static esp_err_t set_static_ip_post_handler(httpd_req_t *req) {
+static esp_err_t settings_static_ip_post_handler(httpd_req_t *req) {
     int total_len = req->content_len;
     int cur_len = 0;
     char *buf = ((rest_server_context_t *) (req->user_ctx))->scratch;
     int received = 0;
     if (total_len >= SCRATCH_BUFSIZE) {
-        /* Respond with 500 Internal Server Error */
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "content too long");
         return ESP_FAIL;
     }
     while (cur_len < total_len) {
@@ -431,7 +430,7 @@ static esp_err_t system_stats_get_handler(httpd_req_t *req) {
  * @param req
  * @return ESP_OK on successfully sending the http request
  */
-static esp_err_t system_connections_get_handler(httpd_req_t *req) {
+static esp_err_t system_clients_get_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "application/json");
     cJSON *root = cJSON_CreateObject();
 //    cJSON *tcp_clients = cJSON_CreateArray();
@@ -462,7 +461,7 @@ static esp_err_t system_connections_get_handler(httpd_req_t *req) {
  * @param req
  * @return
  */
-static esp_err_t system_reboot_get_handler(httpd_req_t *req) {
+static esp_err_t system_reboot_post_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "application/json");
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "msg", "Rebooting!");
@@ -478,7 +477,7 @@ static esp_err_t system_reboot_get_handler(httpd_req_t *req) {
  * @param req
  * @return ESP_OK on successfully sending the http request
  */
-static esp_err_t settings_data_get_handler(httpd_req_t *req) {
+static esp_err_t settings_get_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "application/json");
     cJSON *root = cJSON_CreateObject();
     cJSON_AddNumberToObject(root, "esp32_mode", DB_WIFI_MODE);
@@ -529,13 +528,13 @@ esp_err_t start_rest_server(const char *base_path) {
     httpd_register_uri_handler(server, &system_info_get_uri);
 
     /* URI handler for fetching client connection info */
-    httpd_uri_t system_connections_get = {
-            .uri = "/api/system/conns",
+    httpd_uri_t system_clients_get_uri = {
+            .uri = "/api/system/clients",
             .method = HTTP_GET,
-            .handler = system_connections_get_handler,
+            .handler = system_clients_get_handler,
             .user_ctx = rest_context
     };
-    httpd_register_uri_handler(server, &system_connections_get);
+    httpd_register_uri_handler(server, &system_clients_get_uri);
 
     /* URI handler for fetching system info */
     httpd_uri_t system_stats_get_uri = {
@@ -547,48 +546,48 @@ esp_err_t start_rest_server(const char *base_path) {
     httpd_register_uri_handler(server, &system_stats_get_uri);
 
     /* URI handler for triggering system reboot */
-    httpd_uri_t system_reboot_get_uri = {
+    httpd_uri_t system_reboot_post_uri = {
             .uri = "/api/system/reboot",
-            .method = HTTP_GET,
-            .handler = system_reboot_get_handler,
+            .method = HTTP_POST,
+            .handler = system_reboot_post_handler,
             .user_ctx = rest_context
     };
-    httpd_register_uri_handler(server, &system_reboot_get_uri);
+    httpd_register_uri_handler(server, &system_reboot_post_uri);
 
     /* URI handler for fetching settings data */
-    httpd_uri_t temperature_data_get_uri = {
-            .uri = "/api/settings/request",
+    httpd_uri_t settings_get_uri = {
+            .uri = "/api/settings",
             .method = HTTP_GET,
-            .handler = settings_data_get_handler,
+            .handler = settings_get_handler,
             .user_ctx = rest_context
     };
-    httpd_register_uri_handler(server, &temperature_data_get_uri);
+    httpd_register_uri_handler(server, &settings_get_uri);
 
-    httpd_uri_t settings_change_post_uri = {
-            .uri = "/api/settings/change",
+    httpd_uri_t settings_post_uri = {
+            .uri = "/api/settings",
             .method = HTTP_POST,
-            .handler = settings_change_post_handler,
+            .handler = settings_post_handler,
             .user_ctx = rest_context
     };
-    httpd_register_uri_handler(server, &settings_change_post_uri);
+    httpd_register_uri_handler(server, &settings_post_uri);
 
     /* URI handler for adding a new udp client connection */
-    httpd_uri_t system_udp_connections_post = {
-            .uri = "/api/settings/addudp",
+    httpd_uri_t settings_clients_udp_post_uri = {
+            .uri = "/api/settings/clients/udp",
             .method = HTTP_POST,
-            .handler = udp_conn_add_post_handler,
+            .handler = settings_clients_udp_post,
             .user_ctx = rest_context
     };
-    httpd_register_uri_handler(server, &system_udp_connections_post);
+    httpd_register_uri_handler(server, &settings_clients_udp_post_uri);
 
     /* URI handler for setting a static IP for the ESP32 in Wi-Fi client mode */
-    httpd_uri_t system_static_ip_connections_post = {
-            .uri = "/api/settings/setstaticip",
+    httpd_uri_t settings_static_ip_port_uri = {
+            .uri = "/api/settings/static-ip",
             .method = HTTP_POST,
-            .handler = set_static_ip_post_handler,
+            .handler = settings_static_ip_post_handler,
             .user_ctx = rest_context
     };
-    httpd_register_uri_handler(server, &system_static_ip_connections_post);
+    httpd_register_uri_handler(server, &settings_static_ip_port_uri);
 
     /* URI handler for getting web server files */
     httpd_uri_t common_get_uri = {
