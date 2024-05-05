@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include <esp_now.h>
 
+#define DB_ESPNOW_MAX_BROADCAST_PEERS   26 // Number of max. broadcast peers. that we support with internal telemetry. Limit is 255, but this is the max we can fit into one packet 250bytes
 #define ESPNOW_QUEUE_SIZE   6
 #define ESPNOW_MAXDELAY     512
 #define DB_ESPNOW_AES_IV_LEN       12   // 96 bit
@@ -33,8 +34,20 @@
 
 #define IS_BROADCAST_ADDR(addr) (memcmp(addr, BROADCAST_MAC, ESP_NOW_ETH_ALEN) == 0)
 
-extern QueueHandle_t db_espnow_send_queue;    // Queue that contains data to be sent via ESP-NOW (filled by control task)
+extern QueueHandle_t db_espnow_send_queue;    // Queue that contains data to be sent via ESP-NOW
 extern QueueHandle_t db_uart_write_queue;    // Queue that contains data to be written to UART (filled by ESP-NOW task)
+
+typedef struct {
+    int16_t gnd_rssi;               // RSSI in dBm of that peer when we received the last message
+    uint8_t broadcast_peer_mac[ESP_NOW_ETH_ALEN];  // mac address of a peer that sent us broadcast messages
+} __attribute__((__packed__)) db_esp_now_bpeer_info_t;
+
+// structure used by ESP-NOW GND to keep infos about RSSI from every device that sent us something
+typedef struct {
+    uint8_t size;
+    int16_t gnd_noise_floor;
+    db_esp_now_bpeer_info_t db_esp_now_bpeer_info[DB_ESPNOW_MAX_BROADCAST_PEERS];
+} __attribute__((__packed__)) db_esp_now_clients_list_t;    // structure is sent as ESP-NOW internal telemetry frame to AIR ESP32
 
 typedef enum {
     DB_ESPNOW_SEND_CB,
@@ -48,6 +61,7 @@ typedef struct {
 
 typedef struct {
     uint8_t mac_addr[ESP_NOW_ETH_ALEN];
+    int16_t rssi;
     uint8_t data_len;
     uint8_t *data;
 } db_espnow_event_recv_cb_t;
@@ -74,9 +88,14 @@ enum {
     DB_ESPNOW_ORIGIN_AIR = 1,
 };
 
+enum {
+    DB_ESP_NOW_PACKET_TYPE_DATA = 0,
+    DB_ESP_NOW_PACKET_TYPE_INTERNAL_TELEMETRY = 1,
+};
+
 typedef struct {
     uint8_t origin;                         // type: db_espnow_data_origin_t: 0=packet sent by GCS - 1=packet sent by drone
-    uint8_t packet_type;                    // FEC packet type or non FEC protected data ToDo: Check if really necessary
+    uint8_t packet_type;                    // DB_ESP_NOW_PACKET_TYPE_DATA or DB_ESP_NOW_PACKET_TYPE_INTERNAL_TELEMETRY or FEC in the future
     uint32_t seq_num;                       // Sequence number of the packet
     uint8_t aes_iv[DB_ESPNOW_AES_IV_LEN];   // Initialization vector for AES
 } __attribute__((__packed__)) db_esp_now_packet_header_t;             // authenticated but NOT encrypted by AES-GCM

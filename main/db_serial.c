@@ -95,12 +95,11 @@ esp_err_t open_serial_socket() {
  */
 void write_to_uart(const uint8_t data_buffer[], const unsigned int data_length) {
     int written = uart_write_bytes(UART_NUM, data_buffer, data_length);
-    if (written > 0) {
-        ESP_LOGD(TAG, "Wrote %i bytes to UART", written);
-    } else if (written != data_length) {
-        ESP_LOGW(TAG, "Wrote 0 of %i bytes to UART.", data_length);
+    if (written != data_length) {
+        // This is a debug log since it happens very rarely that not all bytes get written. Save some cpu cycles.
+        ESP_LOGD(TAG, "Wrote only %i of %i bytes to UART: %s", written, data_length, esp_err_to_name(errno));
     } else {
-        ESP_LOGE(TAG, "Error writing to UART %s", esp_err_to_name(errno));
+        // all good
     }
 
 }
@@ -151,13 +150,6 @@ void db_parse_msp_ltm(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_
  */
 uint8_t db_get_mav_comp_id() {
     return MAV_COMP_ID_TELEMETRY_RADIO;
-//    if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND) {
-//        return MAV_COMP_ID_TELEMETRY_RADIO;
-//    } else if (DB_WIFI_MODE == DB_WIFI_MODE_AP) {
-//        return MAV_COMP_ID_UDP_BRIDGE;
-//    } else {
-//        return MAV_COMP_ID_UART_BRIDGE;
-//    }
 }
 
 /**
@@ -166,6 +158,18 @@ uint8_t db_get_mav_comp_id() {
  */
 uint8_t db_get_mav_sys_id() {
     return DB_MAV_SYS_ID;
+}
+
+/**
+ * Creates and writes Mavlink heartbeat message to supplied buffer
+ * @param buff Buffer to write heartbeat to (>280 bytes)
+ * @return Length of the message in the buffer
+ */
+uint16_t db_create_heartbeat(uint8_t *buff) {
+    return fmav_msg_heartbeat_pack_to_frame_buf(
+            buff, db_get_mav_sys_id(), db_get_mav_comp_id(),
+            MAV_TYPE_GENERIC, MAV_AUTOPILOT_INVALID, MAV_MODE_FLAG_CUSTOM_MODE_ENABLED, 0, MAV_STATE_ACTIVE,
+            &fmav_status);
 }
 
 /**
@@ -182,51 +186,59 @@ void handle_mavlink_message(fmav_message_t* new_msg, int *tcp_clients) {
             fmav_heartbeat_t payload;
             fmav_msg_heartbeat_decode(&payload, new_msg);
             if (payload.autopilot == MAV_AUTOPILOT_INVALID && payload.type == MAV_TYPE_GCS) {
-                ESP_LOGI(TAG, "Got heartbeat from GCS (sysID: %i)", new_msg->sysid);
+                ESP_LOGD(TAG, "Got heartbeat from GCS (sysID: %i)", new_msg->sysid);
                 DB_MAV_SYS_ID = new_msg->sysid;
+                // We must be in either one of these modes: AP LR or ESP-NOW GND
+                if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND || DB_WIFI_MODE == DB_WIFI_MODE_AP_LR) {
+                    // Send heartbeat to GCS: Every ESP32 no matter its role or mode is emitting a heartbeat
+                    uint16_t length = db_create_heartbeat(buff);
+                    write_to_uart(buff, length);
+                } else {
+                    ESP_LOGW(TAG, "We received a heartbeat from GCS while not being in DB_WIFI_MODE_ESPNOW_GND or "
+                                  "DB_WIFI_MODE_AP_LR mode. Check your configuration! AIR-Side ESP32 seems to be "
+                                  "connected to GCS via UART");
+                }
+                // In AP LR mode and in ESP-NOW GND mode the heartbeat has to be emitted via UART directly to the GCS
             } else if (payload.autopilot != MAV_AUTOPILOT_INVALID && new_msg->compid == MAV_COMP_ID_AUTOPILOT1) {
-                ESP_LOGI(TAG, "Got heartbeat from flight controller (sysID: %i)", new_msg->sysid);
+                ESP_LOGD(TAG, "Got heartbeat from flight controller (sysID: %i)", new_msg->sysid);
                 // This means we are connected to the FC since we only parse mavlink on UART and thus only see the
                 // device we are connected to via UART
                 DB_MAV_SYS_ID = new_msg->sysid;
-                if (DB_WIFI_MODE == DB_WIFI_MODE_STA) {
-                    fmav_radio_status_t payload_r = {.fixed = 0, .noise = 0, .remnoise = 0, .remrssi=station_rssi, .rssi=station_rssi_ap, .rxerrors=0, .txbuf=0};
+                // ESP32s that are connected to a flight controller via UART will send RADIO_STATUS messages to the GND
+                if (DB_WIFI_MODE == DB_WIFI_MODE_STA || DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_AIR) {
+                    fmav_radio_status_t payload_r = {.fixed = 0, .rxerrors=0, .txbuf=0,
+                                                     .noise = db_esp_signal_quality.gnd_noise_floor,
+                                                     .remnoise = db_esp_signal_quality.air_noise_floor,
+                                                     .remrssi = db_esp_signal_quality.air_rssi,
+                                                     .rssi = db_esp_signal_quality.gnd_rssi};
                     uint16_t len = fmav_msg_radio_status_encode_to_frame_buf(buff, db_get_mav_sys_id(), db_get_mav_comp_id(), &payload_r, &fmav_status);
                     send_to_all_clients(tcp_clients, udp_conn_list, buff, len);
                 } else if (DB_WIFI_MODE == DB_WIFI_MODE_AP && wifi_sta_list.num > 0) {
-                    // ToDo: Beware: Only the RSSI of the first client is considered
+                    // we assume ESP32 is not used in DB_WIFI_MODE_AP on the ground but only on the drone side
+                    // ToDo: Only the RSSI of the first client is considered.
+                    //  Send each connected client its RSSI back. Easier for UDP since we have a nice list with mac addresses to use for mapping. Harder for TCP -> no macs
                     fmav_radio_status_t payload_r = {.fixed = 0, .noise = 0, .remnoise = 0, .remrssi=wifi_sta_list.sta[0].rssi, .rssi=-127, .rxerrors=0, .txbuf=0};
                     uint16_t len = fmav_msg_radio_status_encode_to_frame_buf(buff, db_get_mav_sys_id(), db_get_mav_comp_id(), &payload_r, &fmav_status);
                     send_to_all_clients(tcp_clients, udp_conn_list, buff, len);
-                } else if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_AIR) {
-                    // ToDo: Send radio status message via ESP-NOW
                 } else {
                     // In AP LR mode the clients will send the info to the GCS
                 }
             } else {
                 // We do not react to any other heartbeat!
             }
-            // use this as a trigger to send our own heartbeat
-            // ToDo: Check if that is a good idea or push to extra thread
-            uint16_t length = fmav_msg_heartbeat_pack_to_frame_buf(
-                    buff, db_get_mav_sys_id(), db_get_mav_comp_id(),
-                    MAV_TYPE_GENERIC, MAV_AUTOPILOT_INVALID, MAV_MODE_FLAG_CUSTOM_MODE_ENABLED, 0, MAV_STATE_ACTIVE,
-                    &fmav_status);
-            if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_AIR || DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND) {
-                // ToDo send via ESP-NOW
-            } else {
-                send_to_all_clients(tcp_clients, udp_conn_list, buff, length);
-            }
+            // ToDo: Use this as a trigger to send our own heartbeat. Check if that is a good idea or push to extra thread
+            uint16_t length = db_create_heartbeat(buff);
+            // Send heartbeat to GND clients: Every ESP32 no matter its role or mode is emitting a heartbeat
+            send_to_all_clients(tcp_clients, udp_conn_list, buff, length);
         }
         break;
         case FASTMAVLINK_MSG_ID_PARAM_REQUEST_LIST: {
-            // ToDo add more parameters
-            // ToDo send via UART when connected to GCS in AP LR or AIR mode
+            // ToDo Add more parameters
             ESP_LOGI(TAG, "Received PARAM_REQUEST_LIST msg");
             fmav_param_value_t fmav_param_value = {.param_id="esp32_mode", .param_value=DB_WIFI_MODE, .param_type=MAV_PARAM_TYPE_UINT8, .param_count = 2, .param_index=0};
             uint16_t len = fmav_msg_param_value_encode_to_frame_buf(buff, db_get_mav_sys_id(), db_get_mav_comp_id(), &fmav_param_value, &fmav_status);
-            if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_AIR || DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND) {
-                // ToDo send via ESP-NOW
+            if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND || DB_WIFI_MODE==DB_WIFI_MODE_AP_LR) {
+                write_to_uart(buff, len);
             } else {
                 send_to_all_clients(tcp_clients, udp_conn_list, buff, len);
             }
@@ -237,8 +249,8 @@ void handle_mavlink_message(fmav_message_t* new_msg, int *tcp_clients) {
             fmav_param_value.param_count = 2;
             fmav_param_value.param_index=1;
             len = fmav_msg_param_value_encode_to_frame_buf(buff, db_get_mav_sys_id(), db_get_mav_comp_id(), &fmav_param_value, &fmav_status);
-            if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_AIR || DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND) {
-                // ToDo send via ESP-NOW
+            if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND || DB_WIFI_MODE==DB_WIFI_MODE_AP_LR) {
+                write_to_uart(buff, len);
             } else {
                 send_to_all_clients(tcp_clients, udp_conn_list, buff, len);
             }
@@ -249,6 +261,7 @@ void handle_mavlink_message(fmav_message_t* new_msg, int *tcp_clients) {
             fmav_param_request_read_t payload;
             fmav_msg_param_request_read_decode(&payload, new_msg);
             ESP_LOGI(TAG, "GCS request reading parameter: %s", payload.param_id);
+            // ToDo Respond :)
         }
             break;
         default:

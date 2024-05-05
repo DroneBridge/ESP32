@@ -124,7 +124,8 @@ void send_to_all_udp_clients(udp_conn_list_t *n_udp_conn_list, const uint8_t *da
 }
 
 /**
- * Send to all connected TCP & UDP clients. Typically called by a function that read from UART.
+ * Send to all connected TCP & UDP clients or broadcast via ESP-NOW depending on the mode (DB_WIFI_MODE) we are currently in.
+ * Typically called by a function that read from UART.
  *
  * @param tcp_clients Array of socket IDs for the TCP clients
  * @param udp_conn Structure handling the UDP connection
@@ -345,21 +346,17 @@ _Noreturn void control_module_esp_now(){
  * @param udp_conns
  */
 void db_tell_stations_their_rssi(wifi_sta_list_t *sta_list, udp_conn_list_t *udp_conns) {
+    // ToDo: Check if broadcasting a single/multi packet containing all RSSI and MACs (like with ESP-NOW) is more efficient
     if (DB_WIFI_MODE == DB_WIFI_MODE_AP_LR && udp_conns->size > 0 && sta_list->num > 0) {
+        struct sockaddr_in telem_udp_client = {0};
+        telem_udp_client.sin_port = htons(DB_ESP32_INTERNAL_TELEMETRY_PORT);
         // determine udp client and its IP based on MAC
         for (int i = 0; i < sta_list->num; i++) {
             for (int v = 0; v < udp_conns->size; v++) {
-                if (sta_list->sta[i].mac[0] == udp_conns->db_udp_clients[v].mac[0] &&
-                        sta_list->sta[i].mac[1] == udp_conns->db_udp_clients[v].mac[1] &&
-                        sta_list->sta[i].mac[2] == udp_conns->db_udp_clients[v].mac[2] &&
-                        sta_list->sta[i].mac[3] == udp_conns->db_udp_clients[v].mac[3] &&
-                        sta_list->sta[i].mac[4] == udp_conns->db_udp_clients[v].mac[4] &&
-                        sta_list->sta[i].mac[5] == udp_conns->db_udp_clients[v].mac[5]) {
+                if (memcmp(sta_list->sta[i].mac, udp_conns->db_udp_clients[v].mac, ESP_NOW_ETH_ALEN) == 0) {
                     // found a match between macs of station of wifi_sta_list and udp_conn_list
                     // create target UDP based on udp_conn_list entry, overwriting target port
-                    struct sockaddr_in telem_udp_client;
                     memcpy(&telem_udp_client, &udp_conns->db_udp_clients[v].udp_client, sizeof(telem_udp_client));
-                    telem_udp_client.sin_port = htons(DB_ESP32_INTERNAL_TELEMETRY_PORT);
                     // send that IP the rssi value we are seeing when that IP sends us something. Send to DB_ESP32_INTERNAL_TELEMETRY_PORT
                     int sent = sendto(udp_conns->udp_socket, &sta_list->sta[i].rssi, 1, 0,
                                       (struct sockaddr *) &telem_udp_client,
@@ -379,7 +376,7 @@ void db_tell_stations_their_rssi(wifi_sta_list_t *sta_list, udp_conn_list_t *udp
 }
 
 /**
- * Receive and process internal telemetry (ESP32 to ESP32) sent by ESP32 LR access point.
+ * Receive and process internal telemetry (ESP32 AP to ESP32 Station) sent by ESP32 LR access point.
  * Matches with db_tell_stations_their_rssi()
  * Sets station_rssi_ap based on the received value
  *
@@ -390,8 +387,8 @@ void handle_internal_telemetry(int tel_sock, uint8_t *udp_buffer, socklen_t *soc
         ssize_t recv_length = recvfrom(tel_sock, udp_buffer, UDP_BUF_SIZE, 0,
                                        (struct sockaddr *) udp_client, sock_len);
         if (recv_length > 0) {
-            station_rssi_ap = (uint8_t) udp_buffer[0];
-            ESP_LOGD(TAG, "Received %i bytes int. telem - AP receives our packets with RSSI: %i", recv_length, station_rssi_ap);
+            db_esp_signal_quality.gnd_rssi = udp_buffer[0];
+            ESP_LOGD(TAG, "Received %i bytes int. telem - AP receives our packets with RSSI: %i", recv_length, db_esp_signal_quality.gnd_rssi);
         }
     }
 }
@@ -449,7 +446,6 @@ _Noreturn void control_module_udp_tcp() {
             if (tcp_clients[i] > 0) {
                 ssize_t recv_length = recv(tcp_clients[i], tcp_client_buffer, TCP_BUFF_SIZ, 0);
                 if (recv_length > 0) {
-                    ESP_LOGD(TAG, "TCP: Received %i bytes", recv_length);
                     write_to_uart(tcp_client_buffer, recv_length);
                 } else if (recv_length == 0) {
                     shutdown(tcp_clients[i], 0);
@@ -471,7 +467,6 @@ _Noreturn void control_module_udp_tcp() {
         ssize_t recv_length = recvfrom(udp_conn_list->udp_socket, udp_buffer, UDP_BUF_SIZE, 0,
                                        (struct sockaddr *) &new_db_udp_client.udp_client, &udp_socklen);
         if (recv_length > 0) {
-            ESP_LOGD(TAG, "UDP: Received %i bytes", recv_length);
             write_to_uart(udp_buffer, recv_length);
             // Allows to register new app on different port. Used e.g. for UDP conn setup in sta-mode.
             // Devices/Ports added this way cannot be removed in sta-mode since UDP is connectionless, and we cannot
@@ -495,10 +490,10 @@ _Noreturn void control_module_udp_tcp() {
             delay_timer_cnt = 0;
             // Use the opportunity to get some regular status information like rssi
             if (DB_WIFI_MODE == DB_WIFI_MODE_STA) {
-                // update rssi variable - set to 0 when not available
-                if (esp_wifi_sta_get_rssi(&station_rssi) != ESP_OK) {
-                    station_rssi = 0;
-                }
+                // update rssi variable - set to -127 when not available
+                if (esp_wifi_sta_get_rssi((int *) &db_esp_signal_quality.air_rssi) != ESP_OK) {
+                    db_esp_signal_quality.air_rssi = -127;
+                } else {/* all good */}
             } else if (DB_WIFI_MODE == DB_WIFI_MODE_AP || DB_WIFI_MODE == DB_WIFI_MODE_AP_LR) {
                 ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_ap_get_sta_list(&wifi_sta_list));
                 db_tell_stations_their_rssi(&wifi_sta_list, udp_conn_list);

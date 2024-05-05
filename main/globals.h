@@ -49,8 +49,7 @@ extern char DB_STATIC_STA_IP[IP4ADDR_STRLEN_MAX];   // user can specify static I
 extern char DB_STATIC_STA_IP_GW[IP4ADDR_STRLEN_MAX];// if DB_STATIC_STA_IP is set then this must be set to the GW IP
 extern char DB_STATIC_STA_IP_NETMASK[IP4ADDR_STRLEN_MAX]; // netmask when settings static IP in Wi-Fi client mode
 
-extern int station_rssi;                   // RSSI of received data from AP. Updated when ESP32 is in station mode and connected to an access point
-extern int station_rssi_ap;                // AP told the rssi he is seeing when receiving our packets. Updated on every DroneBridge internal telemetry frame from access point
+extern db_esp_signal_quality_t db_esp_signal_quality;   // used on AIR/station side to store RSSI information
 extern wifi_sta_list_t wifi_sta_list;      // updated when ESP32 is in ap mode. Contains RSSI of every connected station
 extern uint8_t LOCAL_MAC_ADDRESS[6];       // filled with the mac address during init of WiFi interface
 extern uint8_t DB_MAV_SYS_ID;              // stores the local system ID - set by heartbeat that is received via UART (UART is the local connection)

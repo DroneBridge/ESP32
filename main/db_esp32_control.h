@@ -39,6 +39,14 @@ typedef struct udp_conn_list_s {
     int udp_socket;     // ID of UDP socket
 } udp_conn_list_t;
 
+// Used on the ESP AIR side to keep track and used to fill MAVlink RADIO STATUS msg
+typedef struct {
+    int16_t air_rssi;            // RSSI of received data from AP. Updated when ESP32 is in station mode and connected to an access point
+    int16_t gnd_rssi;            // AP/GND told the rssi he is seeing when receiving our packets. Updated on every DroneBridge internal telemetry frame from GND
+    int16_t air_noise_floor;     // Noise floor on air side. Updated when ESP32 is in ESP-NOW mode and receives packet - Not supported by all ESP32 variants
+    int16_t gnd_noise_floor;     // AP/GND told the noise floor he is seeing when receiving our packets. Updated on every DroneBridge internal telemetry frame from GND - Not supported by all ESP32 variants
+} db_esp_signal_quality_t;
+
 void control_module();
 udp_conn_list_t *udp_client_list_create();
 void udp_client_list_destroy(udp_conn_list_t *n_udp_conn_list);
