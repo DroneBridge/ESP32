@@ -96,6 +96,46 @@ static EventGroupHandle_t s_wifi_event_group;
 
 esp_netif_t *esp_default_netif;
 
+static esp_err_t db_set_dns_server(esp_netif_t *netif, uint32_t addr, esp_netif_dns_type_t type)
+{
+    if (addr && (addr != IPADDR_NONE)) {
+        esp_netif_dns_info_t dns;
+        dns.ip.u_addr.ip4.addr = addr;
+        dns.ip.type = IPADDR_TYPE_V4;
+        ESP_ERROR_CHECK(esp_netif_set_dns_info(netif, type, &dns));
+    }
+    return ESP_OK;
+}
+
+/**
+ * Assigns static IP to ESP32 when in client mode and static IP, GW and netmask are set in config.
+ * Stops client DHCP server
+ */
+static void set_client_static_ip() {
+    if (DB_WIFI_MODE == DB_WIFI_MODE_STA && strlen(DB_STATIC_STA_IP) > 0 && strlen(DB_STATIC_STA_IP_GW) > 0 && strlen(DB_STATIC_STA_IP_NETMASK) > 0) {
+        ESP_LOGI(TAG, "Assigning static IP to ESP32: ESP32-IP: %s Gateway: %s Netmask: %s", DB_STATIC_STA_IP,
+                 DB_STATIC_STA_IP_GW, DB_STATIC_STA_IP_NETMASK);
+
+        if (esp_netif_dhcpc_stop(esp_default_netif) != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to stop dhcp client in order to set static IP");
+            return;
+        }
+        esp_netif_ip_info_t ip;
+        memset(&ip, 0, sizeof(esp_netif_ip_info_t));
+        ip.ip.addr = ipaddr_addr(DB_STATIC_STA_IP);
+        ip.netmask.addr = ipaddr_addr(DB_STATIC_STA_IP_NETMASK);
+        ip.gw.addr = ipaddr_addr(DB_STATIC_STA_IP_GW);
+        if (esp_netif_set_ip_info(esp_default_netif, &ip) != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to set static ip info");
+        }
+        ESP_LOGD(TAG, "Success to set static ip: %s, netmask: %s, gw: %s", DB_STATIC_STA_IP, DB_STATIC_STA_IP_NETMASK, DB_STATIC_STA_IP_GW);
+        ESP_ERROR_CHECK(db_set_dns_server(esp_default_netif, ipaddr_addr(DB_STATIC_STA_IP_GW), ESP_NETIF_DNS_MAIN));
+        ESP_ERROR_CHECK(db_set_dns_server(esp_default_netif, ipaddr_addr("0.0.0.0"), ESP_NETIF_DNS_BACKUP));
+    } else {
+        //no static IP specified let the DHCP assign us one
+    }
+}
+
 /**
  * Devices get added based on IP (check if IP & PORT are already listed) and removed from the UDP broadcast connection
  * based on MAC address
@@ -136,6 +176,8 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         ESP_LOGI(TAG, "WIFI_EVENT - Wifi Started");
         ESP_ERROR_CHECK(esp_wifi_connect());
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_CONNECTED) {
+        set_client_static_ip();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         ESP_LOGI(TAG, "WIFI_EVENT - Lost connection to access point");
         if (s_retry_num < WIFI_ESP_MAXIMUM_RETRY) {
@@ -285,29 +327,14 @@ void init_wifi_apmode(int wifi_mode) {
 }
 
 /**
- * Initializes the ESP Wifi client mode where we connect to a known access point.
+ * Initializes the ESP Wifi client/station mode where we connect to a known access point.
  */
 int init_wifi_clientmode() {
     s_wifi_event_group = xEventGroupCreate();
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     esp_default_netif = esp_netif_create_default_wifi_sta();
-
-    /* Assign static IP to esp32 in client mode if specified */
-    if (strlen(DB_STATIC_STA_IP) > 0 && strlen(DB_STATIC_STA_IP_GW) > 0 && strlen(DB_STATIC_STA_IP_NETMASK) > 0) {
-        ESP_LOGI(TAG, "Assigning static IP to ESP32: ESP32-IP: %s Gateway: %s Netmask: %s", DB_STATIC_STA_IP,
-                 DB_STATIC_STA_IP_GW, DB_STATIC_STA_IP_NETMASK);
-        esp_netif_ip_info_t ip;
-        memset(&ip, 0, sizeof(esp_netif_ip_info_t));
-        ip.ip.addr = ipaddr_addr(DB_STATIC_STA_IP);
-        ip.netmask.addr = ipaddr_addr(DB_STATIC_STA_IP_NETMASK);
-        ip.gw.addr = ipaddr_addr(DB_STATIC_STA_IP_GW);
-        ESP_ERROR_CHECK(esp_netif_dhcpc_stop(esp_default_netif));
-        ESP_ERROR_CHECK(esp_netif_set_ip_info(esp_default_netif, &ip));
-        ESP_ERROR_CHECK(esp_netif_dhcpc_start(esp_default_netif));
-    } else {
-        //no static IP specified let the DHCP assign us one
-    }
+    assert(esp_default_netif);
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
@@ -324,6 +351,7 @@ int init_wifi_clientmode() {
                                                         NULL,
                                                         &instance_got_ip));
 
+
     wifi_config_t wifi_config = {
             .sta = {
                     .ssid = "DroneBridge_ESP32_Init",
@@ -337,7 +365,7 @@ int init_wifi_clientmode() {
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_LR));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
-    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
+    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE)); // disable power saving
     ESP_ERROR_CHECK(esp_wifi_start());
 
     ESP_LOGI(TAG, "Init of WiFi Client-Mode finished. (SSID: %s PASS: %s)", DB_WIFI_SSID, DB_WIFI_PWD);
@@ -572,6 +600,7 @@ void app_main() {
     }
     ESP_ERROR_CHECK(ret);
     read_settings_nvs();
+    set_reset_trigger();
     if (DB_WIFI_MODE == DB_WIFI_MODE_AP || DB_WIFI_MODE == DB_WIFI_MODE_AP_LR) {
         init_wifi_apmode(DB_WIFI_MODE);
     } else if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_AIR || DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND) {
@@ -607,5 +636,4 @@ void app_main() {
         // Disable legacy support for DroneBridge communication module - no use case for DroneBridge for ESP32
         // communication_module();
     }
-    set_reset_trigger();
 }

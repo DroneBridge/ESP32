@@ -115,6 +115,7 @@ function get_system_info() {
 		console.log("Received settings: " + json_data)
 		document.getElementById("about").innerHTML = "DroneBridge for ESP32 - v" + json_data["major_version"] +
 			"." + json_data["minor_version"] + " - esp-idf " + json_data["idf_version"]
+		document.getElementById("esp_mac").innerHTML = json_data["esp_mac"]
 	}).catch(error => {
 		conn_status = 0
 		error.message;
@@ -169,9 +170,9 @@ function get_stats() {
 		} else if ('connected_sta' in json_data) {
 			let a = ""
 			json_data["connected_sta"].forEach((item) => {
-				a = a + "<br />Client: " + item.sta_mac + " RSSI: " + item.sta_rssi + "dBm"
+				a = a + "Client: " + item.sta_mac + " RSSI: " + item.sta_rssi + "dBm<br />"
 			});
-			document.getElementById("current_client_ip").innerHTML = "IP Address: " + json_data["current_client_ip"] + a
+			document.getElementById("current_client_ip").innerHTML = a
 		}
 
 	}).catch(error => {
