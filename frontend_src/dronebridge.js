@@ -91,7 +91,7 @@ async function get_json(api_path) {
  * @param json_data JSON body data to send
  * @returns {Promise<any>}
  */
-async function send_json(api_path, json_data) {
+async function send_json(api_path, json_data = undefined) {
 	let post_url = ROOT_URL + api_path;
 	const response = await fetch(post_url, {
 		method: 'POST',
@@ -186,7 +186,7 @@ function get_stats() {
  *  returns 0 on success and -1 on failure
  */
 function get_settings() {
-	get_json("api/settings/request").then(json_data => {
+	get_json("api/settings").then(json_data => {
 		console.log("Received settings: " + json_data)
 		conn_status = 1
 		for (const key in json_data) {
@@ -218,7 +218,7 @@ function add_new_udp_client() {
 			ip: ip,
 			port: port
 		};
-		send_json("api/settings/addudp", JSON.stringify(myjson)).then(send_response => {
+		send_json("api/settings/clients/udp", JSON.stringify(myjson)).then(send_response => {
 			console.log(send_response);
 			conn_status = 1
 			show_toast(send_response["msg"])
@@ -249,7 +249,7 @@ function show_toast(msg) {
 function save_settings() {
 	let form = document.getElementById("settings_form")
 	let json_data = toJSONString(form)
-	send_json("api/settings/change", json_data).then(send_response => {
+	send_json("api/settings", json_data).then(send_response => {
 		console.log(send_response);
 		conn_status = 1
 		show_toast(send_response["msg"])
@@ -260,7 +260,7 @@ function save_settings() {
 }
 
 function trigger_reboot() {
-	get_json("api/system/reboot").then(json_data => {
+	send_json("api/system/reboot").then(json_data => {
 		show_toast(json_data["msg"])
 	}).catch(error => {
 		error.message;
