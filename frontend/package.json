@@ -1,0 +1,10 @@
+{
+  "name": "@dronebridge/esp32-frontend",
+  "version": "0.0.0",
+  "devDependencies": {
+    "inline-source-cli": "^2.0.0"
+  },
+  "scripts": {
+    "build": "OUT=../build/frontend; mkdir -p $OUT && inline-source --compress < index.html > $OUT/index.html && cp *.png *.ico $OUT"
+  }
+}

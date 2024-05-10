@@ -1,50 +1,26 @@
 <!DOCTYPE html>
 <html lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns="http://www.w3.org/1999/html">
 <head>
-    <meta content="text/javascript" http-equiv="content-type">
-    <meta content="Settings for DB for ESP32" name="description">
-    <meta content="Wolfgang Christl" name="author">
-    <meta content="width=device-width, initial-scale=1" name="viewport">
+    <meta name="description" content="Settings for DB for ESP32">
+    <meta name="author" content="Wolfgang Christl">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>DB for ESP32 Settings</title>
-    <link href="android-icon-192x192.png" rel="icon" sizes="192x192" type="image/png">
-    <link href="favicon-32x32.png" rel="icon" sizes="32x32" type="image/png">
-    <link href="favicon-96x96.png" rel="icon" sizes="96x96" type="image/png">
-    <link href="favicon-16x16.png" rel="icon" sizes="16x16" type="image/png">
-    <meta content="#3166FF" name="theme-color">
-    <style>.columns,.container{width:100%;box-sizing:border-box}h1,h2,h3{letter-spacing:-.1rem}body,h6{line-height:1.6}ol,p,ul{margin-top:0}.container{position:relative;max-width:800px;margin:0 auto;padding:0 20px}.column,.columns{float:left}@media (min-width:400px){.container{width:85%;padding:0}}html{font-size:62.5%}body{font-size:1.5em;font-weight:400;font-family:Raleway,HelveticaNeue,"Helvetica Neue",Helvetica,Arial,sans-serif;color:#222}h1,h2,h3,h4,h5,h6{margin-top:0;margin-bottom:2rem;font-weight:300}h1{font-size:4rem;line-height:1.2}h2{font-size:3.6rem;line-height:1.25}h3{font-size:3rem;line-height:1.3}h4{font-size:2.4rem;line-height:1.35;letter-spacing:-.08rem}h5{font-size:1.8rem;line-height:1.5;letter-spacing:-.05rem}h6{font-size:1.5rem;letter-spacing:0}@media (min-width:550px){.container{width:80%}.column,.columns{margin-left:4%}.column:first-child,.columns:first-child{margin-left:0}.one.column,.one.columns{width:4.66666666667%}.two.columns{width:13.3333333333%}.three.columns{width:22%}.four.columns,.one-third.column{width:30.6666666667%}.five.columns{width:39.3333333333%}.one-half.column,.six.columns{width:48%}.seven.columns{width:56.6666666667%}.eight.columns,.two-thirds.column{width:65.3333333333%}.nine.columns{width:74%}.ten.columns{width:82.6666666667%}.eleven.columns{width:91.3333333333%}.twelve.columns{width:100%;margin-left:0}.offset-by-one.column,.offset-by-one.columns{margin-left:8.66666666667%}.offset-by-two.column,.offset-by-two.columns{margin-left:17.3333333333%}.offset-by-three.column,.offset-by-three.columns{margin-left:26%}.offset-by-four.column,.offset-by-four.columns,.offset-by-one-third.column,.offset-by-one-third.columns{margin-left:34.6666666667%}.offset-by-five.column,.offset-by-five.columns{margin-left:43.3333333333%}.offset-by-one-half.column,.offset-by-one-half.columns,.offset-by-six.column,.offset-by-six.columns{margin-left:52%}.offset-by-seven.column,.offset-by-seven.columns{margin-left:60.6666666667%}.offset-by-eight.column,.offset-by-eight.columns,.offset-by-two-thirds.column,.offset-by-two-thirds.columns{margin-left:69.3333333333%}.offset-by-nine.column,.offset-by-nine.columns{margin-left:78%}.offset-by-ten.column,.offset-by-ten.columns{margin-left:86.6666666667%}.offset-by-eleven.column,.offset-by-eleven.columns{margin-left:95.3333333333%}h1{font-size:5rem}h2{font-size:4.2rem}h3{font-size:3.6rem}h4{font-size:3rem}h5{font-size:2.4rem}h6{font-size:1.5rem}}a{color:#1eaedb}a:hover{color:#0fa0ce}.button,button,input[type=button],input[type=reset],input[type=submit]{display:inline-block;height:38px;padding:0 30px;color:#555;text-align:center;font-size:11px;font-weight:600;line-height:38px;letter-spacing:.1rem;text-transform:uppercase;text-decoration:none;white-space:nowrap;background-color:#fff0;border-radius:4px;border:1px solid #bbb;cursor:pointer;box-sizing:border-box}ol,td:first-child,th:first-child,ul{padding-left:0}.button:focus,.button:hover,button:focus,button:hover,input[type=button]:focus,input[type=button]:hover,input[type=reset]:focus,input[type=reset]:hover,input[type=submit]:focus,input[type=submit]:hover{color:#333;border-color:#888;outline:0}.button.button-primary,button.button-primary,input[type=button].button-primary,input[type=reset].button-primary,input[type=submit].button-primary{color:#fff;background-color:#33c3f0;border-color:#33c3f0}.button.button-primary:focus,.button.button-primary:hover,button.button-primary:focus,button.button-primary:hover,input[type=button].button-primary:focus,input[type=button].button-primary:hover,input[type=reset].button-primary:focus,input[type=reset].button-primary:hover,input[type=submit].button-primary:focus,input[type=submit].button-primary:hover{color:#fff;background-color:#1eaedb;border-color:#1eaedb}input[type=email],input[type=number],input[type=password],input[type=search],input[type=tel],input[type=text],input[type=url],select,textarea{height:38px;padding:6px 10px;background-color:#fff;border:1px solid #d1d1d1;border-radius:4px;box-shadow:none;box-sizing:border-box}input[type=email],input[type=number],input[type=password],input[type=search],input[type=tel],input[type=text],input[type=url],textarea{-webkit-appearance:none;-moz-appearance:none;appearance:none}textarea{min-height:65px;padding-top:6px;padding-bottom:6px}input[type=email]:focus,input[type=number]:focus,input[type=password]:focus,input[type=search]:focus,input[type=tel]:focus,input[type=text]:focus,input[type=url]:focus,select:focus,textarea:focus{border:1px solid #33c3f0;outline:0}label,legend{display:block;margin-bottom:.5rem;font-weight:600}fieldset{padding:0;border-width:0}input[type=checkbox],input[type=radio]{display:inline}label>.label-body{display:inline-block;margin-left:.5rem;font-weight:400}ul{list-style:circle inside}ol{list-style:decimal inside}ol ol,ol ul,ul ol,ul ul{margin:1.5rem 0 1.5rem 3rem;font-size:90%}.button,button,li{margin-bottom:1rem}code{padding:.2rem .5rem;margin:0 .2rem;font-size:90%;white-space:nowrap;background:#f1f1f1;border:1px solid #e1e1e1;border-radius:4px}pre>code{display:block;padding:1rem 1.5rem;white-space:pre}td,th{padding:12px 15px;text-align:left;border-bottom:1px solid #e1e1e1}td:last-child,th:last-child{padding-right:0}fieldset,input,select,textarea{margin-bottom:1.5rem}blockquote,dl,figure,form,ol,p,pre,table,ul{margin-bottom:2.5rem}hr{margin-top:3rem;margin-bottom:3.5rem;border-width:0;border-top:1px solid #e1e1e1}.container:after,.row:after,.u-cf{content:"";display:table;clear:both}</style>
-    <style>/*!
-         * Toastify js 1.12.0
-         * https://github.com/apvarun/toastify-js
-         * @license MIT licensed
-         *
-         * Copyright (C) 2018 Varun A P
-         */
-    .toast-close,.toastify{color:#fff;cursor:pointer}.toastify{padding:12px 20px;display:inline-block;box-shadow:0 3px 6px -1px rgb(0 0 0 / .12),0 10px 36px -4px rgb(77 96 232 / .3);background:-webkit-linear-gradient(315deg,#73a5ff,#5477f5);background:linear-gradient(135deg,#73a5ff,#5477f5);position:fixed;opacity:0;transition:.4s cubic-bezier(.215,.61,.355,1);border-radius:2px;text-decoration:none;max-width:calc(50% - 20px);z-index:2147483647}.toastify.on{opacity:1}.toast-close{background:0 0;border:0;font-family:inherit;font-size:1em;opacity:.4;padding:0 5px}.toastify-right{right:15px}.toastify-left{left:15px}.toastify-top{top:-150px}.toastify-bottom{bottom:-150px}.toastify-rounded{border-radius:25px}.toastify-avatar{width:1.5em;height:1.5em;margin:-7px 5px;border-radius:2px}.toastify-center{margin-left:auto;margin-right:auto;left:0;right:0;max-width:fit-content}@media only screen and (max-width:360px){.toastify-left,.toastify-right{margin-left:auto;margin-right:auto;left:0;right:0;max-width:fit-content}}</style>
-    <style>label{font-weight:400;font-size:small}form,h3{margin-bottom:.5rem}.dot_green,.dot_red{height:.8rem;width:.8rem;border-radius:50%;display:inline-block}html{min-height:100%}body{height:100%;margin:0;color:#fff;background:#003166;background:linear-gradient(180deg,#003166 0,#135ba8 100%)}h2{font-size:x-large;padding-top:2rem;margin-bottom:.8rem}h3{font-family:Arial,sans-serif;font-size:large}button.button-primary{background-color:#fff0;color:#ff9734;border-color:#ff9734}button.button-primary:hover{background-color:#ff9734;color:#fff;border-color:#ff9734}button.button-primary:focus{background-color:#003166;color:#fff;border-color:#9a4e0b}input,select{color:#000}.dot_green{background-color:#68b838}.dot_red{background-color:#f63e3e}</style>
-    <script type="text/javascript">/*!
-             * Toastify js 1.12.0
-             * https://github.com/apvarun/toastify-js
-             * @license MIT licensed
-             *
-             * Copyright (C) 2018 Varun A P
-             */
-    !function(t,o){"object"==typeof module&&module.exports?module.exports=o():t.Toastify=o()}(this,(function(t){var o=function(t){return new o.lib.init(t)};function i(t,o){return o.offset[t]?isNaN(o.offset[t])?o.offset[t]:o.offset[t]+"px":"0px"}
-        function s(t,o){return!(!t||"string"!=typeof o)&&!!(t.className&&t.className.trim().split(/\s+/gi).indexOf(o)>-1)}
-        return o.defaults={oldestFirst:!0,text:"Toastify is awesome!",node:void 0,duration:3e3,selector:void 0,callback:function(){},destination:void 0,newWindow:!1,close:!1,gravity:"toastify-top",positionLeft:!1,position:"",backgroundColor:"",avatar:"",className:"",stopOnFocus:!0,onClick:function(){},offset:{x:0,y:0},escapeMarkup:!0,ariaLive:"polite",style:{background:""}},o.lib=o.prototype={toastify:"1.12.0",constructor:o,init:function(t){return t||(t={}),this.options={},this.toastElement=null,this.options.text=t.text||o.defaults.text,this.options.node=t.node||o.defaults.node,this.options.duration=0===t.duration?0:t.duration||o.defaults.duration,this.options.selector=t.selector||o.defaults.selector,this.options.callback=t.callback||o.defaults.callback,this.options.destination=t.destination||o.defaults.destination,this.options.newWindow=t.newWindow||o.defaults.newWindow,this.options.close=t.close||o.defaults.close,this.options.gravity="bottom"===t.gravity?"toastify-bottom":o.defaults.gravity,this.options.positionLeft=t.positionLeft||o.defaults.positionLeft,this.options.position=t.position||o.defaults.position,this.options.backgroundColor=t.backgroundColor||o.defaults.backgroundColor,this.options.avatar=t.avatar||o.defaults.avatar,this.options.className=t.className||o.defaults.className,this.options.stopOnFocus=void 0===t.stopOnFocus?o.defaults.stopOnFocus:t.stopOnFocus,this.options.onClick=t.onClick||o.defaults.onClick,this.options.offset=t.offset||o.defaults.offset,this.options.escapeMarkup=void 0!==t.escapeMarkup?t.escapeMarkup:o.defaults.escapeMarkup,this.options.ariaLive=t.ariaLive||o.defaults.ariaLive,this.options.style=t.style||o.defaults.style,t.backgroundColor&&(this.options.style.background=t.backgroundColor),this},buildToast:function(){if(!this.options)throw "Toastify is not initialized";var t=document.createElement("div");for(var o in t.className="toastify on "+this.options.className,this.options.position?t.className+=" toastify-"+this.options.position:!0===this.options.positionLeft?(t.className+=" toastify-left",console.warn("Property `positionLeft` will be depreciated in further versions. Please use `position` instead.")):t.className+=" toastify-right",t.className+=" "+this.options.gravity,this.options.backgroundColor&&console.warn('DEPRECATION NOTICE: "backgroundColor" is being deprecated. Please use the "style.background" property.'),this.options.style)t.style[o]=this.options.style[o];if(this.options.ariaLive&&t.setAttribute("aria-live",this.options.ariaLive),this.options.node&&this.options.node.nodeType===Node.ELEMENT_NODE)t.appendChild(this.options.node);else if(this.options.escapeMarkup?t.innerText=this.options.text:t.innerHTML=this.options.text,""!==this.options.avatar){var s=document.createElement("img");s.src=this.options.avatar,s.className="toastify-avatar","left"==this.options.position||!0===this.options.positionLeft?t.appendChild(s):t.insertAdjacentElement("afterbegin",s)}
-                if(!0===this.options.close){var e=document.createElement("button");e.type="button",e.setAttribute("aria-label","Close"),e.className="toast-close",e.innerHTML="&#10006;",e.addEventListener("click",function(t){t.stopPropagation(),this.removeElement(this.toastElement),window.clearTimeout(this.toastElement.timeOutValue)}.bind(this));var n=window.innerWidth>0?window.innerWidth:screen.width;("left"==this.options.position||!0===this.options.positionLeft)&&n>360?t.insertAdjacentElement("afterbegin",e):t.appendChild(e)}
-                if(this.options.stopOnFocus&&this.options.duration>0){var a=this;t.addEventListener("mouseover",(function(o){window.clearTimeout(t.timeOutValue)})),t.addEventListener("mouseleave",(function(){t.timeOutValue=window.setTimeout((function(){a.removeElement(t)}),a.options.duration)}))}
-                if(void 0!==this.options.destination&&t.addEventListener("click",function(t){t.stopPropagation(),!0===this.options.newWindow?window.open(this.options.destination,"_blank"):window.location=this.options.destination}.bind(this)),"function"==typeof this.options.onClick&&void 0===this.options.destination&&t.addEventListener("click",function(t){t.stopPropagation(),this.options.onClick()}.bind(this)),"object"==typeof this.options.offset){var l=i("x",this.options),r=i("y",this.options),p="left"==this.options.position?l:"-"+l,d="toastify-top"==this.options.gravity?r:"-"+r;t.style.transform="translate("+p+","+d+")"}
-                return t},showToast:function(){var t;if(this.toastElement=this.buildToast(),!(t="string"==typeof this.options.selector?document.getElementById(this.options.selector):this.options.selector instanceof HTMLElement||"undefined"!=typeof ShadowRoot&&this.options.selector instanceof ShadowRoot?this.options.selector:document.body))throw "Root element is not defined";var i=o.defaults.oldestFirst?t.firstChild:t.lastChild;return t.insertBefore(this.toastElement,i),o.reposition(),this.options.duration>0&&(this.toastElement.timeOutValue=window.setTimeout(function(){this.removeElement(this.toastElement)}.bind(this),this.options.duration)),this},hideToast:function(){this.toastElement.timeOutValue&&clearTimeout(this.toastElement.timeOutValue),this.removeElement(this.toastElement)},removeElement:function(t){t.className=t.className.replace(" on",""),window.setTimeout(function(){this.options.node&&this.options.node.parentNode&&this.options.node.parentNode.removeChild(this.options.node),t.parentNode&&t.parentNode.removeChild(t),this.options.callback.call(t),o.reposition()}.bind(this),400)}},o.reposition=function(){for(var t,o={top:15,bottom:15},i={top:15,bottom:15},e={top:15,bottom:15},n=document.getElementsByClassName("toastify"),a=0;a<n.length;a++){t=!0===s(n[a],"toastify-top")?"toastify-top":"toastify-bottom";var l=n[a].offsetHeight;t=t.substr(9,t.length-1);(window.innerWidth>0?window.innerWidth:screen.width)<=360?(n[a].style[t]=e[t]+"px",e[t]+=l+15):!0===s(n[a],"toastify-left")?(n[a].style[t]=o[t]+"px",o[t]+=l+15):(n[a].style[t]=i[t]+"px",i[t]+=l+15)}
-            return this},o.lib.init.prototype=o.lib,o}));</script>
-    <!--Minified version of dronebridge.js-->
-    <script>
-        const ROOT_URL=window.location.href;let conn_status=0;function change_ap_ip_visibility(){var e=document.getElementById("ap_ip_div"),t=document.getElementById("ap_channel_div"),n=document.getElementById("esp-lr-ap-disclaimer");"2"===document.getElementById("esp32_mode").value?(e.style.display="none",t.style.display="none"):(e.style.display="block",t.style.display="block"),document.getElementById("esp32_mode").value>="3"?n.style.display="block":n.style.display="none"}function change_msp_ltm_visibility(){var e=document.getElementById("msp_ltm_div"),t=document.getElementById("trans_pack_size_div");"1"===document.getElementById("telem_proto").value?(e.style.display="block",t.style.display="none"):(e.style.display="none",t.style.display="block")}function toJSONString(e){let t={},n=e.querySelectorAll("input, select");for(let e=0;e<n.length;++e){let s=n[e],o=s.name,i=s.value;isNaN(Number(i))||0===o.localeCompare("wifi_ssid")||0===o.localeCompare("wifi_pass")?o&&(t[o]=i):o&&(t[o]=parseInt(i))}return JSON.stringify(t)}async function get_json(e){let t=ROOT_URL+e;const n=new AbortController,s=(setTimeout((()=>{n.abort()}),1e3),await fetch(t,{signal:n.signal}));if(!s.ok){const e=`An error has occured: ${s.status}`;throw conn_status=0,new Error(e)}return await s.json()}async function send_json(e,t){let n=ROOT_URL+e;const s=await fetch(n,{method:"POST",headers:{Accept:"application/json","Content-Type":"application/json",charset:"UTF-8"},body:t});if(!s.ok){conn_status=0;const e=`An error has occured: ${s.status}`;throw new Error(e)}return await s.json()}function get_system_info(){return get_json("api/system/info").then((e=>{console.log("Received settings: "+e),document.getElementById("about").innerHTML="DroneBridge for ESP32 - v"+e.major_version+"."+e.minor_version+" - esp-idf "+e.idf_version,document.getElementById("esp_mac").innerHTML=e.esp_mac})).catch((e=>(conn_status=0,e.message,-1))),0}function update_conn_status(){conn_status?document.getElementById("web_conn_status").innerHTML='<span class="dot_green"></span> connected to ESP32':(document.getElementById("web_conn_status").innerHTML='<span class="dot_red"></span> disconnected from ESP32',document.getElementById("current_client_ip").innerHTML="")}function get_stats(){get_json("api/system/stats").then((e=>{conn_status=1;let t=parseInt(e.read_bytes);!isNaN(t)&&t>1e3?document.getElementById("read_bytes").innerHTML=t/1e3+" kb":isNaN(t)||(document.getElementById("read_bytes").innerHTML=t+" bytes");let n=parseInt(e.tcp_connected);isNaN(n)||1!==n?isNaN(n)||(document.getElementById("tcp_connected").innerHTML=n+" clients"):document.getElementById("tcp_connected").innerHTML=n+" client";let s=parseInt(e.udp_connected);if(isNaN(s)||1!==s?isNaN(s)||(document.getElementById("udp_connected").innerHTML=s+" clients"):document.getElementById("udp_connected").innerHTML=s+" client","esp_rssi"in e){let t=parseInt(e.esp_rssi);!isNaN(t)&&t<0?document.getElementById("current_client_ip").innerHTML="IP Address: "+e.current_client_ip+"<br />RSSI: "+t+"dBm":isNaN(t)||(document.getElementById("current_client_ip").innerHTML="IP Address: "+e.current_client_ip)}else if("connected_sta"in e){let t="";e.connected_sta.forEach((e=>{t=t+"<br />Client: "+e.sta_mac+" RSSI: "+e.sta_rssi+"dBm"})),document.getElementById("current_client_ip").innerHTML=t}})).catch((e=>{conn_status=0,e.message}))}function get_settings(){return get_json("api/settings/request").then((e=>{console.log("Received settings: "+e),conn_status=1;for(const t in e)if(e.hasOwnProperty(t)){let n=document.getElementById(t);null!=n&&(n.value=e[t]+"")}})).catch((e=>(conn_status=0,e.message,show_toast(e.message),-1))),change_ap_ip_visibility(),change_msp_ltm_visibility(),0}function add_new_udp_client(){var e=prompt("Please enter the IP address of the UDP receiver","192.168.2.X"),t=parseInt(prompt("Please enter the port number of the UDP receiver","14550"));if(null!=e&&null!=t&&/^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(e)){let n={ip:e,port:t};send_json("api/settings/addudp",JSON.stringify(n)).then((e=>{console.log(e),conn_status=1,show_toast(e.msg)})).catch((e=>{show_toast(e.message)}))}else show_toast("Error: Enter valid IP and port!")}function show_toast(e){Toastify({text:e,duration:5e3,newWindow:!0,close:!0,gravity:"top",position:"center",backgroundColor:"linear-gradient(to right, #b6e026, #abdc28)",stopOnFocus:!0}).showToast()}function save_settings(){send_json("api/settings/change",toJSONString(document.getElementById("settings_form"))).then((e=>{console.log(e),conn_status=1,show_toast(e.msg),get_settings()})).catch((e=>{show_toast(e.message)}))}function trigger_reboot(){get_json("api/system/reboot").then((e=>{show_toast(e.msg)})).catch((e=>{e.message,show_toast(e.message)}))}</script>
+    <link rel="icon" type="image/png" sizes="192x192" href="android-icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+    <meta name="theme-color" content="#3166FF">
+    <link inline href="skeleton.css" />
+    <link inline href="toastify/toastify.css" />
+    <link inline href="dronebridge.css" />
+    <script inline src="toastify/toastify.js"></script>
+    <script inline src="dronebridge.js"></script>
 </head>
 <body>
 <div class="container">
     <br>
     <div class="twelve columns">
-        <img alt="DB Logo" src="DroneBridgeLogo.png">
+        <img src="DroneBridgeLogo.png" alt="DB Logo">
     </div>
 </div>
 <div class="container">
@@ -52,11 +28,11 @@
         <div>
             <h2>Statistics</h2>
             <div class="row">
-                <div class="six columns" id="web_conn_status" style="font-size: 1.3rem">
+                <div style="font-size: 1.3rem" id="web_conn_status" class="six columns">
                 </div>
             </div>
             <div class="row">
-                <div class="six columns" id="current_client_ip" style="font-size: 1.3rem">
+                <div style="font-size: 1.3rem" id="current_client_ip" class="six columns">
                 </div>
             </div>
             <div class="row">
@@ -80,7 +56,7 @@
             <div class="row">
                 <div class="twelve columns">
                     <label for="esp32_mode">ESP32 Mode (requires save & reboot)</label>
-                    <select form="settings_form" id="esp32_mode" name="esp32_mode" onchange="change_ap_ip_visibility()">
+                    <select id="esp32_mode" name="esp32_mode" form="settings_form" onchange="change_ap_ip_visibility()">
                         <option value="1">WiFi Access Point Mode</option>
                         <option value="2">WiFi Client Mode</option>
                         <option value="3">Wifi Access Point LR Mode</option>
@@ -99,50 +75,50 @@
             <div class="row">
                 <div class="six columns">
                     <label for="wifi_ssid">SSID</label>
-                    <input id="wifi_ssid" name="wifi_ssid" type="text" value="">
+                    <input type="text" name="wifi_ssid" value="" id="wifi_ssid">
                 </div>
                 <div class="six columns">
                     <label for="wifi_pass">Password</label>
-                    <input id="wifi_pass" name="wifi_pass" type="text" value="">
+                    <input type="text" name="wifi_pass" value="" id="wifi_pass">
                 </div>
             </div>
             <div class="row">
-                <div class="twelve columns" id="ap_channel_div">
+                <div id="ap_channel_div" class="twelve columns">
                     <label for="ap_channel">Channel</label>
-                    <input id="ap_channel" name="ap_channel" type="text" value="">
+                    <input type="text" name="ap_channel" value="" id="ap_channel">
                 </div>
             </div>
             <h3>Serial</h3>
             <div class="row">
                 <div class="six columns">
                     <label for="tx_pin">UART TX Pin</label>
-                    <input id="tx_pin" name="tx_pin" type="text" value="">
+                    <input type="text" name="tx_pin" value="" id="tx_pin">
                 </div>
                 <div class="six columns">
                     <label for="rx_pin">UART RX Pin</label>
-                    <input id="rx_pin" name="rx_pin" type="text" value="">
+                    <input type="text" name="rx_pin" value="" id="rx_pin">
                 </div>
             </div>
             <div class="row">
                 <div class="six columns">
                     <label for="rts_pin">UART RTS Pin</label>
-                    <input id="rts_pin" name="rts_pin" type="text" value="">
+                    <input type="text" name="rts_pin" value="" id="rts_pin">
                 </div>
                 <div class="six columns">
                     <label for="cts_pin">UART CTS Pin</label>
-                    <input id="cts_pin" name="cts_pin" type="text" value="">
+                    <input type="text" name="cts_pin" value="" id="cts_pin">
                 </div>
             </div>
             <div class="row">
                 <div class="six columns">
                     <label for="rts_thresh">UART RTS threshold</label>
-                    <input id="rts_thresh" max="128" min="1" name="rts_thresh" type="number">
+                    <input type="number" id="rts_thresh" name="rts_thresh" min="1" max="128">
                 </div>
             </div>
             <div class="row">
                 <div class="six columns">
                     <label for="telem_proto">UART serial protocol</label>
-                    <select form="settings_form" id="telem_proto" name="telem_proto"
+                    <select id="telem_proto" name="telem_proto" form="settings_form"
                             onchange="change_msp_ltm_visibility()">
                         <option value="1">MSP/LTM</option>
                         <option value="4">MAVLink</option>
@@ -151,7 +127,7 @@
                 </div>
                 <div class="six columns">
                     <label for="baud">UART baud</label>
-                    <select form="settings_form" id="baud" name="baud">
+                    <select name="baud" id="baud" form="settings_form">
                         <option value="5000000">5000000</option>
                         <option value="1500000">1500000</option>
                         <option value="1000000">1000000</option>
@@ -172,10 +148,10 @@
                     </select>
                 </div>
             </div>
-            <div class="row" id="msp_ltm_div">
+            <div id="msp_ltm_div" class="row">
                 <div class="twelve columns">
                     <label for="ltm_pp">LTM frames per packet</label>
-                    <select form="settings_form" id="ltm_pp" name="ltm_pp">
+                    <select id="ltm_pp" name="ltm_pp" form="settings_form">
                         <option value="1">1</option>
                         <option value="2">2</option>
                         <option value="3">3</option>
@@ -185,10 +161,10 @@
                     </select>
                 </div>
             </div>
-            <div class="row" id="trans_pack_size_div">
+            <div id="trans_pack_size_div" class="row">
                 <div class="twelve columns">
                     <label for="trans_pack_size">Maximum packet size</label>
-                    <select form="settings_form" id="trans_pack_size" name="trans_pack_size">
+                    <select id="trans_pack_size" name="trans_pack_size" form="settings_form">
                         <option value="16">16</option>
                         <option value="32">32</option>
                         <option value="64">64</option>
@@ -199,10 +175,10 @@
                     </select>
                 </div>
             </div>
-            <div class="row" id="ap_ip_div">
+            <div id="ap_ip_div" class="row">
                 <div class="six columns">
                     <label for="ap_ip">Gateway IP address</label>
-                    <input id="ap_ip" name="ap_ip" type="text" value="">
+                    <input type="text" name="ap_ip" value="" id="ap_ip">
                 </div>
             </div>
         </div>
