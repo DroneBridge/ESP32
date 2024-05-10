@@ -22,6 +22,8 @@
 
 #include <lwip/sockets.h>
 
+#define MULTICAST_IPV4_ADDR "232.10.11.12" // "224.0.0.1"
+#define MULTICAST_TTL 1
 #define MAX_UDP_CLIENTS 8
 #define TRANS_RD_BYTES_NUM  8   // amount of bytes read form serial port at once when transparent is selected
 #define UDP_BUF_SIZE    2048

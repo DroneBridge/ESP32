@@ -553,6 +553,7 @@ esp_err_t db_espnow_init() {
  * @return true when packet was scheduled for sending, false if it will not be sent
  */
 bool db_espnow_send_internal_telemetry_packet() {
+    // ToDo: Inject packet into Queue instead of sending via this additional sending function.
     if (DB_WIFI_MODE != DB_WIFI_MODE_ESPNOW_GND) {
         // Only GND sends internal telemetry. This function was called wrongly
         return false;
