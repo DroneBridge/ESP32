@@ -5,6 +5,6 @@
     "inline-source-cli": "^2.0.0"
   },
   "scripts": {
-    "build": "inline-source --compress < index.html > ../frontend/index.html && cp *.png *.ico ../frontend"
+    "build": "OUT=../build/frontend; mkdir -p $OUT && inline-source --compress < index.html > $OUT/index.html && cp *.png *.ico $OUT"
   }
 }
