@@ -2,9 +2,12 @@
   "name": "@dronebridge/esp32-frontend",
   "version": "0.0.0",
   "devDependencies": {
-    "inline-source-cli": "^2.0.0"
+    "i": "^0.3.7",
+    "inline-source-cli": "^2.0.0",
+    "npm": "^10.7.0",
+    "shx": "^0.3.4"
   },
   "scripts": {
-    "build": "OUT=../build/frontend; mkdir -p $OUT && inline-source --compress < index.html > $OUT/index.html && cp *.png *.ico $OUT"
+    "build": "inline-source --compress < index.html > build/index.html && shx cp *.png *.ico build/"
   }
 }

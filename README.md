@@ -7,23 +7,26 @@ communicate with your drone, UAV, UAS, ground based vehicle or whatever you may 
 It also allows for a fully transparent serial to WiFi pass through link with variable packet size
 (Continuous stream of data required).
 
-DroneBridge for ESP32 is a telemetry/low data rate only solution. There is no support for cameras connected to the ESP32 since it does not support video encoding.
+DroneBridge for ESP32 is a telemetry/low data rate only solution. There is no support for cameras connected to the ESP32 
+since it does not support video encoding.
 
 ![DroneBridge for ESP32 concept](wiki/db_ESP32_setup.png)
 
 ## Features
--   Bi-directional transparent serial to WiFi & ESP-NOW link
--   Support for MAVLink, MSP, LTM or any other payload
+-   Bidirectional transparent serial to WiFi, espressif WiFi Long-Range (LR) & ESP-NOW link
+-   Support for MAVLink, MSP, LTM or any other payload using transparent option
 -   Affordable: ~7€
 -   Up to 150m range using WiFi
--   Up to 1km of range using ESP-NOW or Wi-Fi LR Mode (sender & receiver must be ESP32 with LR-Mode enabled [(ESP32 C2 is not supported)](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#lr-compatibility))
+-   Up to 1km of range using ESP-NOW or Wi-Fi LR Mode - sender & receiver must be ESP32 with LR-Mode enabled [(ESP32 C2 is not supported)](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#lr-compatibility)
+-   Fully encrypted in all modes including ESP-NOW broadcasts secured using AES-GCM!
 -   Weight: <10 g
--   Supported by: QGroundControl, DroneBridge for Android (app), mwptools, impload etc.
+-   Supported by: QGroundControl, Mission Planner, mwptools, impload etc.
 -   Easy to set up: Power connection + UART connection to flight controller
 -   Fully configurable through easy to use web interface
 -   Parsing of LTM & MSPv2 for more reliable connection and less packet loss
--   Fully transparent telemetry downlink option for continuous streams like MAVLink or any other protocol
--   Reliable, low latency, light weight
+-   Parsing of MAVLink with injection of Radio Status packets for display of RSSI in the GCS
+-   Fully transparent telemetry down-link option for continuous streams
+-   Reliable, low latency
 -   Upload mission etc.
 
 <img src="https://media-cdn.seeedstudio.com/media/catalog/product/cache/bb49d3ec4ee05b6f018e93f896b8a25d/1/-/1-113991054-seeed-studio-xiao-esp32c3-45font_1.jpg" width="350">
@@ -82,12 +85,21 @@ There are many multiple ways on how to flash the firmware.
 
 **[For further info please check the wiki!](https://github.com/DroneBridge/ESP32/wiki/Configuration)**
 
-## Use with DroneBridge for Android or QGroundControl
-![DroneBridge for Android app screenshot](wiki/dp_app-map-2017-10-29-kleiner.png)
+## Use with QGroundControl, Mission Planner or any other GCS
 
--   Use the Android app to display live telemetry data. Mission planning capabilities for MAVLink will follow.
--   The ESP will auto broadcast messages to all connected devices via UDP to port 14550. QGroundControl should auto connect
--   Connect via **TCP on port 5760** or **UDP on port 14550** to the ESP32 to send & receive data with a GCS of your choice. **In case of a UDP connection the GCS must send at least one packet (e.g. MAVLink heart beat etc.) to the UDP port of the ESP32 to register as an end point.**
+-   The ESP will auto send data to all connected devices via UDP to port 14550. QGroundControl should auto connect using UDP
+-   Connect via **TCP on port 5760** or **UDP on port 14550** to the ESP32 to send & receive data with a GCS of your choice. 
+-   **In case of a UDP connection the GCS must send at least one packet (e.g. MAVLink heart beat etc.) to the UDP port of the ESP32 to register as an end point.**
+-   Manually add a UDP target usign the webinterface
+
+## Further Support & Donations
+
+If you benefited from this project please consider a donation: 
+-   [PayPal](https://www.paypal.com/donate/?hosted_button_id=SG97392AJN73J)
+-   [Buy me a coffee](https://buymeacoffee.com/seeul8er)
+
+For questions or general chatting regarding DroneBridge for ESP32 please visit the  
+**[Discord Channel](https://discord.gg/pqmHJNArE3)**.
 
 ## Developers
 
@@ -98,6 +110,10 @@ There are many multiple ways on how to flash the firmware.
  **This project supports the v5.1.2 of ESP-IDF**  
  Compile and flash by running: `idf.py build`, `idf.py flash`
 
+The webinterface builds using the command `idf.py frontend`. This is done automatically when compiling the entire project using `idf.py build`. 
+The frontend is build to `build/frontend`.  
+Alternatively, the frontend can be built using `npm install && npm i -D shx && npm run build` within `/frontend/`, then manually copy the content of `/frontend/build` to `/build/frontend`
+
  ### API
 The webinterface communicates with a REST:API on the ESP32. You can use that API to set configurations not selectable 
 via the web-interface (e.g. baud rate). It also allows you to easily integrate DroneBridge for ESP32.
@@ -105,22 +121,27 @@ via the web-interface (e.g. baud rate). It also allows you to easily integrate D
 
 #### Request settings
 ```http request
-http://dronebridge.local/api/settings/request
+GET http://dronebridge.local/api/settings
 ```
 
 #### Request stats
 ```http request
-http://dronebridge.local/api/system/stats
+GET http://dronebridge.local/api/system/stats
 ```
 
-#### Request IP and port of active UDP connections**
+#### Request ESP32 info
 ```http request
-http://dronebridge.local/api/system/conns
+GET http://dronebridge.local/api/system/info
+```
+
+#### Request IP and port of active UDP connections
+```http request
+GET http://dronebridge.local/api/system/clients
 ```
 
 #### Trigger a reboot
 ```http request
-http://dronebridge.local/api/system/reboot
+POST http://dronebridge.local/api/system/reboot
 ```
 
 #### Trigger a general settings change:
@@ -143,7 +164,7 @@ Send a valid JSON
 ```
 to
 ```http request
-http://dronebridge.local/api/settings/change
+POST http://dronebridge.local/api/settings
 ```
 
 #### Manually add a UDP connection target:
@@ -156,11 +177,11 @@ Send a valid JSON
 ```
 to
 ```http request
-http://dronebridge.local/api/settings/addudp
+POST http://dronebridge.local/api/settings/clients/udp
 ```
 
 #### Assign a static IP to the ESP32 when in WiFi client mode:
-Send a valid JSON to set static IP, send the same JSON but with empty strings (``"client_ip": ""``) to remove static IP setting
+Send a valid JSON to set static IP, send the same JSON but with empty strings (`"client_ip": ""`) to remove static IP setting
 ```json
  {
   "client_ip": "XXX.XXX.XXX.XXX",
@@ -170,10 +191,12 @@ Send a valid JSON to set static IP, send the same JSON but with empty strings (`
 ```
 to
 ```http request
-http://dronebridge.local/api/settings/setstaticip
+POST http://dronebridge.local/api/settings/static-ip
 ```
 
  ### Testing
+Check `/test` for scripts triggering the API.
+
  To test the frontend without the ESP32 run 
 
  ```sh
