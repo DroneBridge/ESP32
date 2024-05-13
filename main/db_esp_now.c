@@ -205,16 +205,16 @@ bool db_espnow_encrypt_auth_send(db_esp_now_packet_t *db_esp_now_packet, const u
 }
 
 /**
- * Tries to read one entry from the ESP-NOW send queue (filled by the UART task) and sends the data via broadcast.
+ * Tries to read one entry from the ESP-NOW send queue (mainly filled by the UART task) and sends the data via broadcast.
  * Only call this function when the last ESP-NOW send callback has returned! Otherwise order of packets is not guaranteed
  *
  * @return false if no packet was sent, true if packet was sent (actual sending will be confirmed by the send-callback)
  */
 bool db_read_uart_queue_and_send() {
-    static db_espnow_uart_event_t evt;
+    static db_espnow_queue_event_t evt;
     // Receive data from Queue that was put there by other tasks to be sent via ESP-NOW
     if (db_espnow_send_queue != NULL && xQueueReceive(db_espnow_send_queue, &evt, 0) == pdTRUE) {
-        db_esp_now_packet_global.db_esp_now_packet_header.packet_type = DB_ESP_NOW_PACKET_TYPE_DATA; // set incase internal telemetry changed it
+        db_esp_now_packet_global.db_esp_now_packet_header.packet_type = evt.packet_type;
         if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND) {
             db_esp_now_packet_global.db_esp_now_packet_header.origin = DB_ESPNOW_ORIGIN_GND;
         } else {
@@ -276,7 +276,7 @@ void db_espnow_process_rcv_data(uint8_t *data, uint16_t data_len, uint8_t *src_a
         // Process packet depending on packet type
         if (db_esp_now_packet->db_esp_now_packet_header.packet_type == DB_ESP_NOW_PACKET_TYPE_DATA) {
             // Pass data to UART queue
-            db_espnow_uart_event_t db_uart_evt;
+            db_espnow_queue_event_t db_uart_evt;
             db_uart_evt.data_len = db_decrypted_data[0];    // should be equal to len_payload-1 if everything worked out
             db_uart_evt.data = malloc(db_uart_evt.data_len);
             // For some reason it seems we cannot directly decrypt to db_espnow_uart_event_t -> Queues get set to NULL
@@ -500,8 +500,8 @@ esp_err_t db_espnow_init() {
     }
 
     /* Init Queues for communication with control task */
-    db_espnow_send_queue = xQueueCreate(ESPNOW_QUEUE_SIZE, sizeof(db_espnow_uart_event_t));
-    db_uart_write_queue = xQueueCreate(ESPNOW_QUEUE_SIZE, sizeof(db_espnow_uart_event_t));
+    db_espnow_send_queue = xQueueCreate(ESPNOW_QUEUE_SIZE, sizeof(db_espnow_queue_event_t));
+    db_uart_write_queue = xQueueCreate(ESPNOW_QUEUE_SIZE, sizeof(db_espnow_queue_event_t));
     if (db_espnow_send_queue == NULL) {
         ESP_LOGE(TAG, "Create db_espnow_send_queue mutex fail");
         return ESP_FAIL;
@@ -552,40 +552,34 @@ esp_err_t db_espnow_init() {
  * Used by AIR side to create a RADIO_STATUS MAVLink message sent to GCS.
  * @return true when packet was scheduled for sending, false if it will not be sent
  */
-bool db_espnow_send_internal_telemetry_packet() {
-    // ToDo: Inject packet into Queue instead of sending via this additional sending function.
+bool db_espnow_schedule_internal_telemetry_packet() {
     if (DB_WIFI_MODE != DB_WIFI_MODE_ESPNOW_GND) {
         // Only GND sends internal telemetry. This function was called wrongly
         return false;
     } else {
         // continue
     }
-    db_esp_now_packet_global.db_esp_now_packet_header.origin = DB_ESPNOW_ORIGIN_GND;
-    db_esp_now_packet_global.db_esp_now_packet_header.packet_type = DB_ESP_NOW_PACKET_TYPE_INTERNAL_TELEMETRY;
-
+    // ToDo: Split list if longer than max payload size
     uint8_t payload_size = sizeof(db_esp_now_clients_list_t);
     if (payload_size > DB_ESPNOW_PAYLOAD_MAXSIZE) {
         ESP_LOGE(TAG, "Size of db_esp_now_clients_list_t is > %i", DB_ESPNOW_PAYLOAD_MAXSIZE);
         return false;
     } else { /* keep going */}
     // Set payload of DroneBridge for ESP32 ESP-NOW packet
-    db_esp_now_packet_global.db_esp_now_packet_protected_data.payload_length_decrypted = payload_size;
-    // ToDo: Potential to optimize: esp_now_send() does not need an instance of buffer after sending, however using evt.data as pointer resulted in errors
-    memcpy(db_esp_now_packet_global.db_esp_now_packet_protected_data.payload,
-           db_esp_now_clients_list,
-           db_esp_now_packet_global.db_esp_now_packet_protected_data.payload_length_decrypted);
-    // Encrypt, authenticate and send packet
-    ESP_LOGD(TAG, "Sending int. telem packet");
-    if(db_espnow_encrypt_auth_send(&db_esp_now_packet_global, payload_size)) {
-        // update sequence number for next packet
-        if (db_esp_now_packet_global.db_esp_now_packet_header.seq_num < UINT32_MAX) {
-            db_esp_now_packet_global.db_esp_now_packet_header.seq_num++;    // packet is static so just increase number once we sent it
-        } else {
-            db_esp_now_packet_global.db_esp_now_packet_header.seq_num = 0;  // catch overflow in case someone got crazy
-        }
-        return true;
-    } else {
+    ESP_LOGD(TAG, "Scheduling int. telem. packet");
+
+    db_espnow_queue_event_t evt;
+    evt.data = malloc(payload_size);
+    memcpy(evt.data, db_esp_now_clients_list, payload_size);
+    evt.data_len = payload_size;
+    evt.packet_type = DB_ESP_NOW_PACKET_TYPE_INTERNAL_TELEMETRY;
+    if (xQueueSend(db_espnow_send_queue, &evt, ESPNOW_MAXDELAY) != pdTRUE) {
+        ESP_LOGW(TAG, "Send to db_espnow_send_queue queue fail");
+        free(evt.data);
         return false;
+    } else {
+        // all good
+        return true;
     }
 }
 
@@ -616,8 +610,7 @@ _Noreturn void process_espnow_data() {
                     // of packets. ESP-NOW by default does not guarantee the order when many packets are sent in quick succession
                     ready_to_send = true;
                     if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND && send_internal_telemetry_frame) {
-                        send_internal_telemetry_frame = !db_espnow_send_internal_telemetry_packet();
-                        ready_to_send = send_internal_telemetry_frame;
+                        send_internal_telemetry_frame = !db_espnow_schedule_internal_telemetry_packet();
                     } else {
                         // try to immediately send the next packet if available and set ready_to_send accordingly
                         ready_to_send = !db_read_uart_queue_and_send();

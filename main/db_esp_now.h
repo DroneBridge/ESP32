@@ -77,20 +77,21 @@ typedef struct {
     db_espnow_event_info_t info;
 } db_espnow_event_t;
 
-/* Element of db_espnow_send_queue or db_uart_write_queue */
+typedef enum {
+    DB_ESP_NOW_PACKET_TYPE_DATA = 0,
+    DB_ESP_NOW_PACKET_TYPE_INTERNAL_TELEMETRY = 1,
+} db_espnow_queue_event_type_t;
+
+/* Element of db_espnow_send_queue and db_uart_write_queue */
 typedef struct {
     uint8_t data_len;
     uint8_t *data;
-} __attribute__((__packed__)) db_espnow_uart_event_t;
+    db_espnow_queue_event_type_t packet_type;   // only relevant when reading queue that sends via ESP-NOW
+} __attribute__((__packed__)) db_espnow_queue_event_t;
 
 enum {
     DB_ESPNOW_ORIGIN_GND = 0,
     DB_ESPNOW_ORIGIN_AIR = 1,
-};
-
-enum {
-    DB_ESP_NOW_PACKET_TYPE_DATA = 0,
-    DB_ESP_NOW_PACKET_TYPE_INTERNAL_TELEMETRY = 1,
 };
 
 typedef struct {

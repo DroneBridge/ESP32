@@ -181,10 +181,11 @@ void send_to_all_clients(int tcp_clients[], udp_conn_list_t *n_udp_conn_list, ui
         send_to_all_udp_clients(n_udp_conn_list, data, data_length);
     } else {
         // ESP-NOW mode
-        db_espnow_uart_event_t evt;
+        db_espnow_queue_event_t evt;
         evt.data = malloc(data_length);
         memcpy(evt.data, data, data_length);
         evt.data_len = data_length;
+        evt.packet_type = DB_ESP_NOW_PACKET_TYPE_DATA;
         if (xQueueSend(db_espnow_send_queue, &evt, ESPNOW_MAXDELAY) != pdTRUE) {
             ESP_LOGW(TAG, "Send to db_espnow_send_queue queue fail");
             free(evt.data);
@@ -354,7 +355,7 @@ _Noreturn void control_module_esp_now(){
     uint8_t msp_message_buffer[UART_BUF_SIZE];
     uint8_t serial_buffer[DB_TRANS_BUF_SIZE];
     msp_ltm_port_t db_msp_ltm_port;
-    db_espnow_uart_event_t db_espnow_uart_evt;
+    db_espnow_queue_event_t db_espnow_uart_evt;
     uint delay_timer_cnt = 0;
 
     ESP_LOGI(TAG, "Started control module (ESP-NOW)");
