@@ -1,6 +1,9 @@
 {
   "/api/system/info": "/info",
-  "/api/settings/request": "/settings",
+  "/api/settings": "/settings",
   "/api/system/stats": "/stats",
-  "/api/settings/change": "/change"
+  "/api/settings/change": "/change",
+  "/api/system/clients": "clients",
+  "/api/settings/clients/udp": "udp",
+  "/api/settings/static-ip": "static-ip"
 }

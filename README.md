@@ -1,6 +1,15 @@
-![DroneBridge logo](wiki/DroneBridgeLogo_text.png)
+[![Contributors][contributors-shield]][contributors-url]
+[![Forks][forks-shield]][forks-url]
+[![Stargazers][stars-shield]][stars-url]
+[![Issues][issues-shield]][issues-url]
+[![MIT License][license-shield]][license-url]
+[![LinkedIn][linkedin-shield]][linkedin-url]
+<br />
+<div align="center">
+   <img src="wiki/DroneBridgeLogo_text.png" alt="DroneBridge logo" width="400">
+   <h1>DroneBridge for ESP32</h1>
+</div>
 
-# DroneBridge for ESP32
 A DroneBridge enabled firmware for the popular ESP32 modules from Espressif Systems. Probably the cheapest way to
 communicate with your drone, UAV, UAS, ground based vehicle or whatever you may call them.
 
@@ -13,12 +22,15 @@ since it does not support video encoding.
 ![DroneBridge for ESP32 concept](wiki/db_ESP32_setup.png)
 
 ## Features
--   Bidirectional transparent serial to WiFi, espressif WiFi Long-Range (LR) & ESP-NOW link
--   Support for MAVLink, MSP, LTM or any other payload using transparent option
+-   Bidirectional 
+  - serial-to-WiFi 
+  - serial-to-WiFi Long-Range (LR)
+  - serial-to-ESP-NOW link
+-   Support for **MAVLink**, **MSP**, **LTM** or **any other payload** using transparent option
 -   Affordable: ~7€
--   Up to 150m range using WiFi
--   Up to 1km of range using ESP-NOW or Wi-Fi LR Mode - sender & receiver must be ESP32 with LR-Mode enabled [(ESP32 C2 is not supported)](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#lr-compatibility)
--   Fully encrypted in all modes including ESP-NOW broadcasts secured using AES-GCM!
+-   Up to **150m range** using WiFi
+-   Up to **1km of range** using ESP-NOW or Wi-Fi LR Mode - sender & receiver must be ESP32 with LR-Mode enabled [(ESP32 C2 is not supported)](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#lr-compatibility)
+-   **Fully encrypted** in all modes including ESP-NOW broadcasts secured using **AES-GCM**!
 -   Weight: <10 g
 -   Supported by: QGroundControl, Mission Planner, mwptools, impload etc.
 -   Easy to set up: Power connection + UART connection to flight controller
@@ -29,12 +41,20 @@ since it does not support video encoding.
 -   Reliable, low latency
 -   Upload mission etc.
 
-<img src="https://media-cdn.seeedstudio.com/media/catalog/product/cache/bb49d3ec4ee05b6f018e93f896b8a25d/1/-/1-113991054-seeed-studio-xiao-esp32c3-45font_1.jpg" width="350">
+## Hardware
 
-![DroneBridge for ESP32 block diagram blackbox](wiki/DroneBridgeForESP32Blackbox.png)
+**Officially supported and tested boards:**  
+Do the project and yourself a favour and use one of the officially supported and tested boards below.   
+These boards are very low in price, have everything you need and are also very small. Perfect for use on any drone.
 
-Blackbox concept. UDP & TCP connections possible. Automatic UDP uni-cast of messages to port 14550 to all 
-connected devices/stations. Allows additional clients to register for UDP. Client must send a packet with length > 0 to UDP port of ESP32.
+* **[Official board for DroneBridge for ESP32](https://www.ebay.de/itm/116111278197)** - spares from first batch, pre-installed and ready for use  
+  currently shipping to EU only - contact seller for non-EU shipping options    
+  <img src="https://github.com/DroneBridge/ESP32/assets/24637325/e3b2975d-7de4-41af-b052-e4fa024d905e" alt="Official Boadrd DroneBridge for ESP32" width="350">
+
+Other official options
+* [Seeed Studio XIAO ESP32C3](https://www.seeedstudio.com/Seeed-XIAO-ESP32C3-p-5431.html) + [External antenna](https://www.seeedstudio.com/2-4GHz-2-81dBi-Antenna-for-XIAO-ESP32C3-p-5475.html) for more range.
+
+[For further info please check the wiki!](https://github.com/DroneBridge/ESP32/wiki/Supported-Hardware)
 
 ## Download or Compile
 
@@ -44,20 +64,6 @@ Or compile using esp-idf v5.1:
 -   ESP32S2 `idf.py set-target esp32s2 build`
 -   ESP32S3 `idf.py set-target esp32s3 build`
 -   ESP32C3 `idf.py set-target esp32c3 build`
-
-## Hardware
-
-**Officially supported and tested boards:**  
-Do the project and yourself a favour and use one of the officially supported and tested boards below.   
-These boards are very low in price, have everything you need and are also very small. Perfect for use on any drone.   
-
-* [Official board for DroneBridge for ESP32](https://www.ebay.de/itm/116111278197) - spares from first batch, pre-installed and ready for use  
-currently shipping to EU only - contact seller for non-EU shipping options
-
-Other official options
-* [Seeed Studio XIAO ESP32C3](https://www.seeedstudio.com/Seeed-XIAO-ESP32C3-p-5431.html) + [External antenna](https://www.seeedstudio.com/2-4GHz-2-81dBi-Antenna-for-XIAO-ESP32C3-p-5475.html) for more range.
-
-[For further info please check the wiki!](https://github.com/DroneBridge/ESP32/wiki/Supported-Hardware)
 
 ## Installation/Flashing using precompiled binaries
 
@@ -87,6 +93,8 @@ There are many multiple ways on how to flash the firmware.
 
 ## Use with QGroundControl, Mission Planner or any other GCS
 
+![QGroundControl](https://docs.qgroundcontrol.com/master/assets/connected_vehicle.C1qygcZV.jpg)
+
 -   The ESP will auto send data to all connected devices via UDP to port 14550. QGroundControl should auto connect using UDP
 -   Connect via **TCP on port 5760** or **UDP on port 14550** to the ESP32 to send & receive data with a GCS of your choice. 
 -   **In case of a UDP connection the GCS must send at least one packet (e.g. MAVLink heart beat etc.) to the UDP port of the ESP32 to register as an end point.**
@@ -94,12 +102,16 @@ There are many multiple ways on how to flash the firmware.
 
 ## Further Support & Donations
 
-If you benefited from this project please consider a donation: 
+**If you benefited from this project please consider a donation:** 
 -   [PayPal](https://www.paypal.com/donate/?hosted_button_id=SG97392AJN73J)
 -   [Buy me a coffee](https://buymeacoffee.com/seeul8er)
 
-For questions or general chatting regarding DroneBridge for ESP32 please visit the  
-**[Discord Channel](https://discord.gg/pqmHJNArE3)**.
+For questions or general chatting regarding DroneBridge for ESP32 please visit the Discord channel  
+<div>
+<a href="https://discord.gg/pqmHJNArE3">
+<img src="wiki/discord-logo-blue.png" width="200px">
+</a>
+</div>
 
 ## Developers
 
