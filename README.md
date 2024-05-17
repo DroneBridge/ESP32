@@ -1,9 +1,9 @@
+
 [![Contributors][contributors-shield]][contributors-url]
 [![Forks][forks-shield]][forks-url]
 [![Stargazers][stars-shield]][stars-url]
 [![Issues][issues-shield]][issues-url]
-[![MIT License][license-shield]][license-url]
-[![LinkedIn][linkedin-shield]][linkedin-url]
+
 <br />
 <div align="center">
    <img src="wiki/DroneBridgeLogo_text.png" alt="DroneBridge logo" width="400">
@@ -11,21 +11,18 @@
 </div>
 
 A DroneBridge enabled firmware for the popular ESP32 modules from Espressif Systems. Probably the cheapest way to
-communicate with your drone, UAV, UAS, ground based vehicle or whatever you may call them.
+communicate with your drone, UAV, UAS, ground-based vehicle or whatever you may call them.
 
-It also allows for a fully transparent serial to WiFi pass through link with variable packet size
+It also allows for a fully transparent serial to WiFi pass-through link with variable packet size
 (Continuous stream of data required).
 
-DroneBridge for ESP32 is a telemetry/low data rate only solution. There is no support for cameras connected to the ESP32 
+DroneBridge for ESP32 is a telemetry/low data rate-only solution. There is no support for cameras connected to the ESP32 
 since it does not support video encoding.
 
 ![DroneBridge for ESP32 concept](wiki/db_ESP32_setup.png)
 
 ## Features
--   Bidirectional 
-  - serial-to-WiFi 
-  - serial-to-WiFi Long-Range (LR)
-  - serial-to-ESP-NOW link
+-   Bidirectional: serial-to-WiFi, serial-to-WiFi Long-Range (LR), serial-to-ESP-NOW link
 -   Support for **MAVLink**, **MSP**, **LTM** or **any other payload** using transparent option
 -   Affordable: ~7€
 -   Up to **150m range** using WiFi
@@ -34,9 +31,9 @@ since it does not support video encoding.
 -   Weight: <10 g
 -   Supported by: QGroundControl, Mission Planner, mwptools, impload etc.
 -   Easy to set up: Power connection + UART connection to flight controller
--   Fully configurable through easy to use web interface
+-   Fully configurable through an easy-to-use web interface
 -   Parsing of LTM & MSPv2 for more reliable connection and less packet loss
--   Parsing of MAVLink with injection of Radio Status packets for display of RSSI in the GCS
+-   Parsing of MAVLink with the injection of Radio Status packets for the display of RSSI in the GCS
 -   Fully transparent telemetry down-link option for continuous streams
 -   Reliable, low latency
 -   Upload mission etc.
@@ -70,7 +67,7 @@ Or compile using esp-idf v5.1:
 First download the latest release from this repository.
 [You can find them here](https://github.com/DroneBridge/ESP32/releases).
 
-There are many multiple ways on how to flash the firmware.  
+There are multiple ways how to flash the firmware.  
 **[For further info please check the wiki!](https://github.com/DroneBridge/ESP32/wiki/Flashing-DroneBridge-for-ESP32)**
 
 ## Wiring
@@ -78,7 +75,7 @@ There are many multiple ways on how to flash the firmware.
 1.  Connect the UART of the ESP32 to a 3.3V UART of your flight controller. It is not recommended to use the ESP32s pins that are marked with TX & RX since they often are connected to the internal serial ouput. Go for any other pin instead!
 2.  Set the flight controller port to the desired protocol.
 
-**Check out manufacturer datasheet! Only some modules can take more than 3.3V. Follow the recommendations by the ESP32 boards manufacturer for powering the device**  
+**Check out the manufacturer datasheet! Only some modules can take more than 3.3V. Follow the recommendations by the ESP32 board manufacturer for powering the device**  
 **[For further info please check the wiki!](https://github.com/DroneBridge/ESP32/wiki/Wiring-Instructions)**
 
 ## Configuration
@@ -95,10 +92,10 @@ There are many multiple ways on how to flash the firmware.
 
 ![QGroundControl](https://docs.qgroundcontrol.com/master/assets/connected_vehicle.C1qygcZV.jpg)
 
--   The ESP will auto send data to all connected devices via UDP to port 14550. QGroundControl should auto connect using UDP
+-   The ESP will auto-send data to all connected devices via UDP to port 14550. QGroundControl should auto-connect using UDP
 -   Connect via **TCP on port 5760** or **UDP on port 14550** to the ESP32 to send & receive data with a GCS of your choice. 
--   **In case of a UDP connection the GCS must send at least one packet (e.g. MAVLink heart beat etc.) to the UDP port of the ESP32 to register as an end point.**
--   Manually add a UDP target usign the webinterface
+-   **In case of a UDP connection the GCS must send at least one packet (e.g. MAVLink heart beat etc.) to the UDP port of the ESP32 to register as an endpoint.**
+-   Manually add a UDP target usign the web interface
 
 ## Further Support & Donations
 
@@ -117,18 +114,18 @@ For questions or general chatting regarding DroneBridge for ESP32 please visit t
 
 ### Compile
  You will need the Espressif SDK: esp-idf + toolchain. Check out their website for more info and on how to set it up.
- The code is written in pure C using the esp-idf (no arduino libs).
+ The code is written in pure C using the esp-idf (no Arduino libs).
 
  **This project supports the v5.1.2 of ESP-IDF**  
  Compile and flash by running: `idf.py build`, `idf.py flash`
 
-The webinterface builds using the command `idf.py frontend`. This is done automatically when compiling the entire project using `idf.py build`. 
-The frontend is build to `build/frontend`.  
+The web interface is built using the command `idf.py frontend`. This is done automatically when compiling the entire project using `idf.py build`. 
+The frontend is built to `build/frontend`.  
 Alternatively, the frontend can be built using `npm install && npm i -D shx && npm run build` within `/frontend/`, then manually copy the content of `/frontend/build` to `/build/frontend`
 
  ### API
-The webinterface communicates with a REST:API on the ESP32. You can use that API to set configurations not selectable 
-via the web-interface (e.g. baud rate). It also allows you to easily integrate DroneBridge for ESP32.
+The web interface communicates with a REST: API on the ESP32. You can use that API to set configurations not selectable 
+via the web interface (e.g. baud rate). It also allows you to easily integrate DroneBridge for ESP32.
 
 
 #### Request settings
@@ -193,7 +190,7 @@ POST http://dronebridge.local/api/settings/clients/udp
 ```
 
 #### Assign a static IP to the ESP32 when in WiFi client mode:
-Send a valid JSON to set static IP, send the same JSON but with empty strings (`"client_ip": ""`) to remove static IP setting
+Send a valid JSON to set static IP and send the same JSON but with empty strings (`"client_ip": ""`) to remove the static IP setting
 ```json
  {
   "client_ip": "XXX.XXX.XXX.XXX",
@@ -216,3 +213,13 @@ Check `/test` for scripts triggering the API.
  json-server db.json --routes routes.json
  ```
 Set `const ROOT_URL = "http://localhost:3000/"` inside `index.html` and the `<script>` block
+
+
+[contributors-shield]: https://img.shields.io/github/contributors/DroneBridge/ESP32.svg?style=for-the-badge
+[contributors-url]: https://github.com/DroneBridge/ESP32/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/DroneBridge/ESP32.svg?style=for-the-badge
+[forks-url]: https://github.com/DroneBridge/ESP32/network/members
+[stars-shield]: https://img.shields.io/github/stars/DroneBridge/ESP32.svg?style=for-the-badge
+[stars-url]: https://github.com/DroneBridge/ESP32/stargazers
+[issues-shield]: https://img.shields.io/github/issues/DroneBridge/ESP32.svg?style=for-the-badge
+[issues-url]: https://github.com/DroneBridge/ESP32/issues
