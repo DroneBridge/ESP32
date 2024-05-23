@@ -21,10 +21,13 @@
 #ifndef DB_ESP32_MAIN_H
 #define DB_ESP32_MAIN_H
 
+
 enum E_DB_WIFI_MODE {
-    DB_WIFI_MODE_AP = 1,
-    DB_WIFI_MODE_STA = 2,
-    DB_WIFI_MODE_AP_LR = 3
+    DB_WIFI_MODE_AP = 1,            // Wi-Fi access point mode with Wi-Fi B mode enabled
+    DB_WIFI_MODE_STA = 2,           // Wi-Fi client mode with Wi-Fi B and LR mode enabled
+    DB_WIFI_MODE_AP_LR = 3,         // ESP32 LR Mode
+    DB_WIFI_MODE_ESPNOW_AIR = 4,    // ESP-NOW Mode for broadcasting device - automatically enables Wi-Fi B and LR mode
+    DB_WIFI_MODE_ESPNOW_GND = 5,    // ESP-NOW Mode for GND station - automatically enables Wi-Fi B and LR mode
 };
 
 void write_settings_to_nvs();
