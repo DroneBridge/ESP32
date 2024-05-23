@@ -9,8 +9,8 @@ jobs:
   build_esp32_v5_1:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
     - name: Checkout repo & install npm
+      uses: actions/checkout@v4
       with:
         submodules: 'recursive'
     - name: Setup node
