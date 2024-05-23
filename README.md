@@ -10,7 +10,7 @@
    <h1>DroneBridge for ESP32</h1>
 </div>
 
-A DroneBridge enabled firmware for the popular ESP32 modules from Espressif Systems. Probably the cheapest way to
+A firmware for the popular ESP32 modules from Espressif Systems. Probably the cheapest way to
 communicate with your drone, UAV, UAS, ground-based vehicle or whatever you may call them.
 
 It also allows for a fully transparent serial to WiFi pass-through link with variable packet size
@@ -26,8 +26,8 @@ since it does not support video encoding.
 -   Support for **MAVLink**, **MSP**, **LTM** or **any other payload** using transparent option
 -   Affordable: ~7€
 -   Up to **150m range** using WiFi
--   Up to **1km of range** using ESP-NOW or Wi-Fi LR Mode - sender & receiver must be ESP32 with LR-Mode enabled [(ESP32 C2 is not supported)](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#lr-compatibility)
--   **Fully encrypted** in all modes including ESP-NOW broadcasts secured using **AES-GCM**!
+-   Up to **1km of range** using ESP-NOW or Wi-Fi LR Mode - sender & receiver must be ESP32 with LR-Mode enabled
+-   **Fully encrypted** in all modes including ESP-NOW broadcasts secured using **AES-GCM 256 bit**!
 -   Weight: <10 g
 -   Supported by: QGroundControl, Mission Planner, mwptools, impload etc.
 -   Easy to set up: Power connection + UART connection to flight controller
@@ -36,7 +36,6 @@ since it does not support video encoding.
 -   Parsing of MAVLink with the injection of Radio Status packets for the display of RSSI in the GCS
 -   Fully transparent telemetry down-link option for continuous streams
 -   Reliable, low latency
--   Upload mission etc.
 
 ## Hardware
 
@@ -52,15 +51,6 @@ Other official options
 * [Seeed Studio XIAO ESP32C3](https://www.seeedstudio.com/Seeed-XIAO-ESP32C3-p-5431.html) + [External antenna](https://www.seeedstudio.com/2-4GHz-2-81dBi-Antenna-for-XIAO-ESP32C3-p-5475.html) for more range.
 
 [For further info please check the wiki!](https://github.com/DroneBridge/ESP32/wiki/Supported-Hardware)
-
-## Download or Compile
-
-Ready to use binaries for ESP32 via [GitHub releases](https://github.com/DroneBridge/ESP32/releases).  
-Or compile using esp-idf v5.1:
--   ESP32   `idf.py set-target esp32 build`
--   ESP32S2 `idf.py set-target esp32s2 build`
--   ESP32S3 `idf.py set-target esp32s3 build`
--   ESP32C3 `idf.py set-target esp32c3 build`
 
 ## Installation/Flashing using precompiled binaries
 
@@ -94,8 +84,8 @@ There are multiple ways how to flash the firmware.
 
 -   The ESP will auto-send data to all connected devices via UDP to port 14550. QGroundControl should auto-connect using UDP
 -   Connect via **TCP on port 5760** or **UDP on port 14550** to the ESP32 to send & receive data with a GCS of your choice. 
--   **In case of a UDP connection the GCS must send at least one packet (e.g. MAVLink heart beat etc.) to the UDP port of the ESP32 to register as an endpoint.**
--   Manually add a UDP target usign the web interface
+-   **In case of a UDP connection the GCS must send at least one packet (e.g. MAVLink heart beat etc.) to the UDP port of the ESP32 to register as an endpoint. Add ESP32 as an UDP target in the GCS**
+-   Manually add a UDP target using the web interface
 
 ## Further Support & Donations
 
@@ -114,7 +104,12 @@ For questions or general chatting regarding DroneBridge for ESP32 please visit t
 
 ### Compile
  You will need the Espressif SDK: esp-idf + toolchain. Check out their website for more info and on how to set it up.
- The code is written in pure C using the esp-idf (no Arduino libs).
+ The code is written in pure C using the esp-idf (no Arduino libs).  
+Compile using esp-idf v5.1:
+-   ESP32   `idf.py set-target esp32 build`
+-   ESP32S2 `idf.py set-target esp32s2 build`
+-   ESP32S3 `idf.py set-target esp32s3 build`
+-   ESP32C3 `idf.py set-target esp32c3 build`
 
  **This project supports the v5.1.2 of ESP-IDF**  
  Compile and flash by running: `idf.py build`, `idf.py flash`
@@ -157,19 +152,24 @@ POST http://dronebridge.local/api/system/reboot
 Send a valid JSON
 ```json
 {
-  "esp32_mode": 1,
-  "wifi_ssid": "DroneBridge ESP32",
-  "wifi_pass": "dronebridge",
-  "ap_channel": 6,
-  "tx_pin": 17,
-  "rx_pin": 16,
-  "telem_proto": 4,
-  "baud": 115200,
-  "msp_ltm_port": 0,
-  "ltm_pp": 2,
-  "trans_pack_size": 64,
-  "ap_ip": "192.168.2.1"
-}
+  "esp32_mode":	2,
+  "wifi_ssid":	"DroneBridge",
+  "wifi_pass":	"dronebridge",
+  "ap_channel":	6,
+  "trans_pack_size":	128,
+  "tx_pin":	4,
+  "rx_pin":	5,
+  "cts_pin":	0,
+  "rts_pin":	0,
+  "rts_thresh":	64,
+  "baud":	115200,
+  "telem_proto":	4,
+  "ltm_pp":	2,
+  "ap_ip":	"192.168.2.1",
+  "static_client_ip":	"",
+  "static_netmask":	"",
+  "static_gw_ip":	""
+  }
 ```
 to
 ```http request
