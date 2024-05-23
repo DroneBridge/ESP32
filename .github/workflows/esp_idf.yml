@@ -9,10 +9,14 @@ jobs:
   build_esp32_v5_1:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v2
+    - uses: actions/checkout@v4
+    - name: Checkout repo & install npm
       with:
         submodules: 'recursive'
+    - name: Setup node
+      uses: actions/setup-node@v4
+    - run: npm ci
+    - run: npm test
     - name: ESP-IDF v5.1 build esp32
       uses: espressif/esp-idf-ci-action@v1
       with:
