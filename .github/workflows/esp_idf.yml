@@ -9,12 +9,17 @@ jobs:
   build_esp32_v5_1:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout repo & install npm
+    - name: Checkout repo
       uses: actions/checkout@v4
       with:
         submodules: 'recursive'
-    - name: Setup node
+    - name: Setup node (npm)
       uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    - run: npm ci
     - run: npm ci
     - run: npm test
     - name: ESP-IDF v5.1 build esp32
