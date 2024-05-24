@@ -25,9 +25,9 @@ since it does not support video encoding.
 -   Bidirectional: serial-to-WiFi, serial-to-WiFi Long-Range (LR), serial-to-ESP-NOW link
 -   Support for **MAVLink**, **MSP**, **LTM** or **any other payload** using transparent option
 -   Affordable: ~7€
--   Up to **150m range** using WiFi
+-   Up to **150m range** using standard WiFi
 -   Up to **1km of range** using ESP-NOW or Wi-Fi LR Mode - sender & receiver must be ESP32 with LR-Mode enabled
--   **Fully encrypted** in all modes including ESP-NOW broadcasts secured using **AES-GCM 256 bit**!
+-   **Fully encrypted** in all modes including ESP-NOW broadcasts secured using AES-GCM 256 bit!
 -   Weight: <10 g
 -   Supported by: QGroundControl, Mission Planner, mwptools, impload etc.
 -   Easy to set up: Power connection + UART connection to flight controller
@@ -36,6 +36,15 @@ since it does not support video encoding.
 -   Parsing of MAVLink with the injection of Radio Status packets for the display of RSSI in the GCS
 -   Fully transparent telemetry down-link option for continuous streams
 -   Reliable, low latency
+
+<div align="center">
+    <img src="wiki/DB_ESP32_NOW_Illistration.png" alt="DroneBridge with connectionless ESP-NOW protocol support for increased range of 1km or more.">
+    <div>DroneBridge for ESP32 can be used to control drone swarms at a low cost.</div>
+</div>
+<br />
+<div>
+DroneBridge for ESP32 supports ESP-NOW LR which enables ranges of more than 1km with external receiving antennas.<br />The number of drones is only limited by the channel capacity and the ESP32s processing power. All data is encrypted using AES256-GCM.
+</div>
 
 ## Hardware
 
