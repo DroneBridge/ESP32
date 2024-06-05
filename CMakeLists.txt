@@ -8,7 +8,7 @@ add_custom_target(
         COMMAND cmake -E make_directory "${CMAKE_BINARY_DIR}/frontend"
         COMMAND cmake -E make_directory "${CMAKE_SOURCE_DIR}/frontend/build"
         # Run frontend npm build process
-        COMMAND npm install && npm i -D shx && npm run build
+        COMMAND npm install && npm run build
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/frontend")
 # Copy the content of npm to the build directory
 add_custom_command(
