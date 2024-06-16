@@ -29,6 +29,7 @@
 #include <sys/fcntl.h>
 #include <sys/cdefs.h>
 #include <stdint-gcc.h>
+#include <driver/usb_serial_jtag.h>
 #include "common/common.h"
 #include "db_serial.h"
 #include "main.h"
@@ -64,7 +65,7 @@ fmav_message_t msg;
  * 8 data bits, no parity, 1 stop bit
  * @return ESP_ERROR or ESP_OK
  */
-esp_err_t open_serial_socket() {
+esp_err_t open_uart_serial_socket() {
     // only open serial socket/UART if PINs are not matching - matching PIN nums mean they still need to be defined by
     // the user no pre-defined pins as of this release since ESP32 boards have wildly different pin configurations
     if (DB_UART_PIN_RX == DB_UART_PIN_TX) {
@@ -88,20 +89,74 @@ esp_err_t open_serial_socket() {
     return uart_driver_install(UART_NUM, 1024, 0, 10, NULL, 0);
 }
 
+esp_err_t open_jtag_serial_socket() {
+    // Configure USB SERIAL JTAG
+    usb_serial_jtag_driver_config_t usb_serial_jtag_config = {
+            .rx_buffer_size = 1024*4,
+            .tx_buffer_size = 512,
+    };
+    ESP_LOGI(TAG, "Initializing USB/JTAG serial interface.");
+    return usb_serial_jtag_driver_install(&usb_serial_jtag_config);
+}
+
 /**
- * Writes data from buffer to UART
+ * Opens a serial socket for communication with a serial source. On the GND this is the GCS and on the air side this is the flight controller.
+ * Depending on the configuration it may open a native UART socket or a JTAG based serial interface.
+ * The JTAG serial based interface is a special feature of official DroneBridge for ESP32 boards. Uses the onboard USB for serial I/O with GCS. No FTDI required.
+ *
+ * @return ESP_FAIL on failure
+ */
+esp_err_t open_serial_socket() {
+#ifdef CONFIG_DB_SERIAL_OPTION_JTAG
+    // open JTAG based serial socket for comms with FC or GCS via FTDI - special feature of official DB for ESP32 boards. Uses the onboard USB for serial I/O with GCS.
+    // this is basically the GND-Station mode for the ESP32
+    return open_jtag_serial_socket();
+#else
+    // open UART based serial socket for comms with FC or GCS via FTDI - configured by pins in the web interface
+    return open_uart_serial_socket();
+#endif
+}
+
+/**
+ * Writes data from buffer to the opened serial device
  * @param data_buffer Payload to write to UART
  * @param data_length Size of payload to write to UART
  */
-void write_to_uart(const uint8_t data_buffer[], const unsigned int data_length) {
-    int written = uart_write_bytes(UART_NUM, data_buffer, data_length);
+void write_to_serial(const uint8_t data_buffer[], const unsigned int data_length) {
+#ifdef CONFIG_DB_SERIAL_OPTION_JTAG
+    // Writes data from buffer to JTAG based serial interface
+    int written = usb_serial_jtag_write_bytes(data_buffer, data_length, 20 / portTICK_PERIOD_MS);
     if (written != data_length) {
-        // This is a debug log since it happens very rarely that not all bytes get written. Save some cpu cycles.
-        ESP_LOGD(TAG, "Wrote only %i of %i bytes to UART: %s", written, data_length, esp_err_to_name(errno));
+        ESP_LOGD(TAG, "Wrote only %i of %i bytes to JTAG", written, data_length);
     } else {
         // all good
     }
+#else
+    // UART based serial socket for comms with FC or GCS via FTDI - configured by pins in the web interface
+    // Writes data from buffer to native UART interface
+    int written = uart_write_bytes(UART_NUM, data_buffer, data_length);
+    if (written != data_length) {
+        // This is a debug log since it happens very rarely that not all bytes get written. Save some cpu cycles.
+        ESP_LOGD(TAG, "Wrote only %i of %i bytes to UART", written, data_length);
+    } else {
+        // all good
+    }
+#endif
+}
 
+/**
+ * Read data from the open serial interface
+ * @param uart_read_buf Pointer to buffer to put the read bytes into
+ * @param length Max length to read
+ * @return number of read bytes
+ */
+int db_read_serial(uint8_t *uart_read_buf, uint length) {
+#ifdef CONFIG_DB_SERIAL_OPTION_JTAG
+    return usb_serial_jtag_read_bytes(uart_read_buf, length, 0);
+#else
+    // UART based serial socket for comms with FC or GCS via FTDI - configured by pins in the web interface
+    return uart_read_bytes(UART_NUM, uart_read_buf, length, 0);
+#endif
 }
 
 /**
@@ -112,7 +167,7 @@ void db_parse_msp_ltm(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_
                       msp_ltm_port_t *db_msp_ltm_port) {
     uint8_t serial_bytes[TRANS_RD_BYTES_NUM];
     unsigned int read;
-    if ((read = uart_read_bytes(UART_NUM, serial_bytes, TRANS_RD_BYTES_NUM, 0)) > 0) {
+    if ((read = db_read_serial( serial_bytes, TRANS_RD_BYTES_NUM)) > 0) {
         uart_byte_count += read;
         for (unsigned int j = 0; j < read; j++) {
             (*serial_read_bytes)++;
@@ -168,13 +223,13 @@ uint8_t db_get_mav_sys_id() {
 uint16_t db_create_heartbeat(uint8_t *buff) {
     return fmav_msg_heartbeat_pack_to_frame_buf(
             buff, db_get_mav_sys_id(), db_get_mav_comp_id(),
-            MAV_TYPE_GENERIC, MAV_AUTOPILOT_INVALID, MAV_MODE_FLAG_CUSTOM_MODE_ENABLED, 0, MAV_STATE_ACTIVE,
+            MAV_TYPE_ONBOARD_CONTROLLER, MAV_AUTOPILOT_INVALID, MAV_MODE_FLAG_CUSTOM_MODE_ENABLED, 0, MAV_STATE_ACTIVE,
             &fmav_status);
 }
 
 /**
  * Expects GCS to have system ID 255.
- * Processes Mavlink messages and sends the radio status message to the GCS on every heartbeat from the flight controller
+ * Processes Mavlink messages and sends the radio status message and heartbeat to the GCS on every heartbeat received via UART
  *
  * @param new_msg Message to process
  * @param tcp_clients List of connected tcp clients
@@ -192,7 +247,7 @@ void handle_mavlink_message(fmav_message_t* new_msg, int *tcp_clients) {
                 if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND || DB_WIFI_MODE == DB_WIFI_MODE_AP_LR) {
                     // Send heartbeat to GCS: Every ESP32 no matter its role or mode is emitting a heartbeat
                     uint16_t length = db_create_heartbeat(buff);
-                    write_to_uart(buff, length);
+                    write_to_serial(buff, length);
                 } else {
                     ESP_LOGW(TAG, "We received a heartbeat from GCS while not being in DB_WIFI_MODE_ESPNOW_GND or "
                                   "DB_WIFI_MODE_AP_LR mode. Check your configuration! AIR-Side ESP32 seems to be "
@@ -207,18 +262,22 @@ void handle_mavlink_message(fmav_message_t* new_msg, int *tcp_clients) {
                 // ESP32s that are connected to a flight controller via UART will send RADIO_STATUS messages to the GND
                 if (DB_WIFI_MODE == DB_WIFI_MODE_STA || DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_AIR) {
                     fmav_radio_status_t payload_r = {.fixed = 0, .rxerrors=0, .txbuf=0,
-                                                     .noise = db_esp_signal_quality.gnd_noise_floor,
-                                                     .remnoise = db_esp_signal_quality.air_noise_floor,
-                                                     .remrssi = db_esp_signal_quality.air_rssi,
-                                                     .rssi = db_esp_signal_quality.gnd_rssi};
-                    uint16_t len = fmav_msg_radio_status_encode_to_frame_buf(buff, db_get_mav_sys_id(), db_get_mav_comp_id(), &payload_r, &fmav_status);
+                            .noise = db_esp_signal_quality.gnd_noise_floor,
+                            .remnoise = db_esp_signal_quality.air_noise_floor,
+                            .remrssi = db_esp_signal_quality.air_rssi,
+                            .rssi = db_esp_signal_quality.gnd_rssi};
+                    uint16_t len = fmav_msg_radio_status_encode_to_frame_buf(buff, db_get_mav_sys_id(),
+                                                                             db_get_mav_comp_id(), &payload_r,
+                                                                             &fmav_status);
                     send_to_all_clients(tcp_clients, udp_conn_list, buff, len);
                 } else if (DB_WIFI_MODE == DB_WIFI_MODE_AP && wifi_sta_list.num > 0) {
                     // we assume ESP32 is not used in DB_WIFI_MODE_AP on the ground but only on the drone side
                     // ToDo: Only the RSSI of the first client is considered.
                     //  Send each connected client its RSSI back. Easier for UDP since we have a nice list with mac addresses to use for mapping. Harder for TCP -> no macs
                     fmav_radio_status_t payload_r = {.fixed = 0, .noise = 0, .remnoise = 0, .remrssi=wifi_sta_list.sta[0].rssi, .rssi=-127, .rxerrors=0, .txbuf=0};
-                    uint16_t len = fmav_msg_radio_status_encode_to_frame_buf(buff, db_get_mav_sys_id(), db_get_mav_comp_id(), &payload_r, &fmav_status);
+                    uint16_t len = fmav_msg_radio_status_encode_to_frame_buf(buff, db_get_mav_sys_id(),
+                                                                             db_get_mav_comp_id(), &payload_r,
+                                                                             &fmav_status);
                     send_to_all_clients(tcp_clients, udp_conn_list, buff, len);
                 } else {
                     // In AP LR mode the clients will send the info to the GCS
@@ -231,47 +290,58 @@ void handle_mavlink_message(fmav_message_t* new_msg, int *tcp_clients) {
             // Send heartbeat to GND clients: Every ESP32 no matter its role or mode is emitting a heartbeat
             send_to_all_clients(tcp_clients, udp_conn_list, buff, length);
         }
-        break;
+            break;
         case FASTMAVLINK_MSG_ID_PARAM_REQUEST_LIST: {
             // ToDo Add more parameters
             ESP_LOGI(TAG, "Received PARAM_REQUEST_LIST msg");
-            fmav_param_value_t fmav_param_value = {.param_id="esp32_mode", .param_value=DB_WIFI_MODE, .param_type=MAV_PARAM_TYPE_UINT8, .param_count = 2, .param_index=0};
-            uint16_t len = fmav_msg_param_value_encode_to_frame_buf(buff, db_get_mav_sys_id(), db_get_mav_comp_id(), &fmav_param_value, &fmav_status);
-            if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND || DB_WIFI_MODE==DB_WIFI_MODE_AP_LR) {
-                write_to_uart(buff, len);
-            } else {
-                send_to_all_clients(tcp_clients, udp_conn_list, buff, len);
-            }
-
-            strcpy(fmav_param_value.param_id, "trans_pack_size");
-            fmav_param_value.param_value=DB_TRANS_BUF_SIZE;
-            fmav_param_value.param_type=MAV_PARAM_TYPE_UINT16;
-            fmav_param_value.param_count = 2;
-            fmav_param_value.param_index=1;
-            len = fmav_msg_param_value_encode_to_frame_buf(buff, db_get_mav_sys_id(), db_get_mav_comp_id(), &fmav_param_value, &fmav_status);
-            if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND || DB_WIFI_MODE==DB_WIFI_MODE_AP_LR) {
-                write_to_uart(buff, len);
-            } else {
-                send_to_all_clients(tcp_clients, udp_conn_list, buff, len);
-            }
-
-        }
-        break;
-        case FASTMAVLINK_MSG_ID_PARAM_REQUEST_READ: {
-            fmav_param_request_read_t payload;
-            fmav_msg_param_request_read_decode(&payload, new_msg);
-            ESP_LOGI(TAG, "GCS request reading parameter: %s", payload.param_id);
-            // ToDo Respond :)
-        }
+//            fmav_param_value_t fmav_param_value = {.param_id="esp32_mode", .param_value=DB_WIFI_MODE, .param_type=MAV_PARAM_TYPE_UINT8, .param_count = 2, .param_index=0};
+//            uint16_t len = fmav_msg_param_value_encode_to_frame_buf(buff, db_get_mav_sys_id(), db_get_mav_comp_id(), &fmav_param_value, &fmav_status);
+//            if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND || DB_WIFI_MODE==DB_WIFI_MODE_AP_LR) {
+//                write_to_uart(buff, len);
+//            } else {
+//                send_to_all_clients(tcp_clients, udp_conn_list, buff, len);
+//            }
+//
+//            strcpy(fmav_param_value.param_id, "trans_pack_size");
+//            fmav_param_value.param_value=DB_TRANS_BUF_SIZE;
+//            fmav_param_value.param_type=MAV_PARAM_TYPE_UINT16;
+//            fmav_param_value.param_count = 2;
+//            fmav_param_value.param_index=1;
+//            len = fmav_msg_param_value_encode_to_frame_buf(buff, db_get_mav_sys_id(), db_get_mav_comp_id(), &fmav_param_value, &fmav_status);
+//            if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND || DB_WIFI_MODE==DB_WIFI_MODE_AP_LR) {
+//                write_to_uart(buff, len);
+//            } else {
+//                send_to_all_clients(tcp_clients, udp_conn_list, buff, len);
+//            }
+//
+//        }
             break;
-        default:
+            case FASTMAVLINK_MSG_ID_PARAM_REQUEST_READ: {
+                fmav_param_request_read_t payload;
+                fmav_msg_param_request_read_decode(&payload, new_msg);
+                ESP_LOGI(TAG, "GCS request reading parameter: %s", payload.param_id);
+                // ToDo Respond to PARAM_REQUEST_READ
+            }
             break;
+            case FASTMAVLINK_MSG_ID_PARAM_EXT_REQUEST_LIST: {
+                ESP_LOGI(TAG, "GCS request reading ext parameters");
+                // ToDo Respond to PARAM_EXT_REQUEST_LIST
+            }
+            break;
+            case FASTMAVLINK_MSG_ID_PARAM_EXT_REQUEST_READ: {
+                ESP_LOGI(TAG, "GCS request reading ext parameter");
+                // ToDo Respond to EXT_REQUEST_READ
+            }
+            break;
+            default:
+                break;
+        }
     }
 }
 
 /**
  * Parses MAVLink messages and sends them via the radio link.
- * This function reads data from UART, parses it for complete MAVLink messages, and sends those messages in a buffer.
+ * This function reads data from the serial interface, parses it for complete MAVLink messages, and sends those messages in a buffer.
  * It ensures that only complete messages are sent and that the buffer does not exceed TRANS_BUFF_SIZE
  * The parsing is done semi-transparent as in: parser understands the MavLink frame format but performs no further checks
  *
@@ -280,13 +350,13 @@ void handle_mavlink_message(fmav_message_t* new_msg, int *tcp_clients) {
  * @param serial_buffer Buffer that gets filled with data and then sent via radio, shall be >x2 the max payload
  * @param serial_buff_pos Number of bytes already read for the current packet
  */
-void db_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *serial_buffer, unsigned int *serial_buff_pos) {
+void db_read_serial_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *serial_buffer, unsigned int *serial_buff_pos) {
     static uint mav_msg_counter = 0;
     static uint8_t mav_parser_rx_buf[296];  // at least 280 bytes which is the max len for a MAVLink v2 packet
     uint8_t uart_read_buf[DB_TRANS_BUF_SIZE];
 
     // Read bytes from UART
-    int bytes_read = uart_read_bytes(UART_NUM, uart_read_buf, DB_TRANS_BUF_SIZE, 0);
+    int bytes_read = db_read_serial(uart_read_buf, DB_TRANS_BUF_SIZE);
     uart_byte_count += bytes_read; // increase total bytes read via UART
     // Parse each byte received
     for (int i = 0; i < bytes_read; ++i) {
@@ -340,19 +410,19 @@ void db_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *ser
 }
 
 /**
- * Reads TRANS_RD_BYTES_NUM bytes from UART and checks if we already got enough bytes to send them out. Requires a
- * continuos stream of data.
+ * Reads TRANS_RD_BYTES_NUM bytes from serial interface and checks if we already got enough bytes to send them out.
+ * Requires a continuous stream of data.
  *
  * @param tcp_clients Array of connected TCP clients
  * @param udp_connection Structure containing all UDP connection data including the sockets
  * @param serial_buffer Buffer that gets filled with data and then sent via radio
  * @param serial_read_bytes Number of bytes already read for the current packet
  */
-void db_parse_transparent(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_t serial_buffer[],
-                          unsigned int *serial_read_bytes) {
+void db_read_serial_parse_transparent(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_t serial_buffer[],
+                                      unsigned int *serial_read_bytes) {
     uint16_t read;
     // read from UART directly into TCP & UDP send buffer
-    if ((read = uart_read_bytes(UART_NUM, &serial_buffer[*serial_read_bytes], (DB_TRANS_BUF_SIZE - *serial_read_bytes), 0)) > 0) {
+    if ((read = db_read_serial(&serial_buffer[*serial_read_bytes], (DB_TRANS_BUF_SIZE - *serial_read_bytes))) > 0) {
         uart_byte_count += read;    // increase total bytes read via UART
         *serial_read_bytes += read; // set new buffer position
         // TODO: Support UART data streams that are not continuous. Use timer to check how long we waited for data already

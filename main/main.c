@@ -175,7 +175,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
     // Wifi client mode events
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         ESP_LOGI(TAG, "WIFI_EVENT - Wifi Started");
-        ESP_ERROR_CHECK(esp_wifi_connect());
+        ESP_ERROR_CHECK(esp_wifi_connect());    // ToDo: Check crash here: Loses connection to AP and then claims that Wifi is not started
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_CONNECTED) {
         set_client_static_ip();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
@@ -633,7 +633,9 @@ void app_main() {
     if (DB_WIFI_MODE != DB_WIFI_MODE_ESPNOW_AIR && DB_WIFI_MODE != DB_WIFI_MODE_ESPNOW_GND) {
         // no need to start these services - won`t be available anyway - safe the resources
         ESP_ERROR_CHECK(start_rest_server(CONFIG_WEB_MOUNT_POINT));
+        ESP_LOGI(TAG, "Rest Server started");
         // Disable legacy support for DroneBridge communication module - no use case for DroneBridge for ESP32
         // communication_module();
     }
+    ESP_LOGI(TAG, "app_main finished initial setup");
 }

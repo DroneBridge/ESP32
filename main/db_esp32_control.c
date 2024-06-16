@@ -327,11 +327,11 @@ void read_process_uart(int *tcp_clients, uint *transparent_buff_pos, uint *msp_l
             break;
         case 3:
         case 4:
-            db_parse_mavlink(tcp_clients, udp_conn_list, msp_message_buffer, transparent_buff_pos);
+            db_read_serial_parse_mavlink(tcp_clients, udp_conn_list, msp_message_buffer, transparent_buff_pos);
             break;
         case 5:
         default:
-            db_parse_transparent(tcp_clients, udp_conn_list, serial_buffer, transparent_buff_pos);
+            db_read_serial_parse_transparent(tcp_clients, udp_conn_list, serial_buffer, transparent_buff_pos);
             break;
     }
 }
@@ -342,10 +342,10 @@ void read_process_uart(int *tcp_clients, uint *transparent_buff_pos, uint *msp_l
  */
 _Noreturn void control_module_esp_now(){
     ESP_LOGI(TAG, "Starting control module (ESP-NOW)");
-    // only open serial socket/UART if PINs are not matching - matching PIN nums mean they still need to be defined by
-    // the user no pre-defined pins as of this release since ESP32 boards have wildly different pin configurations
-    int uart_socket = open_serial_socket();
-    if (uart_socket == ESP_FAIL) {
+    int serial_socket = ESP_FAIL;
+    // open serial socket for comms with FC or GCS
+    serial_socket = open_serial_socket();
+    if (serial_socket == ESP_FAIL) {
         ESP_LOGE(TAG, "UART socket not opened. Aborting start of control module.");
         vTaskDelete(NULL);
     }
@@ -363,7 +363,7 @@ _Noreturn void control_module_esp_now(){
         read_process_uart(NULL, &transparent_buff_pos, &msp_ltm_buff_pos, msp_message_buffer, serial_buffer,
                           &db_msp_ltm_port);
         if (db_uart_write_queue != NULL && xQueueReceive(db_uart_write_queue, &db_espnow_uart_evt, 0) == pdTRUE) {
-            write_to_uart(db_espnow_uart_evt.data, db_espnow_uart_evt.data_len);
+            write_to_serial(db_espnow_uart_evt.data, db_espnow_uart_evt.data_len);
             free(db_espnow_uart_evt.data);
         } else {
             if (db_uart_write_queue == NULL) ESP_LOGE(TAG, "db_uart_write_queue is NULL!");
@@ -474,9 +474,9 @@ void handle_internal_telemetry(int tel_sock, uint8_t *udp_buffer, socklen_t *soc
  */
 _Noreturn void control_module_udp_tcp() {
     ESP_LOGI(TAG, "Starting control module (Wi-Fi)");
-    int uart_socket = open_serial_socket();
-    if (uart_socket == ESP_FAIL) {
-        ESP_LOGE(TAG, "UART socket not opened. Aborting start of control module.");
+    esp_err_t serial_socket_status = open_serial_socket();
+    if (serial_socket_status == ESP_FAIL) {
+        ESP_LOGE(TAG, "JTAG serial socket not opened. Aborting start of control module.");
         vTaskDelete(NULL);
     }
 
@@ -521,7 +521,7 @@ _Noreturn void control_module_udp_tcp() {
             if (tcp_clients[i] > 0) {
                 ssize_t recv_length = recv(tcp_clients[i], tcp_client_buffer, TCP_BUFF_SIZ, 0);
                 if (recv_length > 0) {
-                    write_to_uart(tcp_client_buffer, recv_length);
+                    write_to_serial(tcp_client_buffer, recv_length);
                 } else if (recv_length == 0) {
                     shutdown(tcp_clients[i], 0);
                     close(tcp_clients[i]);
@@ -542,7 +542,7 @@ _Noreturn void control_module_udp_tcp() {
         ssize_t recv_length = recvfrom(udp_conn_list->udp_socket, udp_buffer, UDP_BUF_SIZE, 0,
                                        (struct sockaddr *) &new_db_udp_client.udp_client, &udp_socklen);
         if (recv_length > 0) {
-            write_to_uart(udp_buffer, recv_length);
+            write_to_serial(udp_buffer, recv_length);
             // Allows to register new app on different port. Used e.g. for UDP conn setup in sta-mode.
             // Devices/Ports added this way cannot be removed in sta-mode since UDP is connectionless, and we cannot
             // determine if the client is still existing. This will blow up the list connected devices.

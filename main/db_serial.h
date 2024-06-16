@@ -25,13 +25,18 @@
 
 #define UART_NUM UART_NUM_1
 
+enum DB_SERIAL_DATA_ORIGIN {
+    DB_SERIAL_DATA_ORIGIN_FC,
+    DB_SERIAL_DATA_ORIGIN_GCS
+};
+
 int open_serial_socket();
-void write_to_uart(const uint8_t data_buffer[], unsigned int data_length);
+void write_to_serial(const uint8_t data_buffer[], unsigned int data_length);
 void db_parse_msp_ltm(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_t msp_message_buffer[],
                       unsigned int *serial_read_bytes,
                       msp_ltm_port_t *db_msp_ltm_port);
-void db_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *serial_buffer, unsigned int *serial_buff_pos);
-void db_parse_transparent(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_t serial_buffer[],
-                          unsigned int *serial_read_bytes);
+void db_read_serial_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *serial_buffer, unsigned int *serial_buff_pos);
+void db_read_serial_parse_transparent(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_t serial_buffer[],
+                                      unsigned int *serial_read_bytes);
 
 #endif //DB_ESP32_DB_SERIAL_H

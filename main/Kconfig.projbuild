@@ -1,4 +1,29 @@
-menu "DB Webserver Configuration"
+menu "DroneBridge for ESP32 Configuration"
+
+    choice
+        prompt "Serial interface for data."
+        default DB_SERIAL_OPTION_UART
+        help
+            Select serial interface.
+            USB/JTAG on the official HWv1.x boards for DroneBridge for ESP32 is connected to the USB-C port. 
+            By using this port a ground station can connect to the ESP32 without the use of an UART-to-USB adapter.
+            Intended for use on ground station ESP32 units directly connected to a GCS computer via USB.
+            Requires ESP_CONSOLE_SECONDARY_NONE set to yes.
+            WARNING: No logging available via USB port when USB/JTAG option is selected. Use debugging UART0 as specified by console settings for logging and diagnostics.
+        config DB_SERIAL_OPTION_UART
+            bool "UART"
+            help
+                Use the UART specified in the web interface for serial communication.
+        config DB_SERIAL_OPTION_JTAG
+            bool "USB/JTAG"
+			depends on ESP_CONSOLE_SECONDARY_NONE
+            help
+                Use the JTAG interface for serial communication. 
+                This inferface is attached to the USB port of the official DroneBridge for ESP32 PCB in HW v1.x versions.
+                A ground control station can connect to the USB port directly without having to use a FTDI in between.
+                Not intended for connecting to a UAV etc. Use native UART instead.
+                WARNING: No logging available via USB port.
+    endchoice
 
     choice WEB_DEPLOY_MODE
         prompt "Website deploy mode"
