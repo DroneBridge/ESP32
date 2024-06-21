@@ -42,6 +42,7 @@
 #include "mdns.h"
 #include "db_esp_now.h"
 #include "iot_button.h"
+#include "db_serial.h"
 
 #define NVS_NAMESPACE "settings"
 
@@ -175,7 +176,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
     // Wifi client mode events
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         ESP_LOGI(TAG, "WIFI_EVENT - Wifi Started");
-        ESP_ERROR_CHECK(esp_wifi_connect());    // ToDo: Check crash here: Loses connection to AP and then claims that Wifi is not started
+        ESP_ERROR_CHECK(esp_wifi_connect());
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_CONNECTED) {
         set_client_static_ip();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
@@ -473,7 +474,14 @@ void db_read_str_nvs(nvs_handle my_handle, char *key, char *dst) {
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_str(my_handle, key, read_nvs_val, &required_size));
         memcpy(dst, read_nvs_val, required_size);
         free(read_nvs_val);
+#ifdef CONFIG_DB_SERIAL_OPTION_JTAG
+        uint8_t buffer[64];
+        int len = sprintf((char *) buffer, "\t%s: %s", key, dst);
+        write_to_serial(buffer, len);
+#else
         ESP_LOGI(TAG, "\t%s: %s", key, dst);
+#endif
+
     } else {
         ESP_LOGW(TAG, "Could not read key %s from NVS", key);
     }
@@ -512,12 +520,24 @@ void read_settings_nvs() {
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "ltm_per_packet", &DB_LTM_FRAME_NUM_BUFFER));
 
         nvs_close(my_handle);
+#ifdef CONFIG_DB_SERIAL_OPTION_JTAG
+        // write settings to JTAG, so we can debug issues better - only do it here as it will interfere with serial data
+        uint8_t buffer[512];
+        int len = sprintf((char *) buffer, "\tWifi Mode: %i\n\twifi_chan %i\n\tbaud %liu\n\tgpio_tx %i\n\tgpio_rx %i\n\tgpio_cts %i\n\t"
+                                           "gpio_rts %i\n\trts_thresh %i\n\tproto %i\n\ttrans_pack_size %i\n\tltm_per_packet %i",
+                          DB_WIFI_MODE, DB_WIFI_CHANNEL, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
+                          DB_UART_PIN_CTS, DB_UART_PIN_RTS, DB_UART_RTS_THRESH, DB_SERIAL_PROTOCOL, DB_TRANS_BUF_SIZE,
+                          DB_LTM_FRAME_NUM_BUFFER);
+        write_to_serial(buffer, len);
+#else
         ESP_LOGI(TAG,
                  "\tWifi Mode: %i\n\twifi_chan %i\n\tbaud %liu\n\tgpio_tx %i\n\tgpio_rx %i\n\tgpio_cts %i\n\t"
                  "gpio_rts %i\n\trts_thresh %i\n\tproto %i\n\ttrans_pack_size %i\n\tltm_per_packet %i",
                  DB_WIFI_MODE, DB_WIFI_CHANNEL, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
                  DB_UART_PIN_CTS, DB_UART_PIN_RTS, DB_UART_RTS_THRESH, DB_SERIAL_PROTOCOL, DB_TRANS_BUF_SIZE,
                  DB_LTM_FRAME_NUM_BUFFER);
+#endif
+
     }
 }
 
