@@ -1,6 +1,8 @@
 // const ROOT_URL = "http://localhost:3000/"   // for testing with local json server
 const ROOT_URL = window.location.href       // for production code
-let conn_status = 0;
+let conn_status = 0;		// connection status to the ESP32
+let old_conn_status = 0;	// connection status before last update of UI to know when it changed
+let serial_via_JTAG = 0;	// set to 1 if ESP32 is using the USB interface as serial interface for data and not using the UART. If 0 we set UART config to invisible for the user.
 
 function change_ap_ip_visibility(){
 	var ap_ip_div = document.getElementById("ap_ip_div");
@@ -29,6 +31,21 @@ function change_msp_ltm_visibility(){
 	} else {
 		msp_ltm_div.style.display = "none";
 		trans_pack_size_div.style.display = "block";
+	}
+}
+
+function change_uart_visibility() {
+	var tx_rx_div = document.getElementById("tx_rx_div");
+	var rts_cts_div = document.getElementById("rts_cts_div");
+	var rts_thresh_div = document.getElementById("rts_thresh_div");
+	if (serial_via_JTAG === 0) {
+		rts_cts_div.style.display = "block";
+		tx_rx_div.style.display = "block";
+		rts_thresh_div.style.display = "block";
+	} else {
+		rts_cts_div.style.display = "none";
+		tx_rx_div.style.display = "none";
+		rts_thresh_div.style.display = "none";
 	}
 }
 
@@ -116,6 +133,7 @@ function get_system_info() {
 		document.getElementById("about").innerHTML = "DroneBridge for ESP32 - v" + json_data["major_version"] +
 			"." + json_data["minor_version"] + " - esp-idf " + json_data["idf_version"]
 		document.getElementById("esp_mac").innerHTML = json_data["esp_mac"]
+		serial_via_JTAG = json_data["serial_via_JTAG"];
 	}).catch(error => {
 		conn_status = 0
 		error.message;
@@ -131,6 +149,15 @@ function update_conn_status() {
 		document.getElementById("web_conn_status").innerHTML = "<span class=\"dot_red\"></span> disconnected from ESP32"
 		document.getElementById("current_client_ip").innerHTML = ""
 	}
+	if (conn_status !== old_conn_status) {
+		// connection status changed. Update settings and UI
+		get_system_info();
+		get_settings();
+		setTimeout(change_msp_ltm_visibility, 500);
+		setTimeout(change_ap_ip_visibility, 500);
+		setTimeout(change_uart_visibility, 500);
+	}
+	old_conn_status = conn_status
 }
 
 /**

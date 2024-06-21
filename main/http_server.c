@@ -397,6 +397,11 @@ static esp_err_t system_info_get_handler(httpd_req_t *req) {
     sprintf(mac_str, "%02X:%02X:%02X:%02X:%02X:%02X",
             LOCAL_MAC_ADDRESS[0], LOCAL_MAC_ADDRESS[1], LOCAL_MAC_ADDRESS[2], LOCAL_MAC_ADDRESS[3], LOCAL_MAC_ADDRESS[4], LOCAL_MAC_ADDRESS[5]);
     cJSON_AddStringToObject(root, "esp_mac", mac_str);
+#ifdef CONFIG_DB_SERIAL_OPTION_JTAG
+    cJSON_AddNumberToObject(root, "serial_via_JTAG", 1);
+#else
+    cJSON_AddNumberToObject(root, "serial_via_JTAG", 0);
+#endif
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
     free((void *) sys_info);

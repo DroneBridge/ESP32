@@ -549,6 +549,7 @@ void read_settings_nvs() {
 void short_press_callback(void *arg,void *usr_data) {
     ESP_LOGW(TAG, "Short press detected setting wifi mode to access point with password: dronebridge");
     DB_WIFI_MODE = DB_WIFI_MODE_AP;
+    strncpy((char *) DB_WIFI_SSID, "DroneBridge for ESP32", sizeof(DB_WIFI_SSID) - 1);
     strncpy((char *) DB_WIFI_PWD, "dronebridge", sizeof(DB_WIFI_PWD) - 1);
     write_settings_to_nvs();
     esp_restart();

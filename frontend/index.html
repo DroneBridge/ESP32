@@ -88,7 +88,7 @@
                 </div>
             </div>
             <h3>Serial</h3>
-            <div class="row">
+            <div class="row" id="tx_rx_div">
                 <div class="six columns">
                     <label for="tx_pin">UART TX Pin</label>
                     <input type="text" name="tx_pin" value="" id="tx_pin">
@@ -98,7 +98,7 @@
                     <input type="text" name="rx_pin" value="" id="rx_pin">
                 </div>
             </div>
-            <div class="row">
+            <div class="row" id="rts_cts_div">
                 <div class="six columns">
                     <label for="rts_pin">UART RTS Pin</label>
                     <input type="text" name="rts_pin" value="" id="rts_pin">
@@ -108,7 +108,7 @@
                     <input type="text" name="cts_pin" value="" id="cts_pin">
                 </div>
             </div>
-            <div class="row">
+            <div class="row" id="rts_thresh_div">
                 <div class="six columns">
                     <label for="rts_thresh">UART RTS threshold</label>
                     <input type="number" id="rts_thresh" name="rts_thresh" min="1" max="128">
@@ -213,6 +213,7 @@
     setInterval(update_conn_status, 500)
     setTimeout(change_msp_ltm_visibility, 500)
     setTimeout(change_ap_ip_visibility, 500)
+    setTimeout(change_uart_visibility, 500)
 </script>
 </body>
 </html>
