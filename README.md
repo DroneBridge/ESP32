@@ -28,7 +28,7 @@ since it does not support video encoding.
 -   Up to **150m range** using standard WiFi
 -   Up to **1km of range** using ESP-NOW or Wi-Fi LR Mode - sender & receiver must be ESP32 with LR-Mode enabled
 -   **Fully encrypted** in all modes including ESP-NOW broadcasts secured using AES-GCM 256 bit!
--   Weight: <10 g
+-   Weight: <8 g
 -   Supported by: QGroundControl, Mission Planner, mwptools, impload etc.
 -   Easy to set up: Power connection + UART connection to flight controller
 -   Fully configurable through an easy-to-use web interface
@@ -43,18 +43,21 @@ since it does not support video encoding.
 </div>
 <br />
 <div>
-DroneBridge for ESP32 supports ESP-NOW LR which enables ranges of more than 1km with external receiving antennas.<br />The number of drones is only limited by the channel capacity and the ESP32s processing power. All data is encrypted using AES256-GCM.
+DroneBridge for ESP32 supports ESP-NOW LR, enabling ranges of more than 1km with external receiving antennas.<br />The number of drones is only limited by the channel capacity and the ESP32s processing power. All data is encrypted using AES256-GCM.
 </div>
 
 ## Hardware
 
 **Officially supported and tested boards:**  
 Do the project and yourself a favour and use one of the officially supported and tested boards below.   
-These boards are very low in price, have everything you need and are also very small. Perfect for use on any drone.
+These boards are very low in price, have everything you need and are also very small. Perfect for use on any drone. 
 
-* **[Official board for DroneBridge for ESP32](https://www.ebay.de/itm/116111278197)** - spares from first batch, pre-installed and ready for use  
+* **[Official board for DroneBridge for ESP32 ebay DE/EU](https://www.ebay.de/itm/116227992460)**  
+  **[Official board for DroneBridge for ESP32 ebay EU](https://www.ebay.com/itm/116227992460)**  
+  - spares from the second batch, pre-installed and ready for use  
   currently shipping to EU only - contact seller for non-EU shipping options    
   <img src="https://github.com/DroneBridge/ESP32/assets/24637325/e3b2975d-7de4-41af-b052-e4fa024d905e" alt="Official Boadrd DroneBridge for ESP32" width="350">
+* **Official board for easy use as ground station coming soon!**
 
 Other official options
 * [Seeed Studio XIAO ESP32C3](https://www.seeedstudio.com/Seeed-XIAO-ESP32C3-p-5431.html) + [External antenna](https://www.seeedstudio.com/2-4GHz-2-81dBi-Antenna-for-XIAO-ESP32C3-p-5475.html) for more range.
