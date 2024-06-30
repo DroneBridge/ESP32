@@ -57,7 +57,7 @@ char DB_STATIC_STA_IP_GW[IP4ADDR_STRLEN_MAX] = "";
 char DB_STATIC_STA_IP_NETMASK[IP4ADDR_STRLEN_MAX] = "";
 char CURRENT_CLIENT_IP[IP4ADDR_STRLEN_MAX] = "192.168.2.1";
 uint8_t DB_WIFI_CHANNEL = 6;
-uint8_t DB_SERIAL_PROTOCOL = 4;  // 1=MSP, 4=MAVLink, 5=Transparent
+uint8_t DB_SERIAL_PROTOCOL = DB_SERIAL_PROTOCOL_MAVLINK;  // 1=MSP/LTM, 4=MAVLink, 5=Transparent
 
 // initially set pins to 0 to allow the start of the system on all boards. User has to set the correct pins
 uint8_t DB_UART_PIN_TX = GPIO_NUM_0;
@@ -425,7 +425,7 @@ void init_wifi_espnow() {
 /**
  * Write settings to non-volatile storage
  */
-void write_settings_to_nvs() {
+void db_write_settings_to_nvs() {
     ESP_LOGI(TAG,
              "Trying to save:\nWifi Mode: %i\nssid %s\nwifi_pass %s\nwifi_chan %i\nbaud %liu\ngpio_tx %i\ngpio_rx %i\ngpio_cts %i\ngpio_rts %i\nrts_thresh %i\nproto %i\n"
              "trans_pack_size %i\nltm_per_packet %i\nap_ip %s\nip_sta %s\nip_sta_gw %s\nip_sta_netmsk %s",
@@ -490,14 +490,14 @@ void db_read_str_nvs(nvs_handle my_handle, char *key, char *dst) {
 /**
  * Read stored settings from internal storage
  */
-void read_settings_nvs() {
+void db_read_settings_nvs() {
     nvs_handle my_handle;
     if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &my_handle) != ESP_OK) {
         ESP_LOGI(TAG, "NVS namespace not found. Erasing flash, init NVS ...");
         nvs_close(my_handle);
         ESP_ERROR_CHECK(nvs_flash_erase());
         ESP_ERROR_CHECK(nvs_flash_init());
-        write_settings_to_nvs();
+        db_write_settings_to_nvs();
     } else {
         ESP_LOGI(TAG, "Reading settings from NVS");
 
@@ -551,7 +551,7 @@ void short_press_callback(void *arg,void *usr_data) {
     DB_WIFI_MODE = DB_WIFI_MODE_AP;
     strncpy((char *) DB_WIFI_SSID, "DroneBridge for ESP32", sizeof(DB_WIFI_SSID) - 1);
     strncpy((char *) DB_WIFI_PWD, "dronebridge", sizeof(DB_WIFI_PWD) - 1);
-    write_settings_to_nvs();
+    db_write_settings_to_nvs();
     esp_restart();
 }
 
@@ -569,7 +569,7 @@ void long_press_callback(void *arg,void *usr_data) {
     memset(DB_STATIC_STA_IP, 0, strlen(DB_STATIC_STA_IP));
     memset(DB_STATIC_STA_IP_GW, 0, strlen(DB_STATIC_STA_IP_GW));
     memset(DB_STATIC_STA_IP_NETMASK, 0, strlen(DB_STATIC_STA_IP_NETMASK));
-    DB_WIFI_CHANNEL = 6;
+    DB_WIFI_CHANNEL = DB_SERIAL_PROTOCOL_MAVLINK;
     DB_UART_PIN_TX = GPIO_NUM_0;
     DB_UART_PIN_RX = GPIO_NUM_0;
     DB_UART_PIN_CTS = GPIO_NUM_0;
@@ -577,7 +577,7 @@ void long_press_callback(void *arg,void *usr_data) {
     DB_SERIAL_PROTOCOL = 4;
     DB_TRANS_BUF_SIZE = 64;
     DB_UART_RTS_THRESH = 64;
-    write_settings_to_nvs();
+    db_write_settings_to_nvs();
     esp_restart();
 }
 
@@ -620,7 +620,7 @@ void app_main() {
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
-    read_settings_nvs();
+    db_read_settings_nvs();
     set_reset_trigger();
     if (DB_WIFI_MODE == DB_WIFI_MODE_AP || DB_WIFI_MODE == DB_WIFI_MODE_AP_LR) {
         init_wifi_apmode(DB_WIFI_MODE);

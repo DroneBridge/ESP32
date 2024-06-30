@@ -117,11 +117,13 @@ For questions or general chatting regarding DroneBridge for ESP32 please visit t
 ### Compile
  You will need the Espressif SDK: esp-idf + toolchain. Check out their website for more info and on how to set it up.
  The code is written in pure C using the esp-idf (no Arduino libs).  
-Compile using esp-idf v5.1:
+Compile using esp-idf v5.1.2
 -   ESP32   `idf.py set-target esp32 build`
 -   ESP32S2 `idf.py set-target esp32s2 build`
 -   ESP32S3 `idf.py set-target esp32s3 build`
 -   ESP32C3 `idf.py set-target esp32c3 build`
+
+Or compile all at once with release configuration running the release scripts for bash or powershell `create_release_zip.sh` or `create_release_zip.ps1`
 
  **This project supports the v5.1.2 of ESP-IDF**  
  Compile and flash by running: `idf.py build`, `idf.py flash`

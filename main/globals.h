@@ -25,9 +25,9 @@
 #include "db_esp32_control.h"
 
 #define MAX_LTM_FRAMES_IN_BUFFER 5
-#define BUILDVERSION 11
-#define MAJOR_VERSION 2
-#define MINOR_VERSION 0
+#define DB_BUILD_VERSION 11
+#define DB_MAJOR_VERSION 2
+#define DB_MINOR_VERSION 0
 
 // can be set by user
 extern uint8_t DB_WIFI_MODE;

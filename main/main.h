@@ -30,6 +30,12 @@ enum E_DB_WIFI_MODE {
     DB_WIFI_MODE_ESPNOW_GND = 5,    // ESP-NOW Mode for GND station - automatically enables Wi-Fi B and LR mode
 };
 
-void write_settings_to_nvs();
+enum E_DB_SERIAL_PROTOCOL {
+    DB_SERIAL_PROTOCOL_MSPLTM = 1,
+    DB_SERIAL_PROTOCOL_MAVLINK = 4,
+    DB_SERIAL_PROTOCOL_TRANSPARENT = 5
+};
+
+void db_write_settings_to_nvs();
 
 #endif //DB_ESP32_MAIN_H

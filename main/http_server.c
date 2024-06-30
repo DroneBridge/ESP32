@@ -203,7 +203,7 @@ static esp_err_t settings_post_handler(httpd_req_t *req) {
         DB_SERIAL_PROTOCOL = json->valueint;
     } else if (json) {
         ESP_LOGW(REST_TAG, "telem_proto is not 1 (LTM/MSP) or 4 (MAVLink) or 5 (Transparent). Changing to transparent");
-        DB_SERIAL_PROTOCOL = 5;
+        DB_SERIAL_PROTOCOL = DB_SERIAL_PROTOCOL_TRANSPARENT;
     }
 
     json = cJSON_GetObjectItem(root, "ltm_pp");
@@ -215,7 +215,7 @@ static esp_err_t settings_post_handler(httpd_req_t *req) {
     } else if (json) {
         ESP_LOGE(REST_TAG, "New IP \"%s\" is not a valid IP address! Not changing!", json->valuestring);
     }
-    write_settings_to_nvs();
+    db_write_settings_to_nvs();
     ESP_LOGI(REST_TAG, "Settings changed!");
     cJSON_Delete(root);
     httpd_resp_sendstr(req, "{\n"
@@ -363,7 +363,7 @@ static esp_err_t settings_static_ip_post_handler(httpd_req_t *req) {
 
     // Clean up
     cJSON_Delete(root);
-    write_settings_to_nvs();
+    db_write_settings_to_nvs();
 
     if (err == ESP_OK) {
         httpd_resp_sendstr(req, "{\n"
@@ -390,9 +390,9 @@ static esp_err_t system_info_get_handler(httpd_req_t *req) {
     esp_chip_info_t chip_info;
     esp_chip_info(&chip_info);
     cJSON_AddStringToObject(root, "idf_version", IDF_VER);
-    cJSON_AddNumberToObject(root, "db_build_version", BUILDVERSION);
-    cJSON_AddNumberToObject(root, "major_version", MAJOR_VERSION);
-    cJSON_AddNumberToObject(root, "minor_version", MINOR_VERSION);
+    cJSON_AddNumberToObject(root, "db_build_version", DB_BUILD_VERSION);
+    cJSON_AddNumberToObject(root, "major_version", DB_MAJOR_VERSION);
+    cJSON_AddNumberToObject(root, "minor_version", DB_MINOR_VERSION);
     char mac_str[18];
     sprintf(mac_str, "%02X:%02X:%02X:%02X:%02X:%02X",
             LOCAL_MAC_ADDRESS[0], LOCAL_MAC_ADDRESS[1], LOCAL_MAC_ADDRESS[2], LOCAL_MAC_ADDRESS[3], LOCAL_MAC_ADDRESS[4], LOCAL_MAC_ADDRESS[5]);

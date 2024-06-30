@@ -320,15 +320,16 @@ bool remove_from_known_udp_clients(udp_conn_list_t *n_udp_conn_list, struct db_u
 void read_process_uart(int *tcp_clients, uint *transparent_buff_pos, uint *msp_ltm_buff_pos, uint8_t *msp_message_buffer,
                        uint8_t *serial_buffer, msp_ltm_port_t *db_msp_ltm_port) {
     switch (DB_SERIAL_PROTOCOL) {
-        case 1:
+        case 0:
         case 2:
+        case DB_SERIAL_PROTOCOL_MSPLTM:
             db_parse_msp_ltm(tcp_clients, udp_conn_list, msp_message_buffer, msp_ltm_buff_pos, db_msp_ltm_port);
             break;
         case 3:
-        case 4:
+        case DB_SERIAL_PROTOCOL_MAVLINK:
             db_read_serial_parse_mavlink(tcp_clients, udp_conn_list, msp_message_buffer, transparent_buff_pos);
             break;
-        case 5:
+        case DB_SERIAL_PROTOCOL_TRANSPARENT:
         default:
             db_read_serial_parse_transparent(tcp_clients, udp_conn_list, serial_buffer, transparent_buff_pos);
             break;
@@ -363,6 +364,9 @@ _Noreturn void control_module_esp_now(){
                           &db_msp_ltm_port);
         if (db_uart_write_queue != NULL && xQueueReceive(db_uart_write_queue, &db_espnow_uart_evt, 0) == pdTRUE) {
             write_to_serial(db_espnow_uart_evt.data, db_espnow_uart_evt.data_len);
+            if (DB_SERIAL_PROTOCOL == DB_SERIAL_PROTOCOL_MAVLINK) {
+                db_parse_mavlink_from_radio(NULL, NULL, db_espnow_uart_evt.data, db_espnow_uart_evt.data_len);
+            } // only parse in mavlink mode
             free(db_espnow_uart_evt.data);
         } else {
             if (db_uart_write_queue == NULL) ESP_LOGE(TAG, "db_uart_write_queue is NULL!");
@@ -521,6 +525,9 @@ _Noreturn void control_module_udp_tcp() {
                 ssize_t recv_length = recv(tcp_clients[i], tcp_client_buffer, TCP_BUFF_SIZ, 0);
                 if (recv_length > 0) {
                     write_to_serial(tcp_client_buffer, recv_length);
+                    if (DB_SERIAL_PROTOCOL == DB_SERIAL_PROTOCOL_MAVLINK) {
+                        db_parse_mavlink_from_radio(tcp_clients, udp_conn_list, tcp_client_buffer, recv_length);
+                    }
                 } else if (recv_length == 0) {
                     shutdown(tcp_clients[i], 0);
                     close(tcp_clients[i]);
@@ -547,6 +554,9 @@ _Noreturn void control_module_udp_tcp() {
             // determine if the client is still existing. This will blow up the list connected devices.
             // In AP-Mode the devices can be removed based on the IP/MAC address
             add_to_known_udp_clients(udp_conn_list, new_db_udp_client);
+            if (DB_SERIAL_PROTOCOL == DB_SERIAL_PROTOCOL_MAVLINK) {
+                db_parse_mavlink_from_radio(tcp_clients, udp_conn_list, udp_buffer, recv_length);
+            } // no parsing with any other protocol
         }
 
         if (DB_WIFI_MODE == DB_WIFI_MODE_STA) {

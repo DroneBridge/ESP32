@@ -25,10 +25,20 @@
 
 #define UART_NUM UART_NUM_1
 
-enum DB_SERIAL_DATA_ORIGIN {
-    DB_SERIAL_DATA_ORIGIN_FC,
-    DB_SERIAL_DATA_ORIGIN_GCS
+enum DB_MAVLINK_DATA_ORIGIN {
+    DB_MAVLINK_DATA_ORIGIN_SERIAL,
+    DB_MAVLINK_DATA_ORIGIN_RADIO
 };
+
+typedef union {
+    float f;
+    uint8_t uint8;
+    int8_t int8;
+    uint16_t uint16;
+    int16_t int16;
+    uint32_t uint32;
+    int32_t int32;
+} float_int_union;
 
 int open_serial_socket();
 void write_to_serial(const uint8_t data_buffer[], unsigned int data_length);
@@ -38,5 +48,6 @@ void db_parse_msp_ltm(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_
 void db_read_serial_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *serial_buffer, unsigned int *serial_buff_pos);
 void db_read_serial_parse_transparent(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_t serial_buffer[],
                                       unsigned int *serial_read_bytes);
+void db_parse_mavlink_from_radio(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *buffer, int bytes_read);
 
 #endif //DB_ESP32_DB_SERIAL_H
