@@ -342,12 +342,16 @@ void read_process_uart(int *tcp_clients, uint *transparent_buff_pos, uint *msp_l
  */
 _Noreturn void control_module_esp_now(){
     ESP_LOGI(TAG, "Starting control module (ESP-NOW)");
-    int serial_socket = ESP_FAIL;
+    esp_err_t serial_socket = ESP_FAIL;
     // open serial socket for comms with FC or GCS
     serial_socket = open_serial_socket();
     if (serial_socket == ESP_FAIL) {
         ESP_LOGE(TAG, "UART socket not opened. Aborting start of control module.");
         vTaskDelete(NULL);
+    } else {
+#ifdef CONFIG_DB_SERIAL_OPTION_JTAG
+    db_jtag_serial_info_print();
+#endif
     }
 
     uint transparent_buff_pos = 0;
@@ -481,6 +485,10 @@ _Noreturn void control_module_udp_tcp() {
     if (serial_socket_status == ESP_FAIL) {
         ESP_LOGE(TAG, "JTAG serial socket not opened. Aborting start of control module.");
         vTaskDelete(NULL);
+    } else {
+#ifdef CONFIG_DB_SERIAL_OPTION_JTAG
+        db_jtag_serial_info_print();
+#endif
     }
 
     int tcp_master_socket = open_tcp_server(app_port_proxy);

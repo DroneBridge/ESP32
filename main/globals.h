@@ -42,7 +42,7 @@ extern uint8_t DB_UART_PIN_RX;
 extern uint8_t DB_UART_PIN_RTS;
 extern uint8_t DB_UART_PIN_CTS;
 extern uint8_t DB_UART_RTS_THRESH;
-extern int DB_UART_BAUD_RATE;
+extern int32_t DB_UART_BAUD_RATE;
 extern uint16_t DB_TRANS_BUF_SIZE;          // Maximum packet size via ESP-NOW or WiFi in transparent or mavlink mode
 extern uint8_t DB_LTM_FRAME_NUM_BUFFER;    // Number of LTM frames per UDP packet (min = 1; max = 5)
 extern char DB_STATIC_STA_IP[IP4ADDR_STRLEN_MAX];   // user can specify static IP when in Wi-Fi client mode. If this is empty use auto IP

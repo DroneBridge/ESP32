@@ -36,6 +36,7 @@ enum E_DB_SERIAL_PROTOCOL {
     DB_SERIAL_PROTOCOL_TRANSPARENT = 5
 };
 
+void db_jtag_serial_info_print();
 void db_write_settings_to_nvs();
 
 #endif //DB_ESP32_MAIN_H

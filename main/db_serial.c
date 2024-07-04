@@ -30,6 +30,7 @@
 #include <sys/cdefs.h>
 #include <stdint-gcc.h>
 #include <driver/usb_serial_jtag.h>
+#include <hal/usb_serial_jtag_ll.h>
 #include "common/common.h"
 #include "db_serial.h"
 #include "main.h"
@@ -93,8 +94,8 @@ esp_err_t open_uart_serial_socket() {
 esp_err_t open_jtag_serial_socket() {
     // Configure USB SERIAL JTAG
     usb_serial_jtag_driver_config_t usb_serial_jtag_config = {
-            .rx_buffer_size = 1024 * 4,
-            .tx_buffer_size = 512,
+            .rx_buffer_size = 256,
+            .tx_buffer_size = 256,
     };
     ESP_LOGI(TAG, "Initializing USB/JTAG serial interface.");
     return usb_serial_jtag_driver_install(&usb_serial_jtag_config);
@@ -128,9 +129,9 @@ void write_to_serial(const uint8_t data_buffer[], const unsigned int data_length
     // Writes data from buffer to JTAG based serial interface
     int written = usb_serial_jtag_write_bytes(data_buffer, data_length, 20 / portTICK_PERIOD_MS);
     if (written != data_length) {
-        ESP_LOGD(TAG, "Wrote only %i of %i bytes to JTAG", written, data_length);
+        ESP_LOGW(TAG, "Wrote only %i of %i bytes to JTAG", written, data_length);
     } else {
-        // all good
+        // usb_serial_jtag_ll_txfifo_flush();
     }
 #else
     // UART based serial socket for comms with FC or GCS via FTDI - configured by pins in the web interface

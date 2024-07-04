@@ -49,7 +49,7 @@
 static const char *TAG = "DB_ESP32";
 
 uint8_t DB_WIFI_MODE = DB_WIFI_MODE_AP; // 1=Wifi AP mode, 2=Wifi client mode, 3=ESP-NOW LR Mode
-uint8_t DB_WIFI_SSID[32] = "DroneBridge ESP32";
+uint8_t DB_WIFI_SSID[32] = "DroneBridge for ESP32";
 uint8_t DB_WIFI_PWD[64] = "dronebridge";
 char DEFAULT_AP_IP[IP4ADDR_STRLEN_MAX] = "192.168.2.1";
 char DB_STATIC_STA_IP[IP4ADDR_STRLEN_MAX] = "";
@@ -474,14 +474,7 @@ void db_read_str_nvs(nvs_handle my_handle, char *key, char *dst) {
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_str(my_handle, key, read_nvs_val, &required_size));
         memcpy(dst, read_nvs_val, required_size);
         free(read_nvs_val);
-#ifdef CONFIG_DB_SERIAL_OPTION_JTAG
-        uint8_t buffer[64];
-        int len = sprintf((char *) buffer, "\t%s: %s", key, dst);
-        write_to_serial(buffer, len);
-#else
         ESP_LOGI(TAG, "\t%s: %s", key, dst);
-#endif
-
     } else {
         ESP_LOGW(TAG, "Could not read key %s from NVS", key);
     }
@@ -520,23 +513,13 @@ void db_read_settings_nvs() {
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "ltm_per_packet", &DB_LTM_FRAME_NUM_BUFFER));
 
         nvs_close(my_handle);
-#ifdef CONFIG_DB_SERIAL_OPTION_JTAG
-        // write settings to JTAG, so we can debug issues better - only do it here as it will interfere with serial data
-        uint8_t buffer[512];
-        int len = sprintf((char *) buffer, "\tWifi Mode: %i\n\twifi_chan %i\n\tbaud %liu\n\tgpio_tx %i\n\tgpio_rx %i\n\tgpio_cts %i\n\t"
-                                           "gpio_rts %i\n\trts_thresh %i\n\tproto %i\n\ttrans_pack_size %i\n\tltm_per_packet %i",
-                          DB_WIFI_MODE, DB_WIFI_CHANNEL, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
-                          DB_UART_PIN_CTS, DB_UART_PIN_RTS, DB_UART_RTS_THRESH, DB_SERIAL_PROTOCOL, DB_TRANS_BUF_SIZE,
-                          DB_LTM_FRAME_NUM_BUFFER);
-        write_to_serial(buffer, len);
-#else
         ESP_LOGI(TAG,
                  "\tWifi Mode: %i\n\twifi_chan %i\n\tbaud %liu\n\tgpio_tx %i\n\tgpio_rx %i\n\tgpio_cts %i\n\t"
                  "gpio_rts %i\n\trts_thresh %i\n\tproto %i\n\ttrans_pack_size %i\n\tltm_per_packet %i",
                  DB_WIFI_MODE, DB_WIFI_CHANNEL, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
                  DB_UART_PIN_CTS, DB_UART_PIN_RTS, DB_UART_RTS_THRESH, DB_SERIAL_PROTOCOL, DB_TRANS_BUF_SIZE,
                  DB_LTM_FRAME_NUM_BUFFER);
-#endif
+
 
     }
 }
@@ -601,6 +584,33 @@ void set_reset_trigger() {
         iot_button_register_cb(gpio_btn, BUTTON_SINGLE_CLICK, short_press_callback,NULL);
         iot_button_register_cb(gpio_btn, BUTTON_LONG_PRESS_UP, long_press_callback,NULL);
     }
+}
+
+/**
+ * For simple debugging when serial via JTAG is enabled. Printed once control module configured USB serial socket.
+ * Write settings to JTAG/USB, so we can debug issues better
+ */
+void db_jtag_serial_info_print() {
+    uint8_t buffer[512];
+    int len = sprintf((char *) buffer, "\tWifi Mode: %i\n\twifi_chan %i\n\tbaud %liu\n\tgpio_tx %i\n\tgpio_rx %i\n\tgpio_cts %i\n\t"
+                                       "gpio_rts %i\n\trts_thresh %i\n\tproto %i\n\ttrans_pack_size %i\n\tltm_per_packet %i\n",
+                      DB_WIFI_MODE, DB_WIFI_CHANNEL, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
+                      DB_UART_PIN_CTS, DB_UART_PIN_RTS, DB_UART_RTS_THRESH, DB_SERIAL_PROTOCOL, DB_TRANS_BUF_SIZE,
+                      DB_LTM_FRAME_NUM_BUFFER);
+    write_to_serial(buffer, len);
+    len = sprintf((char *) buffer, "\tSSID: %s\n", DB_WIFI_SSID);
+    write_to_serial(buffer, len);
+    len = sprintf((char *) buffer, "\tPassword: %s\n", DB_WIFI_PWD);
+    write_to_serial(buffer, len);
+    len = sprintf((char *) buffer, "\tAP IP: %s\n", DEFAULT_AP_IP);
+    write_to_serial(buffer, len);
+    len = sprintf((char *) buffer, "\tStatic IP: %s\n", DB_STATIC_STA_IP);
+    write_to_serial(buffer, len);
+    len = sprintf((char *) buffer, "\tStatic IP gateway: %s\n", DB_STATIC_STA_IP_GW);
+    write_to_serial(buffer, len);
+    len = sprintf((char *) buffer, "\tStatic IP netmask: %s\n", DB_STATIC_STA_IP_NETMASK);
+    write_to_serial(buffer, len);
+    ESP_LOGI(TAG, "Wrote to serial!");
 }
 
 /**
