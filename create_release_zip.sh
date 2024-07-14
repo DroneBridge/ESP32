@@ -62,6 +62,17 @@ cp build/bootloader/bootloader.bin "$release_foldername/esp32c3_USBSerial"
 cp build/www.bin "$release_foldername/esp32c3_USBSerial"
 cp build/partition_table/partition-table.bin "$release_foldername/esp32c3_USBSerial"
 
+rm -rf build
+idf.py fullclean
+cp sdkconfig_c6 sdkconfig
+idf.py build
+mkdir "$release_foldername/esp32c6"
+cp build/flash_args "$release_foldername/esp32c6/flash_args.txt"
+cp build/db_esp32.bin "$release_foldername/esp32c6"
+cp build/bootloader/bootloader.bin "$release_foldername/esp32c6"
+cp build/www.bin "$release_foldername/esp32c6"
+cp build/partition_table/partition-table.bin "$release_foldername/esp32c6"
+
 if [ -f "$release_name_zip" ]; then
    rm "$release_name_zip"
 fi
