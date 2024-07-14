@@ -1,8 +1,9 @@
+0. On Windows you may need to run: "python -m esptool ..." instead of "esptool.py ..." - You can specify a port using e.g. "esptool.py -p COM4 ..."
 1. esptool.py -p (PORT) erase_flash
 2. Flash your esp32 with the command below using esptool.py
 	ESP32:
 	-------
-	esptool.py -p (PORT) -b 115200 --before default_reset --after hard_reset --chip esp32  write_flash --flash_mode dio --flash_size 2MB --flash_freq 40m 0x1000 bootloader.bin 0x8000 partition-table.bin 0x10000 db_esp32.bin 0x110000 www.bin
+	esptool --chip esp32 -b 115200 --before default_reset --after hard_reset write_flash --flash_mode dio --flash_size 2MB --flash_freq 40m 0x1000 bootloader.bin 0x8000 partition-table.bin 0x10000 db_esp32.bin 0x190000 www.bin
 
 
 	ESP32S2:
@@ -17,12 +18,16 @@
 
 	ESP32C3:
 	-------
-	esptool.py -p (PORT) -b 115200 --before default_reset --after hard_reset --chip esp32c3  write_flash --flash_mode dio --flash_size 2MB --flash_freq 80m 0x0 bootloader.bin 0x8000 partition-table.bin 0x10000 db_esp32.bin 0x110000 www.bin
+	esptool --chip esp32c3 -b 115200 --before default_reset --after hard_reset write_flash --flash_mode dio --flash_size 2MB --flash_freq 80m 0x0 bootloader.bin 0x8000 partition-table.bin 0x10000 db_esp32.bin 0x190000 www.bin
 	
 	
 	ESP32C3 USB Serial: For use as GND station and onboard USB. Flash the official board HWv1.x with this firmware to disable the TELEM1 serial and use the onboard USB-C instead for serial IO with the GCS. No need for a FTDI adapter.
 	------------------
-	esptool.py -p (PORT) -b 115200 --before default_reset --after hard_reset --chip esp32c3  write_flash --flash_mode dio --flash_size 2MB --flash_freq 80m 0x0 bootloader.bin 0x8000 partition-table.bin 0x10000 db_esp32.bin 0x110000 www.bin
+	esptool --chip esp32c3 -b 115200 --before default_reset --after hard_reset write_flash --flash_mode dio --flash_size 2MB --flash_freq 80m 0x0 bootloader.bin 0x8000 partition-table.bin 0x10000 db_esp32.bin 0x190000 www.bin
+
+	ESP32C6:
+	-------
+	esptool --chip esp32c6 -b 115200 --before default_reset --after hard_reset write_flash --flash_mode dio --flash_size 2MB --flash_freq 80m 0x0 bootloader.bin 0x8000 partition-table.bin 0x10000 db_esp32.bin 0x190000 www.bin
 
 3. 
 Then connect your laptop or phone to the DroneBridge ESP32 WiFi access point and open the link http://192.168.2.1/ in a browser (depending on your setup, the easier to remember URL http://dronebridge.local/ may also work).
