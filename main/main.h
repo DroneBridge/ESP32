@@ -28,6 +28,7 @@ enum E_DB_WIFI_MODE {
     DB_WIFI_MODE_AP_LR = 3,         // ESP32 LR Mode
     DB_WIFI_MODE_ESPNOW_AIR = 4,    // ESP-NOW Mode for broadcasting device - automatically enables Wi-Fi B and LR mode
     DB_WIFI_MODE_ESPNOW_GND = 5,    // ESP-NOW Mode for GND station - automatically enables Wi-Fi B and LR mode
+    DB_WIFI_MODE_ESPNOW_END = 6     // End of enum
 };
 
 enum E_DB_SERIAL_PROTOCOL {

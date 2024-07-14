@@ -17,3 +17,4 @@ managed_components/espressif__mdns/.component_hash
 dependencies.lock
 .openocd_setup.ps1
 frontend/node_modules
+*.old

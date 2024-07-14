@@ -418,7 +418,7 @@ static esp_err_t system_info_get_handler(httpd_req_t *req) {
 static esp_err_t system_stats_get_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "application/json");
     cJSON *root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "read_bytes", uart_byte_count);
+    cJSON_AddNumberToObject(root, "read_bytes", serial_total_byte_count);
     cJSON_AddNumberToObject(root, "tcp_connected", num_connected_tcp_clients);
     cJSON_AddNumberToObject(root, "udp_connected", udp_conn_list->size);
     if (DB_WIFI_MODE == DB_WIFI_MODE_STA) {

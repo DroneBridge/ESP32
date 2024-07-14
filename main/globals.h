@@ -54,10 +54,10 @@ extern wifi_sta_list_t wifi_sta_list;      // updated when ESP32 is in ap mode. 
 extern uint8_t LOCAL_MAC_ADDRESS[6];       // filled with the mac address during init of WiFi interface
 extern uint8_t DB_MAV_SYS_ID;              // stores the local system ID - set by heartbeat that is received via UART (UART is the local connection)
 
-extern uint32_t uart_byte_count;                // Total bytes read from UART
+extern uint32_t serial_total_byte_count;                // Total bytes read from serial link (UART or USB/JTAG)
 extern int8_t num_connected_tcp_clients;
 extern udp_conn_list_t *udp_conn_list;   // List of UDP clients that the ESP32 will send to
 
-extern int WIFI_ESP_MAXIMUM_RETRY;
+// extern int WIFI_ESP_MAXIMUM_RETRY;
 
 #endif //DB_ESP32_GLOBALS_H

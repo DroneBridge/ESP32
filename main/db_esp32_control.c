@@ -152,16 +152,20 @@ int db_open_int_telemetry_udp_socket() {
     return sock;
 }
 
+/**
+ * Sends data to all clients that are part of the udp connection list. No resending of packets in case of failure.
+ * @param n_udp_conn_list List of known UDP clients/connections
+ * @param data Buffer with the data to send
+ * @param data_length Length of the data in the buffer
+ */
 void send_to_all_udp_clients(udp_conn_list_t *n_udp_conn_list, const uint8_t *data, uint data_length) {
     for (int i = 0; i < n_udp_conn_list->size; i++) {  // send to all UDP clients
-        resend:;
         int sent = sendto(n_udp_conn_list->udp_socket, data, data_length, 0,
                           (struct sockaddr *) &n_udp_conn_list->db_udp_clients[i].udp_client,
                           sizeof(n_udp_conn_list->db_udp_clients[i].udp_client));
         if (sent != data_length) {
-            ESP_LOGE(TAG, "UDP - Error sending (%i/%i) because of %d - trying again!", sent, data_length, errno);
-            vTaskDelay(200 / portTICK_PERIOD_MS);
-            goto resend;
+            int err = errno;
+            ESP_LOGE(TAG, "UDP - Error sending (%i/%i) to because of %d", sent, data_length, err);
         }
     }
 }
@@ -306,7 +310,7 @@ bool remove_from_known_udp_clients(udp_conn_list_t *n_udp_conn_list, struct db_u
 }
 
 /**
- * Reads UART transparently or parsing MSP/LTM protocol.
+ * Reads serial (UART/USB/JTAG) transparently or parsing MAVLink/MSP/LTM protocol.
  * Then sends read data to all connected clients via TCP/UDP or ESP-NOW.
  * Non-Blocking function
  *
@@ -317,8 +321,8 @@ bool remove_from_known_udp_clients(udp_conn_list_t *n_udp_conn_list, struct db_u
  * @param serial_buffer Destination-buffer for the serial data
  * @param db_msp_ltm_port Pointer to structure containing MSP/LTM parser information
  */
-void read_process_uart(int *tcp_clients, uint *transparent_buff_pos, uint *msp_ltm_buff_pos, uint8_t *msp_message_buffer,
-                       uint8_t *serial_buffer, msp_ltm_port_t *db_msp_ltm_port) {
+void read_process_serial_link(int *tcp_clients, uint *transparent_buff_pos, uint *msp_ltm_buff_pos, uint8_t *msp_message_buffer,
+                              uint8_t *serial_buffer, msp_ltm_port_t *db_msp_ltm_port) {
     switch (DB_SERIAL_PROTOCOL) {
         case 0:
         case 2:
@@ -364,17 +368,23 @@ _Noreturn void control_module_esp_now(){
 
     ESP_LOGI(TAG, "Started control module (ESP-NOW)");
     while (1) {
-        read_process_uart(NULL, &transparent_buff_pos, &msp_ltm_buff_pos, msp_message_buffer, serial_buffer,
-                          &db_msp_ltm_port);
+        // read UART (and split into packets & process MAVLink if desired); send to ESP-NOW queue to be processed by esp-now task
+        read_process_serial_link(NULL, &transparent_buff_pos, &msp_ltm_buff_pos, msp_message_buffer, serial_buffer,
+                                 &db_msp_ltm_port);
+        // read queue that was filled by esp-now task to check for data that needs to be sent via serial link
         if (db_uart_write_queue != NULL && xQueueReceive(db_uart_write_queue, &db_espnow_uart_evt, 0) == pdTRUE) {
-            write_to_serial(db_espnow_uart_evt.data, db_espnow_uart_evt.data_len);
             if (DB_SERIAL_PROTOCOL == DB_SERIAL_PROTOCOL_MAVLINK) {
+                // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
+                // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existign packet
                 db_parse_mavlink_from_radio(NULL, NULL, db_espnow_uart_evt.data, db_espnow_uart_evt.data_len);
-            } // only parse in mavlink mode
+            } else {
+                // no parsing with any other protocol - transparent here - just pass through
+                write_to_serial(db_espnow_uart_evt.data, db_espnow_uart_evt.data_len);
+            }
             free(db_espnow_uart_evt.data);
         } else {
             if (db_uart_write_queue == NULL) ESP_LOGE(TAG, "db_uart_write_queue is NULL!");
-            // no new data available do nothing
+            // no new data available to be sent via serial link do nothing
         }
         if (delay_timer_cnt == 5000) {
             /* all actions are non-blocking so allow some delay so that the IDLE task of FreeRTOS and the watchdog can run
@@ -450,7 +460,7 @@ void db_send_internal_telemetry_to_stations(int tel_sock, wifi_sta_list_t *sta_l
  * Receive and process internal telemetry (ESP32 AP to ESP32 Station) sent by ESP32 LR access point.
  * Matches with db_send_internal_telemetry_to_stations()
  * Sets station_rssi_ap based on the received value
- * [NUM_Entries, (MAC + RSSI), (MAC + RSSI), (MAC + RSSI), ...]
+ * Packet format: [NUM_Entries, (MAC + RSSI), (MAC + RSSI), (MAC + RSSI), ...]
  *
  * @param tel_sock Socket listening for internal telemetry
  */
@@ -532,9 +542,13 @@ _Noreturn void control_module_udp_tcp() {
             if (tcp_clients[i] > 0) {
                 ssize_t recv_length = recv(tcp_clients[i], tcp_client_buffer, TCP_BUFF_SIZ, 0);
                 if (recv_length > 0) {
-                    write_to_serial(tcp_client_buffer, recv_length);
                     if (DB_SERIAL_PROTOCOL == DB_SERIAL_PROTOCOL_MAVLINK) {
+                        // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
+                        // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existign packet
                         db_parse_mavlink_from_radio(tcp_clients, udp_conn_list, tcp_client_buffer, recv_length);
+                    } else {
+                        // no parsing with any other protocol - transparent here
+                        write_to_serial(tcp_client_buffer, recv_length);
                     }
                 } else if (recv_length == 0) {
                     shutdown(tcp_clients[i], 0);
@@ -552,28 +566,37 @@ _Noreturn void control_module_udp_tcp() {
             }
         }
         // handle incoming UDP data - Read UDP and forward to UART
-        // all devices that send us UDP data will be added to the list of MAVLink UDP receivers
         ssize_t recv_length = recvfrom(udp_conn_list->udp_socket, udp_buffer, UDP_BUF_SIZE, 0,
                                        (struct sockaddr *) &new_db_udp_client.udp_client, &udp_socklen);
         if (recv_length > 0) {
-            write_to_serial(udp_buffer, recv_length);
+            if (DB_SERIAL_PROTOCOL == DB_SERIAL_PROTOCOL_MAVLINK) {
+                // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
+                // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existign packet
+                db_parse_mavlink_from_radio(tcp_clients, udp_conn_list, udp_buffer, recv_length);
+            } else {
+                // no parsing with any other protocol - transparent here
+                write_to_serial(udp_buffer, recv_length);
+            }
+            // all devices that send us UDP data will be added to the list of MAVLink UDP receivers
             // Allows to register new app on different port. Used e.g. for UDP conn setup in sta-mode.
             // Devices/Ports added this way cannot be removed in sta-mode since UDP is connectionless, and we cannot
             // determine if the client is still existing. This will blow up the list connected devices.
             // In AP-Mode the devices can be removed based on the IP/MAC address
             add_to_known_udp_clients(udp_conn_list, new_db_udp_client);
-            if (DB_SERIAL_PROTOCOL == DB_SERIAL_PROTOCOL_MAVLINK) {
-                db_parse_mavlink_from_radio(tcp_clients, udp_conn_list, udp_buffer, recv_length);
-            } // no parsing with any other protocol
+        } else {
+            // received nothing, keep on going
         }
 
         if (DB_WIFI_MODE == DB_WIFI_MODE_STA) {
             handle_internal_telemetry(db_internal_telem_udp_sock, udp_buffer, &udp_socklen, &new_db_udp_client.udp_client);
+        } else {
+            // internal telemetry only received when in STA mode. Coming from the ESP32 AP. Nothing to do here
         }
 
         // Second check for incoming UART data and send it to TCP/UDP
-        read_process_uart(tcp_clients, &transparent_buff_pos, &msp_ltm_buff_pos, msp_message_buffer, serial_buffer,
-                          &db_msp_ltm_port);
+        read_process_serial_link(tcp_clients, &transparent_buff_pos, &msp_ltm_buff_pos, msp_message_buffer,
+                                 serial_buffer,
+                                 &db_msp_ltm_port);
 
         if (delay_timer_cnt == 6000) {
             // all actions are non-blocking so allow some delay so that the IDLE task of FreeRTOS and the watchdog can run
@@ -592,6 +615,9 @@ _Noreturn void control_module_udp_tcp() {
             } else {
                 // no way of getting RSSI here. Do nothing
             }
+//            size_t free_dram = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+//            size_t lowmark_dram = heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT);
+//            ESP_LOGI(TAG, "Free heap: %i, low mark: %i", free_dram, lowmark_dram);
         } else {
             delay_timer_cnt++;
         }
@@ -607,7 +633,7 @@ _Noreturn void control_module_udp_tcp() {
  */
 void control_module() {
     if (DB_WIFI_MODE != DB_WIFI_MODE_ESPNOW_GND && DB_WIFI_MODE != DB_WIFI_MODE_ESPNOW_AIR) {
-        xTaskCreate(&control_module_udp_tcp, "control_wifi", 40960, NULL, 5, NULL);
+        xTaskCreate(&control_module_udp_tcp, "control_wifi", 46080, NULL, 5, NULL);
     } else {
         xTaskCreate(&control_module_esp_now, "control_espnow", 40960, NULL, 5, NULL);
     }

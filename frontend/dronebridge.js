@@ -38,14 +38,17 @@ function change_uart_visibility() {
 	var tx_rx_div = document.getElementById("tx_rx_div");
 	var rts_cts_div = document.getElementById("rts_cts_div");
 	var rts_thresh_div = document.getElementById("rts_thresh_div");
+	var baud_div = document.getElementById("baud_div");
 	if (serial_via_JTAG === 0) {
 		rts_cts_div.style.display = "block";
 		tx_rx_div.style.display = "block";
 		rts_thresh_div.style.display = "block";
+		baud_div.style.display = "block";
 	} else {
 		rts_cts_div.style.display = "none";
 		tx_rx_div.style.display = "none";
 		rts_thresh_div.style.display = "none";
+		baud_div.style.display = "none";
 	}
 }
 

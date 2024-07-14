@@ -48,7 +48,7 @@
 
 static const char *TAG = "DB_ESP32";
 
-uint8_t DB_WIFI_MODE = DB_WIFI_MODE_AP; // 1=Wifi AP mode, 2=Wifi client mode, 3=ESP-NOW LR Mode
+uint8_t DB_WIFI_MODE = DB_WIFI_MODE_AP;
 uint8_t DB_WIFI_SSID[32] = "DroneBridge for ESP32";
 uint8_t DB_WIFI_PWD[64] = "dronebridge";
 char DEFAULT_AP_IP[IP4ADDR_STRLEN_MAX] = "192.168.2.1";
@@ -57,7 +57,7 @@ char DB_STATIC_STA_IP_GW[IP4ADDR_STRLEN_MAX] = "";
 char DB_STATIC_STA_IP_NETMASK[IP4ADDR_STRLEN_MAX] = "";
 char CURRENT_CLIENT_IP[IP4ADDR_STRLEN_MAX] = "192.168.2.1";
 uint8_t DB_WIFI_CHANNEL = 6;
-uint8_t DB_SERIAL_PROTOCOL = DB_SERIAL_PROTOCOL_MAVLINK;  // 1=MSP/LTM, 4=MAVLink, 5=Transparent
+uint8_t DB_SERIAL_PROTOCOL = DB_SERIAL_PROTOCOL_MAVLINK;
 
 // initially set pins to 0 to allow the start of the system on all boards. User has to set the correct pins
 uint8_t DB_UART_PIN_TX = GPIO_NUM_0;
@@ -89,7 +89,7 @@ uint8_t LOCAL_MAC_ADDRESS[6];
 udp_conn_list_t *udp_conn_list;
 
 // Wifi client mode vars
-int WIFI_ESP_MAXIMUM_RETRY = 25;          // max number of retries to connect to the ap before enabling temp. ap mode
+// int WIFI_ESP_MAXIMUM_RETRY = 25;   // max number of retries to connect to the ap before enabling temp. ap mode
 static int s_retry_num = 0;
 static EventGroupHandle_t s_wifi_event_group;
 #define WIFI_CONNECTED_BIT BIT0
@@ -181,14 +181,18 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         set_client_static_ip();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         ESP_LOGI(TAG, "WIFI_EVENT - Lost connection to access point");
-        if (s_retry_num < WIFI_ESP_MAXIMUM_RETRY) {
-            ESP_ERROR_CHECK(esp_wifi_connect());
-            s_retry_num++;
-            ESP_LOGI(TAG, "Retry to connect to the AP (%i/%i)", s_retry_num, WIFI_ESP_MAXIMUM_RETRY);
-        } else {
-            ESP_LOGI(TAG,"Connecting to the AP failed");
-            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
-        }
+        // Disabled failsafe - keep on trying
+        ESP_ERROR_CHECK(esp_wifi_connect());
+        s_retry_num++;
+        ESP_LOGI(TAG, "Retry to connect to the AP (%i)", s_retry_num);
+//        if (s_retry_num < WIFI_ESP_MAXIMUM_RETRY) {
+//            ESP_ERROR_CHECK(esp_wifi_connect());
+//            s_retry_num++;
+//            ESP_LOGI(TAG, "Retry to connect to the AP (%i/%i)", s_retry_num, WIFI_ESP_MAXIMUM_RETRY);
+//        } else {
+//            ESP_LOGI(TAG,"Connecting to the AP failed");
+//            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
+//        }
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
         ESP_LOGI(TAG, "WIFI_EVENT - Got IP:" IPSTR, IP2STR(&event->ip_info.ip));
@@ -368,6 +372,8 @@ int init_wifi_clientmode() {
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
     ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE)); // disable power saving
     ESP_ERROR_CHECK(esp_wifi_start());
+    // consider connection lost after 1s of no beacon - triggers reconnect via WIFI_EVENT_STA_DISCONNECTED event
+    ESP_ERROR_CHECK(esp_wifi_set_inactive_time(WIFI_IF_STA, 3));
 
     ESP_LOGI(TAG, "Init of WiFi Client-Mode finished. (SSID: %s PASS: %s)", DB_WIFI_SSID, DB_WIFI_PWD);
 
@@ -640,14 +646,16 @@ void app_main() {
     } else {
         // Wi-Fi client mode with LR mode enabled
         if (init_wifi_clientmode() < 0) {
-            ESP_LOGW(TAG, "Switching to failsafe: Enabling access point mode");
-            // De-Init all Wi-Fi and enable the AP-Mode temporarily
-            ESP_ERROR_CHECK(esp_event_loop_delete_default());
-            esp_netif_destroy_default_wifi(esp_default_netif);
-            ESP_ERROR_CHECK(esp_wifi_stop());
-            strncpy((char *) DB_WIFI_SSID, "Failsafe DroneBridge ESP32", sizeof(DB_WIFI_SSID));
-            strncpy((char *) DB_WIFI_PWD, "dronebridge", sizeof(DB_WIFI_PWD));
-            init_wifi_apmode(DB_WIFI_MODE_AP);
+            // Disabled failsafe mode.
+            ESP_LOGE(TAG, "Failed to init Wifi Client Mode");
+//            ESP_LOGW(TAG, "Switching to failsafe: Enabling access point mode");
+//            // De-Init all Wi-Fi and enable the AP-Mode temporarily
+//            ESP_ERROR_CHECK(esp_event_loop_delete_default());
+//            esp_netif_destroy_default_wifi(esp_default_netif);
+//            ESP_ERROR_CHECK(esp_wifi_stop());
+//            strncpy((char *) DB_WIFI_SSID, "Failsafe DroneBridge ESP32", sizeof(DB_WIFI_SSID));
+//            strncpy((char *) DB_WIFI_PWD, "dronebridge", sizeof(DB_WIFI_PWD));
+//            init_wifi_apmode(DB_WIFI_MODE_AP);
         }
     }
 
