@@ -1,7 +1,9 @@
 name: ESP-IDF build
 on:
   push:
-    branches: [ master ]
+    branches:
+      - master
+      - v2.0dev
   pull_request:
     branches: [ master ]
 
