@@ -151,12 +151,14 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
     if (event_id == WIFI_EVENT_AP_STACONNECTED) {
         wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *) event_data;
         ESP_LOGI(TAG, "WIFI_EVENT - Client connected - station:"MACSTR", AID=%d", MAC2STR(event->mac), event->aid);
+        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_ap_get_sta_list(&wifi_sta_list)); // update list of connected stations
     } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
         wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *) event_data;
         ESP_LOGI(TAG, "WIFI_EVENT - Client disconnected - station:"MACSTR", AID=%d", MAC2STR(event->mac), event->aid);
         struct db_udp_client_t db_udp_client;
         memcpy(db_udp_client.mac, event->mac, sizeof(db_udp_client.mac));
         remove_from_known_udp_clients(udp_conn_list, db_udp_client);
+        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_ap_get_sta_list(&wifi_sta_list)); // update list of connected stations
     } else if (event_id == WIFI_EVENT_AP_START) {
         ESP_LOGI(TAG, "WIFI_EVENT - AP started! (SSID: %s PASS: %s)", DB_WIFI_SSID, DB_WIFI_PWD);
     } else if (event_id == WIFI_EVENT_AP_STOP) {
