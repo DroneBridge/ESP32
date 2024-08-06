@@ -341,11 +341,12 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
                     DB_MAV_SYS_ID = new_msg->sysid;
                     // ESP32s that are connected to a flight controller via UART will send RADIO_STATUS messages to the GND
                     if (DB_WIFI_MODE == DB_WIFI_MODE_STA || DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_AIR) {
-                        fmav_radio_status_t payload_r = {.fixed = 0, .rxerrors=0, .txbuf=0,
+                        fmav_radio_status_t payload_r = {.fixed = 0, .txbuf=0,
                                 .noise = db_esp_signal_quality.gnd_noise_floor,
                                 .remnoise = db_esp_signal_quality.air_noise_floor,
                                 .remrssi = db_esp_signal_quality.air_rssi,
-                                .rssi = db_esp_signal_quality.gnd_rssi};
+                                .rssi = db_esp_signal_quality.gnd_rssi,
+                                .rxerrors = db_esp_signal_quality.gnd_rx_packets_lost};
                         uint16_t len = fmav_msg_radio_status_encode_to_frame_buf(buff, db_get_mav_sys_id(),
                                                                                  db_get_mav_comp_id(), &payload_r,
                                                                                  fmav_status);

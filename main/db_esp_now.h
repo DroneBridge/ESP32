@@ -24,7 +24,7 @@
 #include <stdint.h>
 #include <esp_now.h>
 
-#define DB_ESPNOW_MAX_BROADCAST_PEERS   26 // Number of max. broadcast peers. that we support with internal telemetry. Limit is 255, but this is the max we can fit into one packet 250bytes
+#define DB_ESPNOW_MAX_BROADCAST_PEERS   19 // Number of max. broadcast peers. that we support with internal telemetry. Limit is 255, but this is the max we can fit into one packet 250bytes
 #define ESPNOW_QUEUE_SIZE   6
 #define ESPNOW_MAXDELAY     512
 #define DB_ESPNOW_AES_IV_LEN       12   // 96 bit
@@ -38,14 +38,16 @@ extern QueueHandle_t db_espnow_send_queue;    // Queue that contains data to be 
 extern QueueHandle_t db_uart_write_queue;    // Queue that contains data to be written to UART (filled by ESP-NOW task)
 
 typedef struct {
-    int16_t gnd_rssi;               // RSSI in dBm of that peer when we received the last message
+    int8_t gnd_rssi;               // RSSI in dBm of that peer when we received the last message
+    uint16_t last_seq_num;          // last sequ. number received by the GND station ToDO: Not something we need to send via internal telemetry
+    uint16_t gnd_rx_lost_packets;   // number of lost packets on the GND side
     uint8_t broadcast_peer_mac[ESP_NOW_ETH_ALEN];  // mac address of a peer that sent us broadcast messages
 } __attribute__((__packed__)) db_esp_now_bpeer_info_t;
 
-// structure used by ESP-NOW GND to keep infos about RSSI from every device that sent us something
+// structure used by ESP-NOW (manly GND) to keep infos about RSSI from every device that sent us something
 typedef struct {
-    uint8_t size;
-    int16_t gnd_noise_floor;
+    uint8_t size;               // number of peers within db_esp_now_bpeer_info
+    int8_t gnd_noise_floor;    // noise floor as measured on GND side (not all ESP32s support that feature)
     db_esp_now_bpeer_info_t db_esp_now_bpeer_info[DB_ESPNOW_MAX_BROADCAST_PEERS];
 } __attribute__((__packed__)) db_esp_now_clients_list_t;    // structure is sent as ESP-NOW internal telemetry frame to AIR ESP32
 
@@ -61,7 +63,7 @@ typedef struct {
 
 typedef struct {
     uint8_t mac_addr[ESP_NOW_ETH_ALEN];
-    int16_t rssi;
+    int8_t rssi;
     uint8_t data_len;
     uint8_t *data;
 } db_espnow_event_recv_cb_t;

@@ -40,7 +40,7 @@ const uint8_t BROADCAST_MAC[ESP_NOW_ETH_ALEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0
 static QueueHandle_t db_espnow_send_recv_callback_queue;    // Queue that contains ESP-NOW callback results
 QueueHandle_t db_espnow_send_queue;    // Queue that contains data to be sent via ESP-NOW (filled by control task)
 QueueHandle_t db_uart_write_queue;    // Queue that contains data to be written to UART (filled by ESP-NOW task)
-db_esp_now_clients_list_t *db_esp_now_clients_list; // List of known ESP-NOW peers with the last RSSI value and noise floor
+db_esp_now_clients_list_t *db_esp_now_clients_list; // Local list of known ESP-NOW peers with the last RSSI value and noise floor and sequence number
 
 // packet that is filled with payload and sent. Updates the sequ. number with every send.
 static db_esp_now_packet_t db_esp_now_packet_global = {
@@ -54,7 +54,7 @@ uint8_t const db_esp_now_packet_header_len = sizeof(db_esp_now_packet_header_t);
 /**
  * Generates a AES key from a password using pkcs5 - pbkdf2 and mbedTLS
  *
- * @param password
+ * @param password The password that gets transformed to PKCS5 key used for encryption
  * @param key Output buffer for the key
  * @param keylen Length of the aes key to be generated
  */
@@ -249,31 +249,84 @@ bool db_read_uart_queue_and_send() {
 }
 
 /**
+ * Add a new ESP-NOW broadcast peer to the list of known ESP-NOW peers. Checks if peer is already known based on MAC.
+ * List is then used to keep track of the RSSI, packet loss and signal quality on GND side.
+ *
+ * @param esp_now_clients List of broadcast peers (ESP-NOW) with their RSSI
+ * @param broadcast_peer_mac MAC address of a potentially new broadcast peer
+ * @return index of the peer inside the list or -1 in case of error e.g. if list is full or not initialized
+ */
+int16_t update_peer_list(db_esp_now_clients_list_t *esp_now_clients, uint8_t broadcast_peer_mac[6]) {
+    if (esp_now_clients == NULL) { // Check if the list is NULL
+        return -1; // Do nothing
+    }
+    for (uint8_t i = 0; i < esp_now_clients->size; i++) {
+        if (memcmp(esp_now_clients->db_esp_now_bpeer_info[i].broadcast_peer_mac, broadcast_peer_mac, ESP_NOW_ETH_ALEN) == 0) {
+            // found the client - he is already part of the known clients list
+            return i;
+        }
+    }
+    if (esp_now_clients->size == DB_ESPNOW_MAX_BROADCAST_PEERS) { // Check if the list is full
+        return -1; // Do nothing - list is full already
+    } else {
+        // Add new peer to list - Copy the element data to the end of the array
+        db_esp_now_bpeer_info_t db_esp_now_bpeer_info = {.gnd_rssi = -127, .last_seq_num = 0, .gnd_rx_lost_packets = 0};
+        memcpy(db_esp_now_bpeer_info.broadcast_peer_mac, broadcast_peer_mac, ESP_NOW_ETH_ALEN);
+        esp_now_clients->db_esp_now_bpeer_info[esp_now_clients->size] = db_esp_now_bpeer_info;
+        esp_now_clients->size++; // Increment the size of the list
+        return (esp_now_clients->size-1) ;
+    }
+}
+
+/**
  * Steps to process received ESPNOW data. ESP firmware ensures that only correct packets are forwarded to us
  * 1. Decrypt & authenticate
- * 2. Check sequence number
- * 3. Write payload to uart-queue so it can be processed by the control_espnow task
+ * 2. Check if we know the client based on MAC - update rssi in case we are GND - AIR side only expects to only ever have on GND peer anyways
+ * 3. Check sequence number and if we are GND station then update lost packet count based on seq. numbers
+ * 4. Write payload to uart-queue so it can be processed by the control_espnow task
  *
  * @param data Received raw data via ESP-NOW
  * @param data_len  Length of received data
  * @param src_addr Source MAC address of the data
- * @return
+ * @param rssi RSSI in dBm of this packet
  */
-void db_espnow_process_rcv_data(uint8_t *data, uint16_t data_len, uint8_t *src_addr) {
+void db_espnow_process_rcv_data(uint8_t *data, uint16_t data_len, uint8_t *src_addr, int8_t rssi) {
     db_esp_now_packet_t *db_esp_now_packet = (db_esp_now_packet_t *) data;
-    static uint32_t last_seq_num = 0;
     uint8_t len_payload = data_len - DB_ESPNOW_AES_TAG_LEN - db_esp_now_packet_header_len;
     uint8_t db_decrypted_data[len_payload];
 
+    /* Decrypt and authenticate packet - only then process its contents */
     if (db_decrypt_payload(db_esp_now_packet, db_decrypted_data, len_payload) == 0) {
-        if (last_seq_num < db_esp_now_packet->db_esp_now_packet_header.seq_num) {
-            // all good and as expected
+        /* Check if we know that peer already */
+        int16_t peer_index = update_peer_list(db_esp_now_clients_list, src_addr);
+        if (peer_index != -1) {
+            if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND) {
+                // update the list with the rssi only if we are GND
+                db_esp_now_clients_list->db_esp_now_bpeer_info[peer_index].gnd_rssi = rssi;
+            } else {
+                // AIR unit keeps track of RSSI using db_esp_signal_quality variable
+                // no need to do here anything
+                // TODO: Clean up RSSI variables - a bit confusing that AIR and GND use different structures
+            }
+            // check packet sequence number
+            if (db_esp_now_clients_list->db_esp_now_bpeer_info[peer_index].last_seq_num < db_esp_now_packet->db_esp_now_packet_header.seq_num) {
+                // Count the lost packets per peer since the last received packet
+                db_esp_now_clients_list->db_esp_now_bpeer_info[peer_index].gnd_rx_lost_packets +=
+                        (db_esp_now_packet->db_esp_now_packet_header.seq_num -
+                        db_esp_now_clients_list->db_esp_now_bpeer_info[peer_index].last_seq_num - 1);
+            } else {
+                ESP_LOGW(TAG, "Sequence number lower than expected. Sender did reset or packet may be part of a replay attack.");
+                // accept packet anyway for now to make for a more robust link
+                db_esp_now_clients_list->db_esp_now_bpeer_info[peer_index].gnd_rx_lost_packets = 0;
+            }
+
+            db_esp_now_clients_list->db_esp_now_bpeer_info[peer_index].last_seq_num = db_esp_now_packet->db_esp_now_packet_header.seq_num;
         } else {
-            ESP_LOGW(TAG, "Sequence number lower than expected. Sender did reset or packet may be part of a replay attack.");
-            // accept packet anyway for now to make for a more robust link
+            /* Do nothing since we only count packet loss and rssi on the GND side not on the air side
+             * and only if there is still a free spot in the list */
         }
-        last_seq_num = db_esp_now_packet->db_esp_now_packet_header.seq_num;
-        // Process packet depending on packet type
+
+        /* Process packet depending on packet type */
         if (db_esp_now_packet->db_esp_now_packet_header.packet_type == DB_ESP_NOW_PACKET_TYPE_DATA) {
             // Pass data to UART queue
             db_espnow_queue_event_t db_uart_evt;
@@ -288,6 +341,7 @@ void db_espnow_process_rcv_data(uint8_t *data, uint16_t data_len, uint8_t *src_a
                 // all good
             }
         } else if (db_esp_now_packet->db_esp_now_packet_header.packet_type == DB_ESP_NOW_PACKET_TYPE_INTERNAL_TELEMETRY) {
+            /* This is only called on the AIR side since GND sends telemetry to AIR only */
             db_esp_now_clients_list_t *clients = (db_esp_now_clients_list_t*) &db_decrypted_data[1];
             ESP_LOGD(TAG, "Received internal telemetry frame containing %i entries", clients->size);
             for (int i = 0; i < clients->size; i++) {
@@ -296,6 +350,7 @@ void db_espnow_process_rcv_data(uint8_t *data, uint16_t data_len, uint8_t *src_a
                     // so it gets sent with next Mavlink RADIO STATUS in case MAVLink radio status is enabled
                     db_esp_signal_quality.gnd_noise_floor = clients->gnd_noise_floor;
                     db_esp_signal_quality.gnd_rssi = clients->db_esp_now_bpeer_info[i].gnd_rssi;
+                    db_esp_signal_quality.gnd_rx_packets_lost = clients->db_esp_now_bpeer_info[i].gnd_rx_lost_packets;
                     break;
                 } else {
                     // keep on looking for our MAC
@@ -366,8 +421,8 @@ static void db_espnow_receive_callback(const esp_now_recv_info_t *recv_info, con
         return;
     } else {
         // we are GND and packet is for us from AIR
-#if defined(CONFIG_IDF_TARGET_ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C2) || defined(CONFIG_IDF_TARGET_ESP32S2)
-        db_esp_now_clients_list->gnd_noise_floor = recv_info->rx_ctrl->noise_floor;
+#if defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C2) || defined(CONFIG_IDF_TARGET_ESP32S2)
+        db_esp_now_clients_list->gnd_noise_floor = (int8_t ) recv_info->rx_ctrl->noise_floor;
         // rest RSSI will be processed in process_espnow_data()
 #endif
     }
@@ -378,7 +433,7 @@ static void db_espnow_receive_callback(const esp_now_recv_info_t *recv_info, con
     } else {
         // we are AIR a packet is for us from GND - we only expect one GND station to be talking to us
         db_esp_signal_quality.air_rssi = recv_info->rx_ctrl->rssi;
-#if defined(CONFIG_IDF_TARGET_ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C2) || defined(CONFIG_IDF_TARGET_ESP32S2)
+#if defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C2) || defined(CONFIG_IDF_TARGET_ESP32S2)
         db_esp_signal_quality.air_noise_floor = recv_info->rx_ctrl->noise_floor;
 #endif
     }
@@ -422,40 +477,6 @@ void db_espnow_broadcast_peers_list_destroy(db_esp_now_clients_list_t *esp_now_c
         return; // Do nothing
     }
     free(esp_now_clients); // Free the list
-}
-
-/**
- * Add a new ESP-NOW broadcast peer to the list of known ESP-NOW peers. Checks if peer is already known based on MAC.
- * Update the RSSI value if it is already known.
- * List is used to keep track of the RSSI and signal quality on GND side.
- *
- * @param esp_now_clients List of broadcast peers (ESP-NOW) with their RSSI
- * @param broadcast_peer_mac MAC address of a potentially new broadcast peer
- * @param peer_rssi RSSI in dBm of the potentially new broadcast peer
- * @return 1 if new one was added - 0 if not or only update rssi
- */
-bool update_broadcast_peer_rssi(db_esp_now_clients_list_t *esp_now_clients, uint8_t broadcast_peer_mac[ESP_NOW_ETH_ALEN], int16_t peer_rssi) {
-    if (esp_now_clients == NULL) { // Check if the list is NULL
-        return false; // Do nothing
-    }
-    for (int i = 0; i < esp_now_clients->size; i++) {
-        if (memcmp(esp_now_clients->db_esp_now_bpeer_info[i].broadcast_peer_mac,
-                   broadcast_peer_mac, ESP_NOW_ETH_ALEN) == 0) {
-            // client existing - do not add but only update
-            esp_now_clients->db_esp_now_bpeer_info[i].gnd_rssi = peer_rssi;
-            return false;
-        }
-    }
-    if (esp_now_clients->size == DB_ESPNOW_MAX_BROADCAST_PEERS) { // Check if the list is full
-        return false; // Do nothing
-    } else {
-        // Copy the element data to the end of the array
-        db_esp_now_bpeer_info_t db_esp_now_bpeer_info = {.gnd_rssi = peer_rssi};
-        memcpy(db_esp_now_bpeer_info.broadcast_peer_mac, broadcast_peer_mac, ESP_NOW_ETH_ALEN);
-        esp_now_clients->db_esp_now_bpeer_info[esp_now_clients->size] = db_esp_now_bpeer_info;
-        esp_now_clients->size++; // Increment the size of the list
-        return true;
-    }
 }
 
 /**
@@ -560,15 +581,17 @@ bool db_espnow_schedule_internal_telemetry_packet() {
         // continue
     }
     // ToDo: Split list if longer than max payload size
-    uint8_t payload_size = sizeof(db_esp_now_clients_list_t);
-    if (payload_size > DB_ESPNOW_PAYLOAD_MAXSIZE) {
+    if (sizeof(db_esp_now_clients_list_t) > DB_ESPNOW_PAYLOAD_MAXSIZE) {
         ESP_LOGE(TAG, "Size of db_esp_now_clients_list_t is > %i", DB_ESPNOW_PAYLOAD_MAXSIZE);
         return false;
-    } else { /* keep going */}
-    // Set payload of DroneBridge for ESP32 ESP-NOW packet
+    } else {
+        /* continue */
+    }
     ESP_LOGD(TAG, "Scheduling int. telem. packet");
+    uint8_t payload_size = sizeof(db_esp_now_clients_list_t);
 
     db_espnow_queue_event_t evt;
+    // Set payload of DroneBridge for ESP32 ESP-NOW packet
     evt.data = malloc(payload_size);
     memcpy(evt.data, db_esp_now_clients_list, payload_size);
     evt.data_len = payload_size;
@@ -619,10 +642,8 @@ _Noreturn void process_espnow_data() {
                 }
                 case DB_ESPNOW_RECV_CB: {
                     db_espnow_event_recv_cb_t *recv_cb = &evt.info.recv_cb;
-                    db_espnow_process_rcv_data(recv_cb->data, recv_cb->data_len, recv_cb->mac_addr);
+                    db_espnow_process_rcv_data(recv_cb->data, recv_cb->data_len, recv_cb->mac_addr, recv_cb->rssi);
                     free(recv_cb->data);
-                    // this may be a lengthy operation, so we do it here in the task and not in the recv callback directly
-                    update_broadcast_peer_rssi(db_esp_now_clients_list, recv_cb->mac_addr, recv_cb->rssi);
                     break;
                 }
                 default:
