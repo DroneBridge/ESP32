@@ -19,7 +19,7 @@
 <div class="container">
     <div class="row header">
         <div class="one-third column">
-            <img class="u-pull-left logo" src="images/DroneBridgeLogo_noblue_tiny.svg" alt="DroneBridge for ESP32"/>
+            <a href="index.html"><img class="u-pull-left logo" src="images/DroneBridgeLogo_noblue_tiny.svg" alt="DroneBridge for ESP32"/></a>
         </div>
         <div class="two-thirds column nav">
             <nav class="u-pull-right">
@@ -31,31 +31,31 @@
         </div>
     </div>
 
-    <div style="margin-top: 5rem" class="container center-all">
-        <div>
-            This page is under construction. More to come in the future!
-        </div>
-    </div>
-
     <div class="container hero">
         <h5 class="h5">Online Serial Flashing Tool<br>DroneBridge for ESP32</h5>
         <div>This is not working for now. Come back later :(</div>
     </div>
     <div class="container center-all">
         <div>
-            <label for="Version">Version</label>
+            <label for="conn_status">1. Connect ESP32</label>
+            <div id="conn_status">Not connected...</div>
+        </div>
+        <div>
+            <label for="Version">2. Select DroneBridge for ESP32 Version</label>
             <select id="Version">
-                <option>v1.5</option>
-                <option>v2.0RC1</option>
-                <option>v2.0RC2</option>
+                <option>v2.0RC2 (pre-release)</option>
+                <option>v2.0RC1 (pre-release)</option>
+                <option>v1.5 (stable)</option>
             </select>
         </div>
         <div>
-            <label for="HW">Hardware</label>
+            <label for="HW">3. Choose Hardware Target</label>
             <select id="HW">
                 <option>Official HW1.x Board</option>
+                <option>Official HW1.x Board (USBSerial)</option>
                 <option>Generic ESP32</option>
                 <option>Generic ESP32C3</option>
+                <option>Generic ESP32C3 (USBSerial)</option>
                 <option>Generic ESP32C6</option>
                 <option>Generic ESP32S2</option>
                 <option>Generic ESP32S3</option>
