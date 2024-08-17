@@ -8,6 +8,10 @@
   margin-right: auto;
 }
 
+.center-text {
+  text-align: center;
+}
+
 .hero {
   text-align: center;
   padding-left: 6rem;
@@ -91,8 +95,34 @@ button.button-primary:focus {
   border-color: #9a4e0b;
 }
 
-input, select {
+input {
   color: #000;
+}
+
+.custom-select select {
+  padding: 0.675em 6em 0.675em 1em;
+  background-color: white;
+  border-radius: 0.25rem;
+  color: black;
+  cursor: pointer;
+  height: max-content;
+}
+
+.custom-select::before,
+.custom-select::after {
+  --size: 0.3rem;
+  content: "";
+  position: absolute;
+  right: 1rem;
+  pointer-events: none;
+}
+
+.custom-select::before {
+  top: 40%;
+}
+
+.custom-select::after {
+  top: 55%;
 }
 
 .dot_green {
@@ -111,6 +141,52 @@ input, select {
 
 li {
   margin: auto;
+}
+
+.loader {
+  width: 48px;
+  height: 48px;
+  display: inline-block;
+  position: relative;
+}
+
+.loader::after,
+.loader::before {
+  content: "";
+  box-sizing: border-box;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid #FFF;
+  position: absolute;
+  left: 0;
+  top: 0;
+  animation: animloader 2s linear infinite;
+}
+
+.loader::after {
+  animation-delay: 1s;
+}
+
+@keyframes animloader {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+.donate_div {
+  margin: 1rem;
+}
+
+.paypal_button {
+  background-color: #fff;
+  width: 217px;
+  padding: 0.4em 2em;
+  border-radius: 0.6em;
 }
 
 /*# sourceMappingURL=dronebridge.css.map */
