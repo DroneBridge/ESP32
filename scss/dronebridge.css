@@ -1,7 +1,5 @@
-@import "base/variables";
-
 .logo {
-  width:200px;
+  width: 200px;
 }
 
 .center-all {
@@ -32,6 +30,7 @@
   text-align: center;
   margin: 0;
 }
+
 .nav {
   transform: translateY(50%);
   font-weight: bold;
@@ -62,14 +61,14 @@
 }
 
 .dot_green, .dot_red {
-  height: .8rem;
-  width: .8rem;
+  height: 0.8rem;
+  width: 0.8rem;
   border-radius: 50%;
-  display: inline-block
+  display: inline-block;
 }
 
 html {
-  min-height: 100%
+  min-height: 100%;
 }
 
 body {
@@ -81,26 +80,23 @@ body {
 button.button-primary {
   background-color: rgba(0, 49, 102, 0);
   color: #ff9734;
-  border-color: #ff9734
+  border-color: #ff9734;
 }
 
 button.button-primary:hover {
   background-color: #ff9734;
   color: #fff;
-  border-color: #ff9734
+  border-color: #ff9734;
 }
 
 button.button-primary:focus {
   background-color: #003166;
   color: #fff;
-  border-color: #9a4e0b
+  border-color: #9a4e0b;
 }
 
 input {
   color: #000;
-}
-
-.custom-select {
 }
 
 .custom-select select {
@@ -130,11 +126,11 @@ input {
 }
 
 .dot_green {
-  background-color: #68b838
+  background-color: #68b838;
 }
 
 .dot_red {
-  background-color: #f63e3e
+  background-color: #f63e3e;
 }
 
 .image-fullwidth {
@@ -153,9 +149,10 @@ li {
   display: inline-block;
   position: relative;
 }
+
 .loader::after,
 .loader::before {
-  content: '';
+  content: "";
   box-sizing: border-box;
   width: 48px;
   height: 48px;
@@ -166,6 +163,7 @@ li {
   top: 0;
   animation: animloader 2s linear infinite;
 }
+
 .loader::after {
   animation-delay: 1s;
 }
@@ -180,7 +178,6 @@ li {
     opacity: 0;
   }
 }
-
 .donate_div {
   margin: 1rem;
 }
@@ -189,6 +186,7 @@ li {
   background-color: #fff;
   width: 217px;
   padding: 0.4em 2em;
-  border-radius: 0.6em
+  border-radius: 0.6em;
 }
 
+/*# sourceMappingURL=dronebridge.css.map */

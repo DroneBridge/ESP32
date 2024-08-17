@@ -33,9 +33,25 @@
 
     <div class="container hero">
         <h5 class="h5">A secure & transparent telemetry link with support for WiFi and ESP-NOW.</h5>
-        <div>ESP-NOW enables ranges of up to 1km</div>
     </div>
-
+    <div class="container">
+        <div class="row">
+            <h5 style="margin-top: 2rem">WiFi Data Link</h5>
+        </div>
+        <img alt="DroneBridge for ESP32 WiFi connection to GCS" class="image-fullwidth" src="images/DB_ESP32_Docs_Trans_2.png"/>
+        <div>
+            <p>DroneBridge for ESP32 supports traditional WiFi. Run the access point directly on the drones ESP32 or connect to a central access point on the ground.</p>
+        </div>
+    </div>
+    <div class="container">
+        <div class="row">
+            <h5 style="margin-top: 2rem">Long Range ESP-NOW Data Link</h5>
+        </div>
+        <img alt="DroneBridge for ESP32 ESP-NOW connection to GCS" class="image-fullwidth" src="images/DB_ESP32_Docs_Trans_6.png"/>
+        <div>
+            <p>DroneBridge for ESP32 supports ESP-NOW as a protocol. While similar to WiFi it offers far more range at the cost of some data rate (still 250kbit brutto rate). In contrast to a WiFi setup you will need two ESP32`s running DroneBridge for ESP32. On one the ground and one on every drone.</p>
+        </div>
+    </div>
     <div class="container">
         <h5>Features</h5>
         <ul>
@@ -57,14 +73,9 @@
             <li>Weight: <8 g</li>
         </ul>
     </div>
-
-    <div class="container">
-        <img class="image-fullwidth" src="https://raw.githubusercontent.com/DroneBridge/ESP32/master/wiki/DB_ESP32_NOW_Illistration.png"/>
-    </div>
-
     <div>
         <p>A firmware for the popular ESP32 modules from Espressif Systems. Probably the cheapest way to communicate with your drone, UAV, UAS, ground-based vehicle.
-        <br>It also allows for a fully transparent serial to WiFi pass-through link with variable packet size.</p>
+        <br>It also allows for a fully transparent serial to WiFi pass-through link with variable packet size.<br>It is ideal for connecting many drones in one single network.</p>
         <p>DroneBridge for ESP32 is a telemetry/low data rate-only solution. There is no support for cameras connected to the ESP32 since it does not support video encoding.</p>
     </div>
 
@@ -74,9 +85,23 @@
         </button>
     </div>
 
-    <div style="margin-top: 5rem" class="container center-all">
-        <div>
-            This page is under construction. More to come in the future!
+    <div class="container" style="margin-top: 5rem; max-width: 500px">
+        <div class="row donate_div">
+            <div class="twelve columns center-text">DroneBridge for ESP32 is free and almost everything is maintained by a single developer! It takes many hundreds of hours to develop, debug and document such software.<br><b>Please consider supporting the development by donating, an Espresso or by ordering the official boards to keep the project running!</b></div>
+        </div>
+        <div class="row">
+            <div class="six columns">
+                <div class="center-all">
+                    <a href="https://www.buymeacoffee.com/seeul8er" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
+                </div>
+            </div>
+            <div class="six columns">
+                <div class="paypal_button center-all">
+                    <a href="https://www.paypal.com/donate/?hosted_button_id=SG97392AJN73J">
+                        <img src="images/de-pp-logo-150px.png" alt="Donate via PayPal" />
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
 

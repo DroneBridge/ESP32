@@ -81,8 +81,6 @@ let transport;
 let chip = null;
 let esploader;
 
-browser_comp_check();
-
 function browser_comp_check() {
     if (!navigator.serial && !navigator.usb) {
         // the browser is not supporting the required technology for this flasher to run
@@ -330,3 +328,5 @@ function clean_up() {
     transport = null;
     chip = null;
 }
+
+browser_comp_check();
