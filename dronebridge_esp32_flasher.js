@@ -1,8 +1,7 @@
-import { ESPLoader, Transport } from './ESP32/esptool/bundle.js';
-import { serial } from './ESP32/web-serial-polyfill/serial.js';
-// for local testing
-//import { ESPLoader, Transport } from './esptool/bundle.js';
-//import { serial } from './web-serial-polyfill/serial.js';
+// import { ESPLoader, Transport } from './ESP32/esptool/bundle.js';
+// import { serial } from './ESP32/web-serial-polyfill/serial.js';
+import { ESPLoader, Transport } from './esptool/bundle.js';
+import { serial } from './web-serial-polyfill/serial.js';
 if (!navigator.serial && navigator.usb) navigator.serial = serial;  // switch to WebSerial over WebUSB by polyfill
 
 const not_compatible_warning = document.getElementById('not_compatible_warning');
