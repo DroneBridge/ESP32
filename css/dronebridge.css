@@ -189,4 +189,32 @@ li {
   border-radius: 0.6em;
 }
 
+progress[value] {
+  --color: $primary-color; /* the progress color */
+  --background: #f3f3f3; /* the background color */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  border: none;
+  width: 200px;
+  margin: 0 10px;
+  border-radius: 0.2em;
+  background: var(--background);
+}
+
+progress[value]::-webkit-progress-bar {
+  border-radius: 0.2em;
+  background: #f3f3f3;
+}
+
+progress[value]::-webkit-progress-value {
+  border-radius: 0.2em;
+  background: #ff9734;
+}
+
+progress[value]::-moz-progress-bar {
+  border-radius: 0.2em;
+  background: #ff9734;
+}
+
 /*# sourceMappingURL=dronebridge.css.map */
