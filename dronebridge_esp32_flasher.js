@@ -226,6 +226,8 @@ flash_button.onclick = async () => {
             // term.writeln(`Error: ${e.message}`);
         } finally {
             display_ui_success();
+            // simple analytics event
+            sa_event("click_flash", { release: db_rel.display_name, chip: db_target.target_display_name });
         }
     } else {
         // we are not connected
