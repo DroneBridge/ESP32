@@ -150,7 +150,7 @@ bool db_write_mavlink_parameter(fmav_param_set_t *param_set_payload) {
 
     if (strncmp(param_set_payload->param_id, "SYS_ESP32_MODE", 16) == 0) {
         if (float_int.uint8 < DB_WIFI_MODE_ESPNOW_END) {   // check E_DB_WIFI_MODE for allowed modes
-            DB_WIFI_MODE = float_int.uint8;
+            DB_WIFI_MODE_DESIGNATED = float_int.uint8;  // do not directly change DB_WIFI_MODE since it is not safe and constantly processed by other tasks. Save settings and reboot will assign DB_WIFI_MODE_DESIGNATED to DB_WIFI_MODE
             success = true;
         } else {
             ESP_LOGE(TAG, "Unknown mode %i, not saving as new setting", float_int.uint8);

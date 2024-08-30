@@ -49,6 +49,7 @@
 static const char *TAG = "DB_ESP32";
 
 uint8_t DB_WIFI_MODE = DB_WIFI_MODE_AP;
+uint8_t DB_WIFI_MODE_DESIGNATED = DB_WIFI_MODE_AP;  // initially assign the same value as DB_WIFI_MODE
 uint8_t DB_WIFI_SSID[32] = "DroneBridge for ESP32";
 uint8_t DB_WIFI_PWD[64] = "dronebridge";
 char DEFAULT_AP_IP[IP4ADDR_STRLEN_MAX] = "192.168.2.1";
@@ -437,14 +438,14 @@ void db_write_settings_to_nvs() {
     ESP_LOGI(TAG,
              "Trying to save:\nWifi Mode: %i\nssid %s\nwifi_pass %s\nwifi_chan %i\nbaud %liu\ngpio_tx %i\ngpio_rx %i\ngpio_cts %i\ngpio_rts %i\nrts_thresh %i\nproto %i\n"
              "trans_pack_size %i\nltm_per_packet %i\nap_ip %s\nip_sta %s\nip_sta_gw %s\nip_sta_netmsk %s",
-             DB_WIFI_MODE, DB_WIFI_SSID, DB_WIFI_PWD, DB_WIFI_CHANNEL, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
+             DB_WIFI_MODE_DESIGNATED, DB_WIFI_SSID, DB_WIFI_PWD, DB_WIFI_CHANNEL, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
              DB_UART_PIN_CTS, DB_UART_PIN_RTS, DB_UART_RTS_THRESH,
              DB_SERIAL_PROTOCOL, DB_TRANS_BUF_SIZE, DB_LTM_FRAME_NUM_BUFFER,
              DEFAULT_AP_IP, DB_STATIC_STA_IP, DB_STATIC_STA_IP_GW, DB_STATIC_STA_IP_NETMASK);
     ESP_LOGI(TAG, "Saving to NVS %s", NVS_NAMESPACE);
     nvs_handle my_handle;
     ESP_ERROR_CHECK(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &my_handle));
-    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "esp32_mode", DB_WIFI_MODE));
+    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "esp32_mode", DB_WIFI_MODE_DESIGNATED));  // only DB_WIFI_MODE_DESIGNATED gets updated by user
     ESP_ERROR_CHECK(nvs_set_str(my_handle, "ssid", (char *) DB_WIFI_SSID));
     ESP_ERROR_CHECK(nvs_set_str(my_handle, "wifi_pass", (char *) DB_WIFI_PWD));
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "wifi_chan", DB_WIFI_CHANNEL));
@@ -539,7 +540,7 @@ void db_read_settings_nvs() {
  */
 void short_press_callback(void *arg,void *usr_data) {
     ESP_LOGW(TAG, "Short press detected setting wifi mode to access point with password: dronebridge");
-    DB_WIFI_MODE = DB_WIFI_MODE_AP;
+    DB_WIFI_MODE_DESIGNATED = DB_WIFI_MODE_AP;  // do not directly change DB_WIFI_MODE since it is not safe and constantly processed by other tasks. Save settings and reboot will assign DB_WIFI_MODE_DESIGNATED to DB_WIFI_MODE.
     strncpy((char *) DB_WIFI_SSID, "DroneBridge for ESP32", sizeof(DB_WIFI_SSID) - 1);
     strncpy((char *) DB_WIFI_PWD, "dronebridge", sizeof(DB_WIFI_PWD) - 1);
     db_write_settings_to_nvs();
@@ -553,19 +554,19 @@ void short_press_callback(void *arg,void *usr_data) {
  */
 void long_press_callback(void *arg,void *usr_data) {
     ESP_LOGW(TAG, "Reset triggered via GPIO %i. Resetting settings and rebooting", DB_RESET_PIN);
-    DB_WIFI_MODE = DB_WIFI_MODE_AP;
+    DB_WIFI_MODE_DESIGNATED = DB_WIFI_MODE_AP;  // do not directly change DB_WIFI_MODE since it is not safe and constantly processed by other tasks. Save settings and reboot will assign DB_WIFI_MODE_DESIGNATED to DB_WIFI_MODE.
     strncpy((char *) DB_WIFI_SSID, "DroneBridge for ESP32", sizeof(DB_WIFI_SSID) - 1);
     strncpy((char *) DB_WIFI_PWD, "dronebridge", sizeof(DB_WIFI_PWD) - 1);
     strncpy(DEFAULT_AP_IP, "192.168.2.1", sizeof(DEFAULT_AP_IP) - 1);
     memset(DB_STATIC_STA_IP, 0, strlen(DB_STATIC_STA_IP));
     memset(DB_STATIC_STA_IP_GW, 0, strlen(DB_STATIC_STA_IP_GW));
     memset(DB_STATIC_STA_IP_NETMASK, 0, strlen(DB_STATIC_STA_IP_NETMASK));
-    DB_WIFI_CHANNEL = DB_SERIAL_PROTOCOL_MAVLINK;
+    DB_WIFI_CHANNEL = 6;
     DB_UART_PIN_TX = GPIO_NUM_0;
     DB_UART_PIN_RX = GPIO_NUM_0;
     DB_UART_PIN_CTS = GPIO_NUM_0;
     DB_UART_PIN_RTS = GPIO_NUM_0;
-    DB_SERIAL_PROTOCOL = 4;
+    DB_SERIAL_PROTOCOL = DB_SERIAL_PROTOCOL_MAVLINK;
     DB_TRANS_BUF_SIZE = 64;
     DB_UART_RTS_THRESH = 64;
     db_write_settings_to_nvs();
@@ -639,6 +640,7 @@ void app_main() {
     }
     ESP_ERROR_CHECK(ret);
     db_read_settings_nvs();
+    DB_WIFI_MODE_DESIGNATED = DB_WIFI_MODE; // must always match, mismatch only allowed when changed by user action and not rebooted, yet.
     set_reset_trigger();
     if (DB_WIFI_MODE == DB_WIFI_MODE_AP || DB_WIFI_MODE == DB_WIFI_MODE_AP_LR) {
         init_wifi_apmode(DB_WIFI_MODE);
@@ -648,16 +650,7 @@ void app_main() {
     } else {
         // Wi-Fi client mode with LR mode enabled
         if (init_wifi_clientmode() < 0) {
-            // Disabled failsafe mode.
             ESP_LOGE(TAG, "Failed to init Wifi Client Mode");
-//            ESP_LOGW(TAG, "Switching to failsafe: Enabling access point mode");
-//            // De-Init all Wi-Fi and enable the AP-Mode temporarily
-//            ESP_ERROR_CHECK(esp_event_loop_delete_default());
-//            esp_netif_destroy_default_wifi(esp_default_netif);
-//            ESP_ERROR_CHECK(esp_wifi_stop());
-//            strncpy((char *) DB_WIFI_SSID, "Failsafe DroneBridge ESP32", sizeof(DB_WIFI_SSID));
-//            strncpy((char *) DB_WIFI_PWD, "dronebridge", sizeof(DB_WIFI_PWD));
-//            init_wifi_apmode(DB_WIFI_MODE_AP);
         }
     }
 

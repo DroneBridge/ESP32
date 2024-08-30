@@ -25,6 +25,13 @@ menu "DroneBridge for ESP32 Configuration"
                 WARNING: No logging available via USB port.
     endchoice
 
+    config DB_SKYBRUSH_SUPPORT
+          bool "Enable support for Skybrush by enabling UDP broadcast receiver on port 14555"
+          default y
+          help
+            In WiFi Client Mode the ESP32 will open an additional UDP port 14555 that receives Skybrush broadcast msgs.
+            The messages will be transparently forwarded to the serial port/UART.
+
     choice WEB_DEPLOY_MODE
         prompt "Website deploy mode"
         default WEB_DEPLOY_SF

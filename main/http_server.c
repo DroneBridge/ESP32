@@ -160,7 +160,7 @@ static esp_err_t settings_post_handler(httpd_req_t *req) {
     cJSON *root = cJSON_Parse(buf);
 
     cJSON *json = cJSON_GetObjectItem(root, "esp32_mode");
-    if (json) DB_WIFI_MODE = json->valueint;
+    if (json) DB_WIFI_MODE_DESIGNATED = json->valueint;    // do not directly change DB_WIFI_MODE since it is not safe and constantly processed by other tasks. Save settings and reboot will assign DB_WIFI_MODE_DESIGNATED to DB_WIFI_MODE
 
     json = cJSON_GetObjectItem(root, "wifi_ssid");
     if (json && strlen(json->valuestring) < 32 && strlen(json->valuestring) > 0)
@@ -222,6 +222,17 @@ static esp_err_t settings_post_handler(httpd_req_t *req) {
                             "    \"status\": \"success\",\n"
                             "    \"msg\": \"Settings changed!\"\n"
                             "  }");
+    vTaskDelay(1000 / portTICK_PERIOD_MS);  // wait to allow the website displaying the success message
+    // Send reboot message
+    httpd_resp_set_type(req, "application/json");
+    cJSON *reboot_info = cJSON_CreateObject();
+    cJSON_AddStringToObject(reboot_info, "msg", "Rebooting!");
+    const char *sys_info = cJSON_Print(reboot_info);
+    httpd_resp_sendstr(req, sys_info);
+    free((void *) sys_info);
+    cJSON_Delete(reboot_info);
+    vTaskDelay(500 / portTICK_PERIOD_MS);  // wait 1s to allow the website displaying the success message
+    esp_restart();
     return ESP_OK;
 }
 
@@ -293,6 +304,23 @@ static esp_err_t settings_clients_udp_post(httpd_req_t *req) {
                                 "  }");
     }
 
+    return ESP_OK;
+}
+
+/**
+ * Process a request that shall clear all active UDP connections.
+ * ESP32 will remove all maintained UDP connections from its internal list and UDP clients will have to register again.
+ * This also clears the one UDP client connection that gets saved to NVM.
+ *
+ * @param req
+ * @return ESP_OK if all was good. Else ESP_FAIL
+ */
+static esp_err_t settings_clients_clear_udp_get(httpd_req_t *req) {
+    for (int i = 0; i < udp_conn_list->size; ++i) {
+        memset(&udp_conn_list->db_udp_clients[i], 0, sizeof(struct db_udp_client_t));
+    }
+    udp_conn_list->size = 0;
+    ESP_LOGI(REST_TAG, "Removed all UDP clients from list!");
     return ESP_OK;
 }
 
@@ -421,6 +449,17 @@ static esp_err_t system_stats_get_handler(httpd_req_t *req) {
     cJSON_AddNumberToObject(root, "read_bytes", serial_total_byte_count);
     cJSON_AddNumberToObject(root, "tcp_connected", num_connected_tcp_clients);
     cJSON_AddNumberToObject(root, "udp_connected", udp_conn_list->size);
+    // add IP:PORT info on connected UDP clients
+    cJSON *udp_clients = cJSON_CreateArray();
+    for (int i = 0; i < udp_conn_list->size; i++) {
+        char ip_string[INET_ADDRSTRLEN];
+        char ip_port_string[INET_ADDRSTRLEN+10];
+        inet_ntop(AF_INET, &(udp_conn_list->db_udp_clients[i].udp_client.sin_addr), ip_string, INET_ADDRSTRLEN);
+        sprintf(ip_port_string, "%s:%d", ip_string, htons (udp_conn_list->db_udp_clients[i].udp_client.sin_port));
+        cJSON_AddItemToArray(udp_clients, cJSON_CreateString(ip_port_string));
+    }
+    cJSON_AddItemToObject(root, "udp_clients", udp_clients);
+    // add RSSI and IP info
     if (DB_WIFI_MODE == DB_WIFI_MODE_STA) {
         cJSON_AddStringToObject(root, "current_client_ip", CURRENT_CLIENT_IP);
         cJSON_AddNumberToObject(root, "esp_rssi", db_esp_signal_quality.air_rssi);
@@ -475,22 +514,6 @@ static esp_err_t system_clients_get_handler(httpd_req_t *req) {
     free((void *) sys_info);
     cJSON_Delete(root);
     return ESP_OK;
-}
-
-/**
- * Sends a JSON message that we are going to reboot now
- * @param req
- * @return
- */
-static esp_err_t system_reboot_post_handler(httpd_req_t *req) {
-    httpd_resp_set_type(req, "application/json");
-    cJSON *root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, "msg", "Rebooting!");
-    const char *sys_info = cJSON_Print(root);
-    httpd_resp_sendstr(req, sys_info);
-    free((void *) sys_info);
-    cJSON_Delete(root);
-    esp_restart();
 }
 
 /**
@@ -566,15 +589,6 @@ esp_err_t start_rest_server(const char *base_path) {
     };
     httpd_register_uri_handler(server, &system_stats_get_uri);
 
-    /* URI handler for triggering system reboot */
-    httpd_uri_t system_reboot_post_uri = {
-            .uri = "/api/system/reboot",
-            .method = HTTP_POST,
-            .handler = system_reboot_post_handler,
-            .user_ctx = rest_context
-    };
-    httpd_register_uri_handler(server, &system_reboot_post_uri);
-
     /* URI handler for fetching settings data */
     httpd_uri_t settings_get_uri = {
             .uri = "/api/settings",
@@ -600,6 +614,15 @@ esp_err_t start_rest_server(const char *base_path) {
             .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &settings_clients_udp_post_uri);
+
+    /* URI handler for removing all known UDP client connections */
+    httpd_uri_t settings_clients_clear_udp_get_uri = {
+            .uri = "/api/settings/clients/clear_udp",
+            .method = HTTP_DELETE,
+            .handler = settings_clients_clear_udp_get,
+            .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &settings_clients_clear_udp_get_uri);
 
     /* URI handler for setting a static IP for the ESP32 in Wi-Fi client mode */
     httpd_uri_t settings_static_ip_port_uri = {

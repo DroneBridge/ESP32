@@ -5,9 +5,10 @@ let old_conn_status = 0;	// connection status before last update of UI to know w
 let serial_via_JTAG = 0;	// set to 1 if ESP32 is using the USB interface as serial interface for data and not using the UART. If 0 we set UART config to invisible for the user.
 
 function change_ap_ip_visibility(){
-	var ap_ip_div = document.getElementById("ap_ip_div");
-	var ap_channel_div = document.getElementById("ap_channel_div");
-	var disclamer_div = document.getElementById("esp-lr-ap-disclaimer");
+	let ap_ip_div = document.getElementById("ap_ip_div");
+	let ap_channel_div = document.getElementById("ap_channel_div");
+	let disclamer_div = document.getElementById("esp-lr-ap-disclaimer");
+	let wifi_ssid_div = document.getElementById("wifi_ssid_div");
 	if (document.getElementById("esp32_mode").value === "2") {
 		ap_ip_div.style.display = "none";
 		ap_channel_div.style.display = "none";
@@ -15,16 +16,22 @@ function change_ap_ip_visibility(){
 		ap_ip_div.style.display = "block";
 		ap_channel_div.style.display = "block";
 	}
-	if (document.getElementById("esp32_mode").value >= "3") {
+	if (document.getElementById("esp32_mode").value > "2") {
 		disclamer_div.style.display = "block";
 	} else {
 		disclamer_div.style.display = "none";
 	}
+	if (document.getElementById("esp32_mode").value > "3") {
+		ap_ip_div.style.display = "none";
+		wifi_ssid_div.style.visibility = 'hidden';
+	} else {
+		wifi_ssid_div.style.visibility = "visible";
+	}
 }
 
 function change_msp_ltm_visibility(){
-	var msp_ltm_div = document.getElementById("msp_ltm_div");
-	var trans_pack_size_div = document.getElementById("trans_pack_size_div");
+	let msp_ltm_div = document.getElementById("msp_ltm_div");
+	let trans_pack_size_div = document.getElementById("trans_pack_size_div");
 	if (document.getElementById("telem_proto").value === "1") {
 		msp_ltm_div.style.display = "block";
 		trans_pack_size_div.style.display = "none";
@@ -35,10 +42,10 @@ function change_msp_ltm_visibility(){
 }
 
 function change_uart_visibility() {
-	var tx_rx_div = document.getElementById("tx_rx_div");
-	var rts_cts_div = document.getElementById("rts_cts_div");
-	var rts_thresh_div = document.getElementById("rts_thresh_div");
-	var baud_div = document.getElementById("baud_div");
+	let tx_rx_div = document.getElementById("tx_rx_div");
+	let rts_cts_div = document.getElementById("rts_cts_div");
+	let rts_thresh_div = document.getElementById("rts_thresh_div");
+	let baud_div = document.getElementById("baud_div");
 	if (serial_via_JTAG === 0) {
 		rts_cts_div.style.display = "block";
 		tx_rx_div.style.display = "block";
@@ -182,12 +189,28 @@ function get_stats() {
 		} else if (!isNaN(tcp_clients)) {
 			document.getElementById("tcp_connected").innerHTML = tcp_clients + " clients"
 		}
+		// UDP clients for tooltip
+		let udp_clients_string = ""
+		if (json_data.hasOwnProperty("udp_clients")) {
+			let udp_conn_jsonarray = json_data["udp_clients"];
+			for (let i = 0; i < udp_conn_jsonarray.length; i++) {
+				udp_clients_string = udp_clients_string + udp_conn_jsonarray[i];
+				if ((i + 1) !== udp_conn_jsonarray.length) {
+					udp_clients_string = udp_clients_string + "<br>";
+				}
+			}
+			if (udp_conn_jsonarray.length === 0) {
+				udp_clients_string = "-";
+			} else {
+				document.getElementById("tooltip_udp_clients").innerHTML = udp_clients_string;
+			}
+		}
 
 		let udp_clients = parseInt(json_data["udp_connected"])
 		if (!isNaN(udp_clients) && udp_clients === 1) {
-			document.getElementById("udp_connected").innerHTML = udp_clients + " client"
+			document.getElementById("udp_connected").innerHTML = "<span class=\"tooltiptext\" id=\"tooltip_udp_clients\">"+udp_clients_string+"</span>" + udp_clients + " client"
 		} else if (!isNaN(udp_clients)) {
-			document.getElementById("udp_connected").innerHTML = udp_clients + " clients"
+			document.getElementById("udp_connected").innerHTML = "<span class=\"tooltiptext\" id=\"tooltip_udp_clients\">"+udp_clients_string+"</span>" + udp_clients + " clients"
 		}
 
 		if ('esp_rssi' in json_data) {
@@ -260,6 +283,28 @@ function add_new_udp_client() {
 	}
 }
 
+async function clear_udp_clients() {
+	if (confirm("Do you want to remove all UDP connections?\nGCS will have to re-connect.") === true) {
+		let post_url = ROOT_URL + "api/settings/clients/clear_udp";
+		const response = await fetch(post_url, {
+			method: 'DELETE',
+			headers: {
+				'Accept': 'application/json',
+				'Content-Type': 'application/json',
+				"charset": 'UTF-8'
+			},
+			body: null
+		});
+		if (!response.ok) {
+			conn_status = 0
+			const message = `An error has occured: ${response.status}`;
+			throw new Error(message);
+		}
+	} else {
+		// cancel
+	}
+}
+
 function show_toast(msg) {
 	Toastify({
 		text: msg,
@@ -285,15 +330,6 @@ function save_settings() {
 		show_toast(send_response["msg"])
 		get_settings()  // update UI with new settings
 	}).catch(error => {
-		show_toast(error.message);
-	});
-}
-
-function trigger_reboot() {
-	send_json("api/system/reboot").then(json_data => {
-		show_toast(json_data["msg"])
-	}).catch(error => {
-		error.message;
 		show_toast(error.message);
 	});
 }
