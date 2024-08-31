@@ -25,7 +25,7 @@
 #include "db_esp32_control.h"
 
 #define MAX_LTM_FRAMES_IN_BUFFER 5
-#define DB_BUILD_VERSION 11
+#define DB_BUILD_VERSION 12
 #define DB_MAJOR_VERSION 2
 #define DB_MINOR_VERSION 0
 

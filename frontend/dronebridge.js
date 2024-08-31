@@ -125,7 +125,7 @@ async function send_json(api_path, json_data = undefined) {
 		headers: {
 			'Accept': 'application/json',
 			'Content-Type': 'application/json',
-			"charset": 'UTF-8'
+			"charset": 'utf-8'
 		},
 		body: json_data
 	});
@@ -262,14 +262,17 @@ function get_settings() {
 }
 
 function add_new_udp_client() {
-	var ip = prompt("Please enter the IP address of the UDP receiver", "192.168.2.X");
-	var port = parseInt(prompt("Please enter the port number of the UDP receiver", "14550"));
+	let ip = prompt("Please enter the IP address of the UDP receiver", "192.168.2.X");
+	let port = prompt("Please enter the port number of the UDP receiver", "14550");
+	port = parseInt(port);
+	let save_to_nvm = confirm("Save this UDP client to the permanent storage so it will be auto added after reboot/reset?\nYou can only save one UDP client to the memory. The old ones will be overwritten.\nSelect no if you only want to add this client for this session.");
 	const ippattern = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
 
 	if (ip != null && port != null && ippattern.test(ip)) {
 		let myjson = {
 			ip: ip,
-			port: port
+			port: port,
+			save: save_to_nvm
 		};
 		send_json("api/settings/clients/udp", JSON.stringify(myjson)).then(send_response => {
 			console.log(send_response);

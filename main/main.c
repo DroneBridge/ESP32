@@ -23,7 +23,6 @@
 #include <string.h>
 #include <driver/gpio.h>
 #include <lwip/apps/netbiosns.h>
-#include <esp_now.h>
 
 #include "freertos/event_groups.h"
 #include "esp_mac.h"
@@ -174,7 +173,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         db_udp_client.udp_client.sin_len = 16;
         db_udp_client.udp_client.sin_addr.s_addr = event->ip.addr;
         memcpy(db_udp_client.mac, event->mac, sizeof(db_udp_client.mac));
-        add_to_known_udp_clients(udp_conn_list, db_udp_client);
+        add_to_known_udp_clients(udp_conn_list, db_udp_client, false);
     }
     // Wifi client mode events
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
@@ -432,7 +431,8 @@ void init_wifi_espnow() {
 }
 
 /**
- * Write settings to non-volatile storage
+ * Write settings to non-volatile memory so they can be loaded on next startup. The UDP clients are saved using a
+ * separate function since the "save" operation is triggered by a separate button on the UI.
  */
 void db_write_settings_to_nvs() {
     ESP_LOGI(TAG,
@@ -468,6 +468,38 @@ void db_write_settings_to_nvs() {
 }
 
 /**
+ * Saves a udp client to the NVM so it can be automatically added on the next boot. No need for the user to manually add it again.
+ * Only one UDP client can be saved to the NVM.
+ * @param new_db_udp_client The client to add to NVM. Must have IP and port set.
+ * @param clear_client Set to true to remove the current client from NVM. In that case the new_db_udp_client param will be ignored.
+ */
+void save_udp_client_to_nvm(struct db_udp_client_t *new_db_udp_client, bool clear_client) {
+    char ip[INET_ADDRSTRLEN];
+    uint16_t port;
+    if (!clear_client) {
+        // convert addr to string
+        char client_str[INET_ADDRSTRLEN + 6];
+        inet_ntop(AF_INET, &(new_db_udp_client->udp_client.sin_addr), ip, INET_ADDRSTRLEN);
+        port = ntohs(new_db_udp_client->udp_client.sin_port);
+        snprintf(client_str, sizeof(client_str), "%s:%d", ip, port);
+        ESP_LOGI(TAG, "Saving UDP client %s to NVS %s", client_str, NVS_NAMESPACE);
+    } else {
+        // clear client from NVM by setting string to empty "" and port to 0
+        ip[0] = '\0';
+        port = 0;
+        ESP_LOGI(TAG, "Clearing UDP client from NVM");
+    }
+
+    nvs_handle my_handle;
+    ESP_ERROR_CHECK(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &my_handle));
+    ESP_ERROR_CHECK(nvs_set_str(my_handle, "udp_client_ip", ip));
+    ESP_ERROR_CHECK(nvs_set_u16(my_handle, "udp_client_port", port));
+
+    ESP_ERROR_CHECK(nvs_commit(my_handle));
+    nvs_close(my_handle);
+}
+
+/**
  * Helper function to read a string from the NVS based on a key. Handles errors accordingly and print result to console
  *
  * @param my_handle nvs_handle to use
@@ -490,7 +522,7 @@ void db_read_str_nvs(nvs_handle my_handle, char *key, char *dst) {
 }
 
 /**
- * Read stored settings from internal storage
+ * Read stored settings from internal storage including the saved UDP client.
  */
 void db_read_settings_nvs() {
     nvs_handle my_handle;
@@ -502,7 +534,6 @@ void db_read_settings_nvs() {
         db_write_settings_to_nvs();
     } else {
         ESP_LOGI(TAG, "Reading settings from NVS");
-
         db_read_str_nvs(my_handle, "ssid", (char *) DB_WIFI_SSID);
         db_read_str_nvs(my_handle, "wifi_pass", (char *) DB_WIFI_PWD);
         db_read_str_nvs(my_handle, "ap_ip", DEFAULT_AP_IP);
@@ -520,7 +551,14 @@ void db_read_settings_nvs() {
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "proto", &DB_SERIAL_PROTOCOL));
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u16(my_handle, "trans_pack_size", &DB_TRANS_BUF_SIZE));
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "ltm_per_packet", &DB_LTM_FRAME_NUM_BUFFER));
-
+        // get saved UDP client
+        char udp_client_ip_str[INET_ADDRSTRLEN + 6];
+        udp_client_ip_str[0] = '\0';
+        db_read_str_nvs(my_handle, "udp_client_ip", udp_client_ip_str);
+        uint16_t udp_client_port = 0;
+        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u16(my_handle, "udp_client_port", &udp_client_port));
+        
+        // close NVM
         nvs_close(my_handle);
         ESP_LOGI(TAG,
                  "\tWifi Mode: %i\n\twifi_chan %i\n\tbaud %liu\n\tgpio_tx %i\n\tgpio_rx %i\n\tgpio_cts %i\n\t"
@@ -528,8 +566,23 @@ void db_read_settings_nvs() {
                  DB_WIFI_MODE, DB_WIFI_CHANNEL, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
                  DB_UART_PIN_CTS, DB_UART_PIN_RTS, DB_UART_RTS_THRESH, DB_SERIAL_PROTOCOL, DB_TRANS_BUF_SIZE,
                  DB_LTM_FRAME_NUM_BUFFER);
-
-
+        if (strlen(udp_client_ip_str) > 0 && udp_client_port != 0) {
+            // there was a saved UDP client in the NVM - add it to the udp clients list
+            ESP_LOGI(TAG, "Adding %s:%i to known UDP clients.", udp_client_ip_str, udp_client_port);
+            struct sockaddr_in new_sockaddr;
+            memset(&new_sockaddr, 0, sizeof(new_sockaddr));
+            new_sockaddr.sin_family = AF_INET;
+            inet_pton(AF_INET, udp_client_ip_str, &new_sockaddr.sin_addr);
+            new_sockaddr.sin_port = htons(udp_client_port);
+            struct db_udp_client_t new_udp_client = {
+                    .udp_client = new_sockaddr,
+                    .mac = {0, 0, 0, 0, 0, 0}   // dummy MAC
+            };
+            bool save_to_nvm = false;   // no need to save it to NVM again
+            add_to_known_udp_clients(udp_conn_list, new_udp_client, save_to_nvm);
+        } else {
+            // no saved UDP client - do nothing
+        }
     }
 }
 
@@ -632,7 +685,7 @@ void db_jtag_serial_info_print() {
  * AP-Mode: ESP32 creates an WiFi access point of its own where the ground control stations can connect
  */
 void app_main() {
-    udp_conn_list = udp_client_list_create();   // http server functions expect the list to exist
+    udp_conn_list = udp_client_list_create();   // http server functions and db_read_settings_nvs expect the list to exist
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES) {
         ESP_ERROR_CHECK(nvs_flash_erase());

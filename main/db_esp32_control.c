@@ -292,10 +292,12 @@ void udp_client_list_destroy(udp_conn_list_t *n_udp_conn_list) {
  *
  * @param n_udp_conn_list Structure containing all UDP connection information
  * @param new_db_udp_client New client to add to the UDP list. PORT, MAC & IP must be set. If MAC is not set then the
- *                          device cannot be removed later on.
+ *                          device cannot be automatically removed later on. To remove it, the user must clear the entire list.
+ * @param save_to_nvm Set to 1 (true) in case you want the UDP client to survive the reboot. Set to 0 (false) if client is temporary for this session.
+ *                    It will then be saved to NVM and added to the udp_conn_list_t on startup. Only one client can be saved to NVM.
  * @return 1 if added - 0 if not
  */
-bool add_to_known_udp_clients(udp_conn_list_t *n_udp_conn_list, struct db_udp_client_t new_db_udp_client) {
+bool add_to_known_udp_clients(udp_conn_list_t *n_udp_conn_list, struct db_udp_client_t new_db_udp_client, bool save_to_nvm) {
     if (n_udp_conn_list == NULL) { // Check if the list is NULL
         return false; // Do nothing
     }
@@ -311,6 +313,11 @@ bool add_to_known_udp_clients(udp_conn_list_t *n_udp_conn_list, struct db_udp_cl
     }
     n_udp_conn_list->db_udp_clients[n_udp_conn_list->size] = new_db_udp_client; // Copy the element data to the end of the array
     n_udp_conn_list->size++; // Increment the size of the list
+    if (save_to_nvm) {
+        save_udp_client_to_nvm(&new_db_udp_client, false);
+    } else {
+        // do not save to NVM
+    }
     return true;
 }
 
@@ -624,7 +631,7 @@ _Noreturn void control_module_udp_tcp() {
             // Devices/Ports added this way cannot be removed in sta-mode since UDP is connectionless, and we cannot
             // determine if the client is still existing. This will blow up the list connected devices.
             // In AP-Mode the devices can be removed based on the IP/MAC address
-            add_to_known_udp_clients(udp_conn_list, new_db_udp_client);
+            add_to_known_udp_clients(udp_conn_list, new_db_udp_client, false);
         } else {
             // received nothing, keep on going
         }

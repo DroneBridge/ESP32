@@ -59,14 +59,14 @@ These boards are very low in price, have everything you need and are also very s
   <img src="https://github.com/DroneBridge/ESP32/assets/24637325/e3b2975d-7de4-41af-b052-e4fa024d905e" alt="Official Boadrd DroneBridge for ESP32" width="350">
 * **Official board for easy use as ground station coming soon!**
 
-[For further info please check the wiki!](https://dronebridge.gitbook.io/docs/dronebridge-for-esp32/untitled#hardware)
+[For further info please check the wiki!](https://dronebridge.gitbook.io/docs/dronebridge-for-esp32/hardware-and-wiring)
 
 ## Installation/Flashing using precompiled binaries
 
 [It is recommended that you use the official online flashing tool!](https://dronebridge.github.io/ESP32/install.html)
 
 In any other case there are multiple ways how to flash the firmware.  
-**[For further info please check the wiki!](https://dronebridge.gitbook.io/docs/dronebridge-for-esp32/untitled#installation-flashing)**
+**[For further info please check the wiki!](https://dronebridge.gitbook.io/docs/dronebridge-for-esp32/installation)**
 
 ## Wiring
 
@@ -74,7 +74,7 @@ In any other case there are multiple ways how to flash the firmware.
 2.  Set the flight controller port to the desired protocol.
 
 **Check out the manufacturer datasheet! Only some modules can take more than 3.3V. Follow the recommendations by the ESP32 board manufacturer for powering the device**  
-**[For further info please check the wiki!](https://dronebridge.gitbook.io/docs/dronebridge-for-esp32/untitled#hardware)**
+**[For further info please check the wiki!](https://dronebridge.gitbook.io/docs/dronebridge-for-esp32/hardware-and-wiring)**
 
 ## Configuration
 1.  Connect to the WiFi `DroneBridge ESP32` with password `dronebridge`
@@ -84,7 +84,7 @@ In any other case there are multiple ways how to flash the firmware.
 
 ![DroneBridge for ESP32 web interface](wiki/dbesp32_webinterface.png)
 
-**[For further info please check the wiki!](https://github.com/DroneBridge/ESP32/wiki/Configuration)**
+**[For further info please check the wiki!](https://dronebridge.gitbook.io/docs/dronebridge-for-esp32/configuration)**
 
 ## Use with QGroundControl, Mission Planner or any other GCS
 
@@ -107,28 +107,6 @@ For questions or general chatting regarding DroneBridge for ESP32 please visit t
 <img src="wiki/discord-logo-blue.png" width="200px">
 </a>
 </div>
-
-## Developers
-
-### Compile
- You will need the Espressif SDK: esp-idf + toolchain. Check out their website for more info and on how to set it up.
- The code is written in pure C using the esp-idf (no Arduino libs).  
-Compile using esp-idf v5.1 or esp-idf v5.2
--   ESP32   `idf.py set-target esp32 build`
--   ESP32S2 `idf.py set-target esp32s2 build`
--   ESP32S3 `idf.py set-target esp32s3 build`
--   ESP32C3 `idf.py set-target esp32c3 build`
--   ESP32C3 `idf.py set-target esp32c6 build`
-
-Or compile all at once with release configuration running the release scripts for bash or powershell `create_release_zip.sh` or `create_release_zip.ps1`
-
- **This project supports the v5.3 of ESP-IDF**  
- Compile and flash by running: `idf.py build`, `idf.py flash`
-
-The web interface is built using the command `idf.py frontend`. This is done automatically when compiling the entire project using `idf.py build`. 
-The frontend is built to `build/frontend`.  
-Alternatively, the frontend can be built using `npm install && npm i -D shx && npm run build` within `/frontend/`, then manually copy the content of `/frontend/build` to `/build/frontend`
-
 
 [contributors-shield]: https://img.shields.io/github/contributors/DroneBridge/ESP32.svg?style=for-the-badge
 [contributors-url]: https://github.com/DroneBridge/ESP32/graphs/contributors

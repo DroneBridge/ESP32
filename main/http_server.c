@@ -271,11 +271,20 @@ static esp_err_t settings_clients_udp_post(httpd_req_t *req) {
 
     int new_udp_port = 0;
     char new_ip[IP4ADDR_STRLEN_MAX];
+    uint8_t save_to_nvm = false;
     cJSON *json = cJSON_GetObjectItem(root, "ip");
     if (json) strncpy(new_ip, json->valuestring, sizeof(new_ip));
     new_ip[IP4ADDR_STRLEN_MAX-1] = '\0';    // to remove warning and to be sure
     json = cJSON_GetObjectItem(root, "port");
     if (json) new_udp_port = json->valueint;
+    json = cJSON_GetObjectItem(root, "save");
+    if (json && cJSON_IsBool(json)) {
+        if(cJSON_IsTrue(json)) {
+            save_to_nvm = true;
+        } else {
+            save_to_nvm = false;
+        }
+    } else {}
 
     // populate the UDP connections list with a new connection
     struct sockaddr_in new_sockaddr;
@@ -288,7 +297,7 @@ static esp_err_t settings_clients_udp_post(httpd_req_t *req) {
             .mac = {0, 0, 0, 0, 0, 0}   // dummy MAC
     };
     // udp_conn_list is initialized as the very first thing during startup - we expect it to be there
-    bool success = add_to_known_udp_clients(udp_conn_list, new_udp_client);
+    bool success = add_to_known_udp_clients(udp_conn_list, new_udp_client, save_to_nvm);
 
     // Clean up
     cJSON_Delete(root);
@@ -321,6 +330,8 @@ static esp_err_t settings_clients_clear_udp_get(httpd_req_t *req) {
     }
     udp_conn_list->size = 0;
     ESP_LOGI(REST_TAG, "Removed all UDP clients from list!");
+    // Clear saved client as well. Pass any client since it will be ignored as long as clear_client is set to true.
+    save_udp_client_to_nvm(&udp_conn_list->db_udp_clients[0], true);
     return ESP_OK;
 }
 

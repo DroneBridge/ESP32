@@ -39,5 +39,6 @@ enum E_DB_SERIAL_PROTOCOL {
 
 void db_jtag_serial_info_print();
 void db_write_settings_to_nvs();
+void save_udp_client_to_nvm(struct db_udp_client_t *new_db_udp_client, bool clear_client);
 
 #endif //DB_ESP32_MAIN_H

@@ -24,7 +24,8 @@ def add_custom_udp():
     url = "http://dronebridge.local/api/settings/clients/udp"
     data = {
         "ip": "192.168.10.32",
-        "port": 456
+        "port": 456,
+        "save": True
     }
     # Send the POST request
     response = requests.post(url, json=data)
