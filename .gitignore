@@ -18,3 +18,4 @@ dependencies.lock
 .openocd_setup.ps1
 frontend/node_modules
 *.old
+/node_modules

@@ -48,7 +48,7 @@ uint16_t app_port_proxy = APP_PORT_PROXY;
 int8_t num_connected_tcp_clients = 0;
 
 /**
- * Opens non-blocking UDP socket used for UART to serial communication. Socket can also accept broadcast messages
+ * Opens non-blocking UDP socket used for WiFi to UART communication. Does also accept broadcast packets just in case.
  * @return returns socket file descriptor
  */
 int db_open_serial_udp_socket() {
@@ -79,6 +79,41 @@ int db_open_serial_udp_socket() {
     ESP_LOGI(TAG, "Opened UDP socket on port %i", APP_PORT_PROXY_UDP);
     return udp_socket;
 }
+
+#ifdef CONFIG_DB_SKYBRUSH_SUPPORT
+/**
+ * Opens non-blocking UDP socket used for WiFi to UART communication using WiFi UDP broadcast packets e.g. by Skybrush.
+ * @return returns socket file descriptor
+ */
+int db_open_serial_udp_broadcast_socket() {
+    struct sockaddr_in server_addr;
+    server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(UDP_BROADCAST_PORT_SKYBRUSH);
+    int addr_family = AF_INET;
+    int ip_protocol = IPPROTO_IP;
+    char addr_str[128];
+    inet_ntoa_r(server_addr.sin_addr, addr_str, sizeof(addr_str) - 1);
+
+    int udp_socket = socket(addr_family, SOCK_DGRAM, ip_protocol);
+    if (udp_socket < 0) {
+        ESP_LOGE(TAG, "Unable to create socket for Skybrush communication: errno %d", errno);
+        return -1;
+    }
+    int broadcastEnable=1;
+    int err = setsockopt(udp_socket, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
+    if (err < 0) {
+        ESP_LOGE(TAG, "Socket unable to set Skybrush udp socket to accept broadcast messages: errno %d", errno);
+    }
+    err = bind(udp_socket, (struct sockaddr *) &server_addr, sizeof(server_addr));
+    if (err < 0) {
+        ESP_LOGE(TAG, "Socket unable to bind Skybrush socket to %i errno %d", UDP_BROADCAST_PORT_SKYBRUSH, errno);
+    }
+    fcntl(udp_socket, F_SETFL, O_NONBLOCK);
+    ESP_LOGI(TAG, "Opened UDP socket on port %i", UDP_BROADCAST_PORT_SKYBRUSH);
+    return udp_socket;
+}
+#endif
 
 /**
  * Opens non-blocking UDP socket used for internal DroneBridge telemetry. Socket shall only be opened when local ESP32
@@ -257,10 +292,12 @@ void udp_client_list_destroy(udp_conn_list_t *n_udp_conn_list) {
  *
  * @param n_udp_conn_list Structure containing all UDP connection information
  * @param new_db_udp_client New client to add to the UDP list. PORT, MAC & IP must be set. If MAC is not set then the
- *                          device cannot be removed later on.
+ *                          device cannot be automatically removed later on. To remove it, the user must clear the entire list.
+ * @param save_to_nvm Set to 1 (true) in case you want the UDP client to survive the reboot. Set to 0 (false) if client is temporary for this session.
+ *                    It will then be saved to NVM and added to the udp_conn_list_t on startup. Only one client can be saved to NVM.
  * @return 1 if added - 0 if not
  */
-bool add_to_known_udp_clients(udp_conn_list_t *n_udp_conn_list, struct db_udp_client_t new_db_udp_client) {
+bool add_to_known_udp_clients(udp_conn_list_t *n_udp_conn_list, struct db_udp_client_t new_db_udp_client, bool save_to_nvm) {
     if (n_udp_conn_list == NULL) { // Check if the list is NULL
         return false; // Do nothing
     }
@@ -276,6 +313,11 @@ bool add_to_known_udp_clients(udp_conn_list_t *n_udp_conn_list, struct db_udp_cl
     }
     n_udp_conn_list->db_udp_clients[n_udp_conn_list->size] = new_db_udp_client; // Copy the element data to the end of the array
     n_udp_conn_list->size++; // Increment the size of the list
+    if (save_to_nvm) {
+        save_udp_client_to_nvm(&new_db_udp_client, false);
+    } else {
+        // do not save to NVM
+    }
     return true;
 }
 
@@ -294,8 +336,7 @@ bool remove_from_known_udp_clients(udp_conn_list_t *n_udp_conn_list, struct db_u
     }
     for (int i = 0; i < n_udp_conn_list->size; i++) { // Loop through the array
         if (memcmp(n_udp_conn_list->db_udp_clients[i].mac, new_db_udp_client.mac,
-                   sizeof(n_udp_conn_list->db_udp_clients[i].mac)) ==
-            0) { // Compare the current array element with the element
+                   sizeof(n_udp_conn_list->db_udp_clients[i].mac)) == 0) { // Compare the current array element with the element
             // Found a match
             for (int j = i; j < n_udp_conn_list->size - 1; j++) { // Loop from the current index to the end of the array
                 n_udp_conn_list->db_udp_clients[j] = n_udp_conn_list->db_udp_clients[j +
@@ -513,6 +554,14 @@ _Noreturn void control_module_udp_tcp() {
     }
 
     udp_conn_list->udp_socket = db_open_serial_udp_socket();
+#ifdef CONFIG_DB_SKYBRUSH_SUPPORT
+    int udp_broadcast_skybrush_socket = -1;
+    if (DB_WIFI_MODE == DB_WIFI_MODE_STA) {
+        udp_broadcast_skybrush_socket = db_open_serial_udp_broadcast_socket();
+    } else {
+        // we do only support Skybrush WiFi and the broadcast port when in WiFi client mode
+    }
+#endif
     int db_internal_telem_udp_sock = -1;
     if (DB_WIFI_MODE == DB_WIFI_MODE_AP_LR || DB_WIFI_MODE == DB_WIFI_MODE_STA) {
         db_internal_telem_udp_sock = db_open_int_telemetry_udp_socket();
@@ -565,7 +614,7 @@ _Noreturn void control_module_udp_tcp() {
                 }
             }
         }
-        // handle incoming UDP data - Read UDP and forward to UART
+        // handle incoming UDP data on main port 14550 - Read UDP and forward to UART
         ssize_t recv_length = recvfrom(udp_conn_list->udp_socket, udp_buffer, UDP_BUF_SIZE, 0,
                                        (struct sockaddr *) &new_db_udp_client.udp_client, &udp_socklen);
         if (recv_length > 0) {
@@ -582,10 +631,22 @@ _Noreturn void control_module_udp_tcp() {
             // Devices/Ports added this way cannot be removed in sta-mode since UDP is connectionless, and we cannot
             // determine if the client is still existing. This will blow up the list connected devices.
             // In AP-Mode the devices can be removed based on the IP/MAC address
-            add_to_known_udp_clients(udp_conn_list, new_db_udp_client);
+            add_to_known_udp_clients(udp_conn_list, new_db_udp_client, false);
         } else {
             // received nothing, keep on going
         }
+#ifdef CONFIG_DB_SKYBRUSH_SUPPORT
+        if (DB_WIFI_MODE == DB_WIFI_MODE_STA && udp_broadcast_skybrush_socket != -1) {
+            // This is special support for Skybrush. Skybrush sends some UDP broadcast msgs to 14555 in addition to regular msgs to 14550
+            // We only read and directly forward here. No parsing and no adding to known UDP clients
+            recv_length = recvfrom(udp_broadcast_skybrush_socket, udp_buffer, UDP_BUF_SIZE, 0,
+                                           (struct sockaddr *) &new_db_udp_client.udp_client, &udp_socklen);
+            if (recv_length > 0) {
+                // no parsing with any other protocol - transparent here
+                write_to_serial(udp_buffer, recv_length);
+            }
+        }
+#endif
 
         if (DB_WIFI_MODE == DB_WIFI_MODE_STA) {
             handle_internal_telemetry(db_internal_telem_udp_sock, udp_buffer, &udp_socklen, &new_db_udp_client.udp_client);
@@ -610,7 +671,7 @@ _Noreturn void control_module_udp_tcp() {
                     db_esp_signal_quality.air_rssi = -127;
                 } else {/* all good */}
             } else if (DB_WIFI_MODE == DB_WIFI_MODE_AP || DB_WIFI_MODE == DB_WIFI_MODE_AP_LR) {
-                ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_ap_get_sta_list(&wifi_sta_list)); // get list of connected stations
+                ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_ap_get_sta_list(&wifi_sta_list)); // update list of connected stations
                 db_send_internal_telemetry_to_stations(db_internal_telem_udp_sock, &wifi_sta_list, udp_conn_list);
             } else {
                 // no way of getting RSSI here. Do nothing

@@ -25,12 +25,13 @@
 #include "db_esp32_control.h"
 
 #define MAX_LTM_FRAMES_IN_BUFFER 5
-#define DB_BUILD_VERSION 11
+#define DB_BUILD_VERSION 12
 #define DB_MAJOR_VERSION 2
 #define DB_MINOR_VERSION 0
 
 // can be set by user
-extern uint8_t DB_WIFI_MODE;
+extern uint8_t DB_WIFI_MODE;    // never change this value while the ESP32 is running, will likely lead to a crash. Assign it during startup when received from storage. Can therefore only be changed via reboot and DB_WIFI_MODE_DESIGNATED
+extern uint8_t DB_WIFI_MODE_DESIGNATED; // introduced and used for settings change only since changing DB_WIFI_MODE directly while system is live will eventually lead to crashes. Stores the new WiFi mode and will be written to the settings. This means it will become active after reboot
 extern uint8_t DB_WIFI_SSID[32];
 extern uint8_t DB_WIFI_PWD[64];
 extern char DEFAULT_AP_IP[IP4ADDR_STRLEN_MAX];

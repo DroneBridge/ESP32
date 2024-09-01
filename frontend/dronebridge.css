@@ -22,8 +22,7 @@ body {
     height: 100%;
     margin: 0;
     color: #fff;
-    background: #003166;
-    background: linear-gradient(180deg, #003166 0, #135ba8 100%)
+    background-image: linear-gradient(127deg, #001f3f 5%, #0074D9 100%);
 }
 
 h2 {
@@ -65,4 +64,69 @@ input, select {
 
 .dot_red {
     background-color: #f63e3e
+}
+
+.small_text {
+    font-size: small
+}
+
+.img_button:hover {
+    cursor: pointer;
+    filter: invert(60%) sepia(100%) saturate(509%) hue-rotate(334deg) brightness(101%) contrast(101%);
+}
+
+.img_button::selection {
+    cursor: pointer;
+    filter: invert(60%) sepia(100%) saturate(509%) hue-rotate(334deg) brightness(101%) contrast(101%);
+}
+
+.txt_button:hover {
+    color: #ff9734;
+    cursor: help;
+}
+
+/* Tooltip container */
+.tooltip {
+    position: relative;
+    display: inline-block;
+}
+
+/* Tooltip text */
+.tooltip .tooltiptext {
+    visibility: hidden;
+    width: fit-content;
+    background-color: #555;
+    color: #fff;
+    text-align: center;
+    padding: 5px 5px;
+    border-radius: 6px;
+
+    /* Position the tooltip text */
+    position: absolute;
+    z-index: 1;
+    bottom: 125%;
+    left: 50%;
+    margin-left: -60px;
+
+    /* Fade in tooltip */
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+/* Tooltip arrow */
+.tooltip .tooltiptext::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #555 transparent transparent transparent;
+}
+
+/* Show the tooltip text when you mouse over the tooltip container */
+.tooltip:hover .tooltiptext {
+    visibility: visible;
+    opacity: 1;
 }

@@ -59,15 +59,14 @@ These boards are very low in price, have everything you need and are also very s
   <img src="https://github.com/DroneBridge/ESP32/assets/24637325/e3b2975d-7de4-41af-b052-e4fa024d905e" alt="Official Boadrd DroneBridge for ESP32" width="350">
 * **Official board for easy use as ground station coming soon!**
 
-[For further info please check the wiki!](https://github.com/DroneBridge/ESP32/wiki/Supported-Hardware)
+[For further info please check the wiki!](https://dronebridge.gitbook.io/docs/dronebridge-for-esp32/hardware-and-wiring)
 
 ## Installation/Flashing using precompiled binaries
 
-First download the latest release from this repository.
-[You can find them here](https://github.com/DroneBridge/ESP32/releases).
+[It is recommended that you use the official online flashing tool!](https://dronebridge.github.io/ESP32/install.html)
 
-There are multiple ways how to flash the firmware.  
-**[For further info please check the wiki!](https://github.com/DroneBridge/ESP32/wiki/Flashing-DroneBridge-for-ESP32)**
+In any other case there are multiple ways how to flash the firmware.  
+**[For further info please check the wiki!](https://dronebridge.gitbook.io/docs/dronebridge-for-esp32/installation)**
 
 ## Wiring
 
@@ -75,17 +74,17 @@ There are multiple ways how to flash the firmware.
 2.  Set the flight controller port to the desired protocol.
 
 **Check out the manufacturer datasheet! Only some modules can take more than 3.3V. Follow the recommendations by the ESP32 board manufacturer for powering the device**  
-**[For further info please check the wiki!](https://github.com/DroneBridge/ESP32/wiki/Wiring-Instructions)**
+**[For further info please check the wiki!](https://dronebridge.gitbook.io/docs/dronebridge-for-esp32/hardware-and-wiring)**
 
 ## Configuration
-1.  Connect to the wifi `DroneBridge ESP32` with password `dronebridge`
+1.  Connect to the WiFi `DroneBridge ESP32` with password `dronebridge`
 2.  In your browser type: `dronebridge.local` (Chrome: `http://dronebridge.local`) or `192.168.2.1` into the address bar.
  **You might need to disable the cellular connection to force the browser to use the WiFi connection**
 3.  Configure as you please and hit `save`
 
 ![DroneBridge for ESP32 web interface](wiki/dbesp32_webinterface.png)
 
-**[For further info please check the wiki!](https://github.com/DroneBridge/ESP32/wiki/Configuration)**
+**[For further info please check the wiki!](https://dronebridge.gitbook.io/docs/dronebridge-for-esp32/configuration)**
 
 ## Use with QGroundControl, Mission Planner or any other GCS
 
@@ -108,123 +107,6 @@ For questions or general chatting regarding DroneBridge for ESP32 please visit t
 <img src="wiki/discord-logo-blue.png" width="200px">
 </a>
 </div>
-
-## Developers
-
-### Compile
- You will need the Espressif SDK: esp-idf + toolchain. Check out their website for more info and on how to set it up.
- The code is written in pure C using the esp-idf (no Arduino libs).  
-Compile using esp-idf v5.1 or esp-idf v5.2
--   ESP32   `idf.py set-target esp32 build`
--   ESP32S2 `idf.py set-target esp32s2 build`
--   ESP32S3 `idf.py set-target esp32s3 build`
--   ESP32C3 `idf.py set-target esp32c3 build`
-
-Or compile all at once with release configuration running the release scripts for bash or powershell `create_release_zip.sh` or `create_release_zip.ps1`
-
- **This project supports the v5.1.2 & v5.2.2 of ESP-IDF**  
- Compile and flash by running: `idf.py build`, `idf.py flash`
-
-The web interface is built using the command `idf.py frontend`. This is done automatically when compiling the entire project using `idf.py build`. 
-The frontend is built to `build/frontend`.  
-Alternatively, the frontend can be built using `npm install && npm i -D shx && npm run build` within `/frontend/`, then manually copy the content of `/frontend/build` to `/build/frontend`
-
- ### API
-The web interface communicates with a REST: API on the ESP32. You can use that API to set configurations not selectable 
-via the web interface (e.g. baud rate). It also allows you to easily integrate DroneBridge for ESP32.
-
-
-#### Request settings
-```http request
-GET http://dronebridge.local/api/settings
-```
-
-#### Request stats
-```http request
-GET http://dronebridge.local/api/system/stats
-```
-
-#### Request ESP32 info
-```http request
-GET http://dronebridge.local/api/system/info
-```
-
-#### Request IP and port of active UDP connections
-```http request
-GET http://dronebridge.local/api/system/clients
-```
-
-#### Trigger a reboot
-```http request
-POST http://dronebridge.local/api/system/reboot
-```
-
-#### Trigger a general settings change:
-Send a valid JSON
-```json
-{
-  "esp32_mode":	2,
-  "wifi_ssid":	"DroneBridge",
-  "wifi_pass":	"dronebridge",
-  "ap_channel":	6,
-  "trans_pack_size":	128,
-  "tx_pin":	4,
-  "rx_pin":	5,
-  "cts_pin":	0,
-  "rts_pin":	0,
-  "rts_thresh":	64,
-  "baud":	115200,
-  "telem_proto":	4,
-  "ltm_pp":	2,
-  "ap_ip":	"192.168.2.1",
-  "static_client_ip":	"",
-  "static_netmask":	"",
-  "static_gw_ip":	""
-  }
-```
-to
-```http request
-POST http://dronebridge.local/api/settings
-```
-
-#### Manually add a UDP connection target:
-Send a valid JSON
-```json
-{
-  "ip": "XXX.XXX.XXX.XXX",
-  "port": 452
-}
-```
-to
-```http request
-POST http://dronebridge.local/api/settings/clients/udp
-```
-
-#### Assign a static IP to the ESP32 when in WiFi client mode:
-Send a valid JSON to set static IP and send the same JSON but with empty strings (`"client_ip": ""`) to remove the static IP setting
-```json
- {
-  "client_ip": "XXX.XXX.XXX.XXX",
-  "netmask": "XXX.XXX.XXX.XXX",
-  "gw_ip": "XXX.XXX.XXX.XXX"
- }
-```
-to
-```http request
-POST http://dronebridge.local/api/settings/static-ip
-```
-
- ### Testing
-Check `/test` for scripts triggering the API.
-
- To test the frontend without the ESP32 run 
-
- ```sh
- npm install -g json-server
- json-server db.json --routes routes.json
- ```
-Set `const ROOT_URL = "http://localhost:3000/"` inside `index.html` and the `<script>` block
-
 
 [contributors-shield]: https://img.shields.io/github/contributors/DroneBridge/ESP32.svg?style=for-the-badge
 [contributors-url]: https://github.com/DroneBridge/ESP32/graphs/contributors
