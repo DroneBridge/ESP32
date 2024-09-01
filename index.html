@@ -16,17 +16,16 @@
 </head>
 <body>
 <div class="container">
-    <div class="row header">
-        <div class="one-third column">
-            <a href="index.html"><img class="u-pull-left logo" src="images/DroneBridgeLogo_noblue_tiny.svg" alt="DroneBridge for ESP32"/></a>
+    <div class="header">
+        <div class="logo">
+            <a href="index.html"><img src="images/DroneBridgeLogo_noblue_aligned.svg" alt="DroneBridge for ESP32"/></a>
         </div>
-        <div class="two-thirds column nav">
-            <nav class="u-pull-right">
-                <a href="index.html">Home</a>
-                <a href="install.html">Install</a>
-                <a href="https://github.com/DroneBridge/ESP32/wiki">Docs</a>
-                <a href="https://github.com/DroneBridge/ESP32">GitHub Project</a>
-            </nav>
+        <div class="nav">
+            <a href="index.html">Home</a>
+            <a href="install.html">Install</a>
+            <a href="https://github.com/DroneBridge/ESP32/wiki">Docs</a>
+            <a href="https://github.com/DroneBridge/ESP32"><img src="images/github-mark-white.svg" alt="Discord Logo for support" height="20em"></a>
+            <a href="https://discord.gg/pqmHJNArE3"><img src="images/discord-mark-white.svg" alt="Discord Logo for support" height="20em"></a>
         </div>
     </div>
 
@@ -72,7 +71,7 @@
             <li>Weight: <8 g</li>
         </ul>
     </div>
-    <div>
+    <div class="container">
         <p>A firmware for the popular ESP32 modules from Espressif Systems. Probably the cheapest way to communicate with your drone, UAV, UAS, ground-based vehicle.
         <br>It also allows for a fully transparent serial to WiFi pass-through link with variable packet size.<br>It is ideal for connecting many drones in one single network.</p>
         <p>DroneBridge for ESP32 is a telemetry/low data rate-only solution. There is no support for cameras connected to the ESP32 since it does not support video encoding.</p>
@@ -84,27 +83,39 @@
         </button>
     </div>
 
-    <div class="container" style="margin-top: 5rem; max-width: 500px">
-        <div class="row donate_div">
-            <div class="twelve columns center-text">DroneBridge for ESP32 is free and almost everything is maintained by a single developer! It takes many hundreds of hours to develop, debug and document such software.<br><b>Please consider supporting the development by donating any amount or even an Espresso or by ordering the official boards to keep the project running!</b></div>
-        </div>
-        <div class="row">
-            <div class="six columns">
-                <div class="center-all">
-                    <a href="https://www.buymeacoffee.com/seeul8er" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
-                </div>
+    <div style="margin-top: 5rem" class="container u-full-width">
+        <h5>Support</h5>
+        <div>Visit the Discord Channel to receive community support.</div>
+        <div><a href="https://discord.gg/pqmHJNArE3"><img style="margin: 2rem" src="images/discord-logo-white.svg" alt="Discord Logo for support" height="30em"></a></div>
+    </div>
+    <div class="container">
+        <h5>Donate</h5>
+        <div class="" style="max-width: 600px">
+            <div class="row donate_div">
+                <div class="twelve columns ">DroneBridge for ESP32 is free and almost everything is maintained by a single developer! It takes many hundreds of hours to develop, debug and document such software.<br><b>Please consider supporting the development by donating any amount or even an Espresso or by ordering the official boards to keep the project running!</b></div>
             </div>
-            <div class="six columns">
-                <div class="paypal_button center-all">
-                    <a href="https://www.paypal.com/donate/?hosted_button_id=SG97392AJN73J">
-                        <img src="images/de-pp-logo-150px.png" alt="Donate via PayPal" />
-                    </a>
+            <div class="row">
+                <div class="six columns">
+                    <div class="center-all">
+                        <a href="https://www.buymeacoffee.com/seeul8er" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
+                    </div>
+                </div>
+                <div class="six columns">
+                    <div class="paypal_button center-all">
+                        <a href="https://www.paypal.com/donate/?hosted_button_id=SG97392AJN73J">
+                            <img src="images/de-pp-logo-150px.png" alt="Donate via PayPal" />
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <footer class="u-max-full-width footer">
+    <footer class="footer">
+        <div class="row center-all" >
+            <div class="six columns"><a href="https://github.com/DroneBridge/ESP32"><img style="margin: 0.5em" src="images/github-mark-white.svg" alt="Discord Logo for support" height="20em"></a></div>
+            <div class="six columns"><a href="https://discord.gg/pqmHJNArE3"><img style="margin: 0.5em" src="images/discord-mark-white.svg" alt="Discord Logo for support" height="20em"></a></div>
+        </div>
         <a href="imprint.html">Imprint</a>
         <p>&copy; Wolfgang Christl 2024</p>
     </footer>

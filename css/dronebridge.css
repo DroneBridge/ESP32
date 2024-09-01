@@ -1,7 +1,3 @@
-.logo {
-  width: 200px;
-}
-
 .center-all {
   max-width: fit-content;
   margin-left: auto;
@@ -21,18 +17,21 @@
 }
 
 .header {
-  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-top: 5rem;
   margin-bottom: 3rem;
 }
 
-.h5 {
-  text-align: center;
-  margin: 0;
+.logo {
+  width: 12em;
+  min-width: 12em;
 }
 
 .nav {
-  transform: translateY(50%);
+  display: flex;
+  float: right;
   font-weight: bold;
 }
 
@@ -44,6 +43,22 @@
 
 .nav a:hover {
   text-decoration: underline;
+}
+
+@media screen and (max-width: 500px) {
+  .header {
+    float: none;
+    display: block;
+  }
+  .hero {
+    margin-top: 4em;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+.h5 {
+  text-align: center;
+  margin: 0;
 }
 
 .footer {

@@ -74,8 +74,17 @@ let t2RC2_esp32s3 = new DBTarget("ESP32-S3", "ESP32-S3", "esp32s3/", ["bootloade
 let release_20RC2 = new DBRelease("v2.0RC2 (pre-release)", "./db_releases/2_0RC2/",
     [t2RC2_esp32, t2RC2_espc3, t2RC2_espc3_usbserial, t2RC2_espc6, t2RC2_esps2, t2RC2_esp32s3]);
 
+let t2RC3_esp32 = new DBTarget("ESP32", "ESP32", "esp32/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x1000, 0x8000, 0x10000, 0x190000], "DIO", "40MHz");
+let t2RC3_espc3 = new DBTarget("ESP32-C3", "ESP32-C3", "esp32c3/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let t2RC3_espc3_usbserial = new DBTarget("ESP32-C3", "ESP32-C3 (USBSerial)", "esp32c3_USBSerial/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let t2RC3_espc6 = new DBTarget("ESP32-C6", "ESP32-C6", "esp32c6/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let t2RC3_esps2 = new DBTarget("ESP32-S2", "ESP32-S2", "esp32s2/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x1000, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let t2RC3_esp32s3 = new DBTarget("ESP32-S3", "ESP32-S3", "esp32s3/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let release_20RC3 = new DBRelease("v2.0RC3 (pre-release)", "./db_releases/2_0RC3/",
+    [t2RC3_esp32, t2RC3_espc3, t2RC3_espc3_usbserial, t2RC3_espc6, t2RC3_esps2, t2RC3_esp32s3]);
+
 // overall array containing all releases with flashing instructions
-let db_releases = [release_20RC2, release_15];
+let db_releases = [release_20RC3, release_20RC2, release_15];
 
 
 let device = null;
