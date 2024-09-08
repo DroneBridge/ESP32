@@ -57,6 +57,7 @@ These boards are very low in price, have everything you need and are also very s
   - spares from the second batch, pre-installed and ready for use  
   currently shipping to EU only - contact seller for non-EU shipping options    
   <img src="https://github.com/DroneBridge/ESP32/assets/24637325/e3b2975d-7de4-41af-b052-e4fa024d905e" alt="Official Boadrd DroneBridge for ESP32" width="350">
+* **[Order the PCB yourself using the KiCAD PCB Project & Production files with private and commercial use options!](https://buymeacoffee.com/seeul8er/e/301194)**
 * **Official board for easy use as ground station coming soon!**
 
 [For further info please check the wiki!](https://dronebridge.gitbook.io/docs/dronebridge-for-esp32/hardware-and-wiring)
