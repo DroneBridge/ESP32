@@ -76,13 +76,23 @@
         <br>It also allows for a fully transparent serial to WiFi pass-through link with variable packet size.<br>It is ideal for connecting many drones in one single network.</p>
         <p>DroneBridge for ESP32 is a telemetry/low data rate-only solution. There is no support for cameras connected to the ESP32 since it does not support video encoding.</p>
     </div>
-
-    <div style="margin-top: 5rem" class="container u-full-width center-all">
-        <button class="button-primary" onclick="location.href='https://github.com/DroneBridge/ESP32'">
-            Learn More!
-        </button>
+    <div style="margin-top: 5rem" class="container">
+        <h5>Official Hardware</h5>
+        <div class="row">
+            <div class="six columns">
+                <button class="button-primary" id="button_official_board">
+                    Get the official board!
+                </button>
+                <div>Get started in no time!<br>Designed according to the DS-009 Pixhawk Connector Standard for easy Plug&Play integration.<br>Private limited sale. Currently shipping within EU & CH.<br>For non EU shipping options please contact me via <a href="https://www.linkedin.com/in/wolfgang-christl/">LinkedIn</a> or ebay directly.</div>
+            </div>
+            <div class="six columns">
+                <button class="button-primary" id="button_pcb_files">
+                    DIY official board!
+                </button>
+                <div>You want to build the official board yourself or shipping from the EU is not an option?<br>While I recommend to just get the ready-made board (cheaper and less of a hassle) you can also get the design & manufacturing files of the official board. E.g. just upload to JLCPCB and assemble yourself.</div>
+            </div>
+        </div>
     </div>
-
     <div style="margin-top: 5rem" class="container u-full-width">
         <h5>Support</h5>
         <div>Visit the Discord Channel to receive community support.</div>
@@ -123,5 +133,19 @@
 <!-- 100% privacy-first analytics -->
 <script data-collect-dnt="true" async defer src="https://scripts.simpleanalyticscdn.com/latest.js"></script>
 <noscript><img src="https://queue.simpleanalyticscdn.com/noscript.gif?collect-dnt=true" alt="" referrerpolicy="no-referrer-when-downgrade" /></noscript>
+<script>
+    const button_official_board = document.getElementById("button_official_board");
+    const button_pcb_files = document.getElementById("button_pcb_files");
+
+    button_official_board.onclick = async () => {
+        sa_event("click_get_board", {});
+        window.open("https://www.ebay.com/itm/116227992460?mkcid=16&mkevt=1&mkrid=711-127632-2357-0&ssspo=nhzOOuH_QF2&sssrc=2047675&ssuid=&widget_ver=artemis&media=COPY", '_blank').focus();
+    }
+
+    button_pcb_files.onclick = async () => {
+        sa_event("click_get_pcb", {});
+        window.open("https://buymeacoffee.com/seeul8er/e/301194", '_blank').focus();
+    }
+</script>
 </body>
 </html>

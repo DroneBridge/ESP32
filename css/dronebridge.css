@@ -205,7 +205,7 @@ li {
 }
 
 progress[value] {
-  --color: $primary-color; /* the progress color */
+  color: #ff9734; /* the progress color */
   --background: #f3f3f3; /* the background color */
   -webkit-appearance: none;
   -moz-appearance: none;
