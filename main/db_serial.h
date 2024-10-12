@@ -23,7 +23,8 @@
 #include "msp_ltm_serial.h"
 #include "db_esp32_control.h"
 
-#define UART_NUM UART_NUM_1
+#define UART_NUM UART_NUM_1             // The UART interface of the ESP32 we use
+#define DB_SERIAL_READ_TIMEOUT_MS  50      // Serial read timeout for transparent and MAVLink mode, after that the packet will be sent over the air even when the max. packet size was not reached.
 
 enum DB_MAVLINK_DATA_ORIGIN {
     DB_MAVLINK_DATA_ORIGIN_SERIAL,
