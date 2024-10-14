@@ -350,7 +350,7 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
                         uint16_t len = fmav_msg_radio_status_encode_to_frame_buf(buff, db_get_mav_sys_id(),
                                                                                  db_get_mav_comp_id(), &payload_r,
                                                                                  fmav_status);
-                        send_to_all_clients(tcp_clients, udp_conns, buff, len);
+                        db_send_to_all_clients(tcp_clients, udp_conns, buff, len);
                     } else if (DB_WIFI_MODE == DB_WIFI_MODE_AP && wifi_sta_list.num > 0) {
                         // we assume ESP32 is not used in DB_WIFI_MODE_AP on the ground but only on the drone side
                         // ToDo: Only the RSSI of the first client is considered.
@@ -359,7 +359,7 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
                         uint16_t len = fmav_msg_radio_status_encode_to_frame_buf(buff, db_get_mav_sys_id(),
                                                                                  db_get_mav_comp_id(), &payload_r,
                                                                                  fmav_status);
-                        send_to_all_clients(tcp_clients, udp_conns, buff, len);
+                        db_send_to_all_clients(tcp_clients, udp_conns, buff, len);
                     } else {
                         // In AP LR mode the clients will send the info to the GCS
                     }
@@ -369,7 +369,7 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
                 // ToDo: Check if that is a good idea or push to extra thread
                 uint16_t length = db_create_heartbeat(buff, fmav_status);
                 // Send heartbeat to GND clients: Every ESP32 no matter its role or mode is emitting a heartbeat
-                send_to_all_clients(tcp_clients, udp_conns, buff, length);
+                db_send_to_all_clients(tcp_clients, udp_conns, buff, length);
             } // do not react to heartbeats received via wireless interface - reaction to serial is sufficient
             break;
         case FASTMAVLINK_MSG_ID_PARAM_REQUEST_LIST: {

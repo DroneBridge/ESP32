@@ -180,7 +180,7 @@ void db_parse_msp_ltm(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_
             if (parse_msp_ltm_byte(db_msp_ltm_port, serial_byte)) {
                 msp_message_buffer[(*serial_read_bytes - 1)] = serial_byte;
                 if (db_msp_ltm_port->parse_state == MSP_PACKET_RECEIVED) {
-                    send_to_all_clients(tcp_clients, udp_connection, msp_message_buffer, *serial_read_bytes);
+                    db_send_to_all_clients(tcp_clients, udp_connection, msp_message_buffer, *serial_read_bytes);
                     *serial_read_bytes = 0;
                 } else if (db_msp_ltm_port->parse_state == LTM_PACKET_RECEIVED) {
                     memcpy(&ltm_frame_buffer[ltm_frames_in_buffer_pnt], db_msp_ltm_port->ltm_frame_buffer,
@@ -189,7 +189,7 @@ void db_parse_msp_ltm(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_
                     ltm_frames_in_buffer++;
                     if (ltm_frames_in_buffer == DB_LTM_FRAME_NUM_BUFFER &&
                         (DB_LTM_FRAME_NUM_BUFFER <= MAX_LTM_FRAMES_IN_BUFFER)) {
-                        send_to_all_clients(tcp_clients, udp_connection, ltm_frame_buffer, *serial_read_bytes);
+                        db_send_to_all_clients(tcp_clients, udp_connection, ltm_frame_buffer, *serial_read_bytes);
                         ESP_LOGD(TAG, "Sent %i LTM message(s) to telemetry port!", DB_LTM_FRAME_NUM_BUFFER);
                         ltm_frames_in_buffer = 0;
                         ltm_frames_in_buffer_pnt = 0;
@@ -216,7 +216,7 @@ void db_route_mavlink_response(uint8_t *buffer, uint16_t length, enum DB_MAVLINK
     if (origin == DB_MAVLINK_DATA_ORIGIN_SERIAL) {
         write_to_serial(buffer, length);
     } else if (origin == DB_MAVLINK_DATA_ORIGIN_RADIO) {
-        send_to_all_clients(tcp_clients, udp_conns, buffer, length);
+        db_send_to_all_clients(tcp_clients, udp_conns, buffer, length);
     } else {
         ESP_LOGE(TAG, "Unknown msg origin. Do not know on which link to respond!");
     }
@@ -309,7 +309,7 @@ void db_read_serial_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, 
             last_tick = current_tick;   // reset timeout
             // flush buffer to air interface -> send what we have in the buffer (already parsed)
             if (*serial_buff_pos > 0) {
-                send_to_all_clients(tcp_clients, udp_conns, serial_buffer, *serial_buff_pos);
+                db_send_to_all_clients(tcp_clients, udp_conns, serial_buffer, *serial_buff_pos);
                 *serial_buff_pos = 0;
             } else {
                 // do nothing since buffer is empty anyway
@@ -333,20 +333,21 @@ void db_read_serial_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, 
             mav_msg_counter++;
             // Check if the new message will fit in the buffer
             if (*serial_buff_pos == 0 && result.frame_len > DB_TRANS_BUF_SIZE) {
-                // frame_len is bigger than DB_TRANS_BUF_SIZE -> Split into multiple messages since e.g. ESP-NOW can only handle 250 bytes which is less than MAVLink max msg length
+                // frame_len is bigger than DB_TRANS_BUF_SIZE -> Split into multiple messages since
+                // e.g. ESP-NOW can only handle DB_ESPNOW_PAYLOAD_MAXSIZE bytes which is less than MAVLink max msg length
                 uint16_t sent_bytes = 0;
-                uint16_t next_chuck_len = 0;
+                uint16_t next_chunk_len = 0;
                 do {
-                    next_chuck_len = result.frame_len - sent_bytes;
-                    if (next_chuck_len > DB_TRANS_BUF_SIZE) {
-                        next_chuck_len = DB_TRANS_BUF_SIZE;
+                    next_chunk_len = result.frame_len - sent_bytes;
+                    if (next_chunk_len > DB_TRANS_BUF_SIZE) {
+                        next_chunk_len = DB_TRANS_BUF_SIZE;
                     } else {}
-                    send_to_all_clients(tcp_clients, udp_conns, &mav_parser_rx_buf[sent_bytes], next_chuck_len);
-                    sent_bytes += next_chuck_len;
+                    db_send_to_all_clients(tcp_clients, udp_conns, &mav_parser_rx_buf[sent_bytes], next_chunk_len);
+                    sent_bytes += next_chunk_len;
                 } while (sent_bytes < result.frame_len);
             } else if (*serial_buff_pos + result.frame_len > DB_TRANS_BUF_SIZE) {
                 // New message won't fit into the buffer, send buffer first
-                send_to_all_clients(tcp_clients, udp_conns, serial_buffer, *serial_buff_pos);
+                db_send_to_all_clients(tcp_clients, udp_conns, serial_buffer, *serial_buff_pos);
                 *serial_buff_pos = 0;
                 // copy the new message to the uart send buffer and set buffer position
                 memcpy(&serial_buffer[*serial_buff_pos], mav_parser_rx_buf, result.frame_len);
@@ -413,7 +414,7 @@ void db_read_serial_parse_transparent(int tcp_clients[], udp_conn_list_t *udp_co
     }
     // send serial data over the air interface
     if (*serial_read_bytes >= DB_TRANS_BUF_SIZE || (serial_read_timeout_reached && *serial_read_bytes > 0)) {
-        send_to_all_clients(tcp_clients, udp_connection, serial_buffer, *serial_read_bytes);
+        db_send_to_all_clients(tcp_clients, udp_connection, serial_buffer, *serial_read_bytes);
         *serial_read_bytes = 0; // reset buffer position
         serial_read_timeout_reached = false;    // reset serial read timeout
     }
