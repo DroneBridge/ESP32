@@ -48,8 +48,9 @@
 #define TAG "DB_SERIAL"
 
 uint8_t DB_MAV_SYS_ID = 1;
-
 uint32_t serial_total_byte_count = 0;
+uint16_t DB_SERIAL_READ_TIMEOUT_MS = DB_SERIAL_READ_TIMEOUT_MS_DEFAULT;
+
 uint8_t ltm_frame_buffer[MAX_LTM_FRAMES_IN_BUFFER * LTM_MAX_FRAME_SIZE];
 uint ltm_frames_in_buffer = 0;
 uint ltm_frames_in_buffer_pnt = 0;
@@ -404,7 +405,7 @@ void db_read_serial_parse_transparent(int tcp_clients[], udp_conn_list_t *udp_co
         serial_read_timeout_reached = false;    // reset serial read timeout
         last_tick = current_tick;               // reset time for serial read timeout
     } else {
-        // did not read anything this cycle -> check serial read timeout
+        /* did not read anything this cycle -> check serial read timeout */
         if (current_tick - last_tick >= pdMS_TO_TICKS(DB_SERIAL_READ_TIMEOUT_MS)) {
             serial_read_timeout_reached = true;
             last_tick = current_tick;

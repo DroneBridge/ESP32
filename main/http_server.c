@@ -184,6 +184,8 @@ static esp_err_t settings_post_handler(httpd_req_t *req) {
 
     json = cJSON_GetObjectItem(root, "trans_pack_size");
     if (json) DB_TRANS_BUF_SIZE = json->valueint;
+    json = cJSON_GetObjectItem(root, "serial_timeout");
+    if (json) DB_SERIAL_READ_TIMEOUT_MS = json->valueint;
     json = cJSON_GetObjectItem(root, "tx_pin");
     if (json) DB_UART_PIN_TX = json->valueint;
     json = cJSON_GetObjectItem(root, "rx_pin");
@@ -540,6 +542,7 @@ static esp_err_t settings_get_handler(httpd_req_t *req) {
     cJSON_AddStringToObject(root, "wifi_pass", (char *) DB_WIFI_PWD);
     cJSON_AddNumberToObject(root, "ap_channel", DB_WIFI_CHANNEL);
     cJSON_AddNumberToObject(root, "trans_pack_size", DB_TRANS_BUF_SIZE);
+    cJSON_AddNumberToObject(root, "serial_timeout", DB_SERIAL_READ_TIMEOUT_MS);
     cJSON_AddNumberToObject(root, "tx_pin", DB_UART_PIN_TX);
     cJSON_AddNumberToObject(root, "rx_pin", DB_UART_PIN_RX);
     cJSON_AddNumberToObject(root, "cts_pin", DB_UART_PIN_CTS);

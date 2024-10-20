@@ -449,7 +449,7 @@ _Noreturn void control_module_esp_now(){
         if (db_uart_write_queue != NULL && xQueueReceive(db_uart_write_queue, &db_espnow_uart_evt, 0) == pdTRUE) {
             if (DB_SERIAL_PROTOCOL == DB_SERIAL_PROTOCOL_MAVLINK) {
                 // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
-                // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existign packet
+                // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existing packet
                 db_parse_mavlink_from_radio(NULL, NULL, db_espnow_uart_evt.data, db_espnow_uart_evt.data_len);
             } else {
                 // no parsing with any other protocol - transparent here - just pass through

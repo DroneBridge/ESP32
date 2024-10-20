@@ -28,7 +28,7 @@
 
 #define TAG "DB_MAV_MSGS"
 
-uint16_t DB_MAV_PARAM_CNT = 11;
+uint16_t DB_MAV_PARAM_CNT = 12; // Number of MAVLink parameters returned by ESP32 in the PARAM message. Needed by GCS.
 
 /**
  * Based on the system architecture and configured wifi mode the ESP32 may have a different role and system id.
@@ -129,6 +129,9 @@ MAV_TYPE db_mav_get_parameter_value(float_int_union *float_int, char *param_id, 
     } else if (strncmp(param_id, "SERIAL_RTS_THRES", 16) == 0 || param_index == 10) {
         float_int->uint8 = DB_UART_RTS_THRESH;
         type = MAV_PARAM_TYPE_UINT8;
+    } else if (strncmp(param_id, "SERIAL_T_OUT_MS", 16) == 0 || param_index == 11) {
+        float_int->uint16 = DB_SERIAL_READ_TIMEOUT_MS;
+        type = MAV_PARAM_TYPE_UINT16;
     } else {
         type = 0;
     }
@@ -161,6 +164,13 @@ bool db_write_mavlink_parameter(fmav_param_set_t *param_set_payload) {
             success = true;
         } else {
             ESP_LOGE(TAG, "SERIAL_PACK_SIZE must be <1024 bytes");
+        }
+    } else if (strncmp(param_set_payload->param_id, "SERIAL_T_OUT_MS", 16) == 0) {
+        if (float_int.uint16 > 0) {
+            DB_SERIAL_READ_TIMEOUT_MS = float_int.uint16;
+            success = true;
+        } else {
+            ESP_LOGE(TAG, "SERIAL_T_OUT_MS must be >0 MS");
         }
     } else if (strncmp(param_set_payload->param_id, "SERIAL_BAUD", 16) == 0) {
         DB_UART_BAUD_RATE = float_int.int32;
@@ -418,6 +428,10 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
 
             float_int.uint8 = DB_UART_RTS_THRESH;
             len = db_get_mavmsg_param(buff, fmav_status, 10, &float_int, MAV_PARAM_TYPE_UINT8, "SERIAL_RTS_THRES");
+            db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
+
+            float_int.uint16 = DB_SERIAL_READ_TIMEOUT_MS;
+            len = db_get_mavmsg_param(buff, fmav_status, 11, &float_int, MAV_PARAM_TYPE_UINT16, "SERIAL_T_OUT_MS");
             db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
         }
             break;
