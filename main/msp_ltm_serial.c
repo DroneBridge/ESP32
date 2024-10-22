@@ -25,8 +25,9 @@
 /**
  * This function is part of Cleanflight/iNAV.
  *
- * Optimized for crc performance in the DroneBridge project and ">" & "<" adjusted
- * LTM telemetry parsing added by Wolfgang Christl
+ * Optimized for crc performance in the DroneBridge project and ">" & "<" added
+ * for bidirectional parsing. Included logic to detect LTM telemetry.
+ * Added by Wolfgang Christl
  *
  * Cleanflight is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -139,7 +140,7 @@ bool parse_msp_ltm_byte(msp_ltm_port_t *msp_ltm_port, uint8_t new_byte) {
             break;
 
         case MSP_HEADER_M:
-            if (new_byte == '>' || new_byte == '!') {
+            if (new_byte == '>' || new_byte == '<' || new_byte == '!') {
                 msp_ltm_port->offset = 0;
                 msp_ltm_port->checksum1 = 0;
                 msp_ltm_port->checksum2 = 0;
@@ -150,7 +151,7 @@ bool parse_msp_ltm_byte(msp_ltm_port_t *msp_ltm_port, uint8_t new_byte) {
             break;
 
         case MSP_HEADER_X:
-            if (new_byte == '>' || new_byte == '!') {
+            if (new_byte == '>' || new_byte == '<' || new_byte == '!') {
                 msp_ltm_port->offset = 0;
                 msp_ltm_port->checksum2 = 0;
                 msp_ltm_port->mspVersion = MSP_V2_NATIVE;
