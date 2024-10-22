@@ -183,9 +183,18 @@ static esp_err_t settings_post_handler(httpd_req_t *req) {
     }
 
     json = cJSON_GetObjectItem(root, "trans_pack_size");
-    if (json) DB_TRANS_BUF_SIZE = json->valueint;
+    if (json && json->valueint > 0 && json->valueint < 1024) {
+        DB_TRANS_BUF_SIZE = json->valueint;
+    } else {
+        ESP_LOGE(REST_TAG, "Settings change: trans_pack_size is out of range (1-1024): %i", json->valueint);
+    }
+
     json = cJSON_GetObjectItem(root, "serial_timeout");
-    if (json) DB_SERIAL_READ_TIMEOUT_MS = json->valueint;
+    if (json && json->valueint > 0) {
+        DB_SERIAL_READ_TIMEOUT_MS = json->valueint;
+    } else {
+        ESP_LOGE(REST_TAG,"Serial read timeout must be >0 - ignoring");
+    }
     json = cJSON_GetObjectItem(root, "tx_pin");
     if (json) DB_UART_PIN_TX = json->valueint;
     json = cJSON_GetObjectItem(root, "rx_pin");
