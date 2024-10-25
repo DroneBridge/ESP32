@@ -28,7 +28,7 @@
 
 #define TAG "DB_MAV_MSGS"
 
-uint16_t DB_MAV_PARAM_CNT = 11;
+uint16_t DB_MAV_PARAM_CNT = 12; // Number of MAVLink parameters returned by ESP32 in the PARAM message. Needed by GCS.
 
 /**
  * Based on the system architecture and configured wifi mode the ESP32 may have a different role and system id.
@@ -129,6 +129,9 @@ MAV_TYPE db_mav_get_parameter_value(float_int_union *float_int, char *param_id, 
     } else if (strncmp(param_id, "SERIAL_RTS_THRES", 16) == 0 || param_index == 10) {
         float_int->uint8 = DB_UART_RTS_THRESH;
         type = MAV_PARAM_TYPE_UINT8;
+    } else if (strncmp(param_id, "SERIAL_T_OUT_MS", 16) == 0 || param_index == 11) {
+        float_int->uint16 = DB_SERIAL_READ_TIMEOUT_MS;
+        type = MAV_PARAM_TYPE_UINT16;
     } else {
         type = 0;
     }
@@ -161,6 +164,13 @@ bool db_write_mavlink_parameter(fmav_param_set_t *param_set_payload) {
             success = true;
         } else {
             ESP_LOGE(TAG, "SERIAL_PACK_SIZE must be <1024 bytes");
+        }
+    } else if (strncmp(param_set_payload->param_id, "SERIAL_T_OUT_MS", 16) == 0) {
+        if (float_int.uint16 > 0) {
+            DB_SERIAL_READ_TIMEOUT_MS = float_int.uint16;
+            success = true;
+        } else {
+            ESP_LOGE(TAG, "SERIAL_T_OUT_MS must be >0 MS");
         }
     } else if (strncmp(param_set_payload->param_id, "SERIAL_BAUD", 16) == 0) {
         DB_UART_BAUD_RATE = float_int.int32;
@@ -350,7 +360,7 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
                         uint16_t len = fmav_msg_radio_status_encode_to_frame_buf(buff, db_get_mav_sys_id(),
                                                                                  db_get_mav_comp_id(), &payload_r,
                                                                                  fmav_status);
-                        send_to_all_clients(tcp_clients, udp_conns, buff, len);
+                        db_send_to_all_clients(tcp_clients, udp_conns, buff, len);
                     } else if (DB_WIFI_MODE == DB_WIFI_MODE_AP && wifi_sta_list.num > 0) {
                         // we assume ESP32 is not used in DB_WIFI_MODE_AP on the ground but only on the drone side
                         // ToDo: Only the RSSI of the first client is considered.
@@ -359,7 +369,7 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
                         uint16_t len = fmav_msg_radio_status_encode_to_frame_buf(buff, db_get_mav_sys_id(),
                                                                                  db_get_mav_comp_id(), &payload_r,
                                                                                  fmav_status);
-                        send_to_all_clients(tcp_clients, udp_conns, buff, len);
+                        db_send_to_all_clients(tcp_clients, udp_conns, buff, len);
                     } else {
                         // In AP LR mode the clients will send the info to the GCS
                     }
@@ -369,7 +379,7 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
                 // ToDo: Check if that is a good idea or push to extra thread
                 uint16_t length = db_create_heartbeat(buff, fmav_status);
                 // Send heartbeat to GND clients: Every ESP32 no matter its role or mode is emitting a heartbeat
-                send_to_all_clients(tcp_clients, udp_conns, buff, length);
+                db_send_to_all_clients(tcp_clients, udp_conns, buff, length);
             } // do not react to heartbeats received via wireless interface - reaction to serial is sufficient
             break;
         case FASTMAVLINK_MSG_ID_PARAM_REQUEST_LIST: {
@@ -418,6 +428,10 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
 
             float_int.uint8 = DB_UART_RTS_THRESH;
             len = db_get_mavmsg_param(buff, fmav_status, 10, &float_int, MAV_PARAM_TYPE_UINT8, "SERIAL_RTS_THRES");
+            db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
+
+            float_int.uint16 = DB_SERIAL_READ_TIMEOUT_MS;
+            len = db_get_mavmsg_param(buff, fmav_status, 11, &float_int, MAV_PARAM_TYPE_UINT16, "SERIAL_T_OUT_MS");
             db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
         }
             break;

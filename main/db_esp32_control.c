@@ -193,7 +193,7 @@ int db_open_int_telemetry_udp_socket() {
  * @param data Buffer with the data to send
  * @param data_length Length of the data in the buffer
  */
-void send_to_all_udp_clients(udp_conn_list_t *n_udp_conn_list, const uint8_t *data, uint data_length) {
+void db_send_to_all_udp_clients(udp_conn_list_t *n_udp_conn_list, const uint8_t *data, uint data_length) {
     for (int i = 0; i < n_udp_conn_list->size; i++) {  // send to all UDP clients
         int sent = sendto(n_udp_conn_list->udp_socket, data, data_length, 0,
                           (struct sockaddr *) &n_udp_conn_list->db_udp_clients[i].udp_client,
@@ -206,30 +206,63 @@ void send_to_all_udp_clients(udp_conn_list_t *n_udp_conn_list, const uint8_t *da
 }
 
 /**
+ * Adds a payload to be sent via ESP-NOW to the ESP-NOW queue (where the esp-now task will pick it up, encrypt, package
+ * and finally send it over the air)
+ *
+ * @param data Pointer to the payload buffer
+ * @param data_length Length of the payload data. Must not be bigger than DB_ESPNOW_PAYLOAD_MAXSIZE - fails otherwise
+ */
+void db_send_to_all_espnow(uint8_t data[], const uint16_t *data_length) {
+    db_espnow_queue_event_t evt;
+    evt.data = malloc(*data_length);
+    memcpy(evt.data, data, *data_length);
+    evt.data_len = *data_length;
+    evt.packet_type = DB_ESP_NOW_PACKET_TYPE_DATA;
+    if (xQueueSend(db_espnow_send_queue, &evt, ESPNOW_MAXDELAY) != pdTRUE) {
+        ESP_LOGW(TAG, "Send to db_espnow_send_queue queue fail");
+        free(evt.data);
+    } else {
+        // all good
+    }
+}
+
+/**
+ * Main call for sending anything over the air.
  * Send to all connected TCP & UDP clients or broadcast via ESP-NOW depending on the mode (DB_WIFI_MODE) we are currently in.
  * Typically called by a function that read from UART.
+ *
+ * When in ESP-NOW mode the packets will be split if they are bigger than DB_ESPNOW_PAYLOAD_MAXSIZE.
  *
  * @param tcp_clients Array of socket IDs for the TCP clients
  * @param udp_conn Structure handling the UDP connection
  * @param data payload to send
  * @param data_length Length of payload to send
  */
-void send_to_all_clients(int tcp_clients[], udp_conn_list_t *n_udp_conn_list, uint8_t data[], uint data_length) {
+void db_send_to_all_clients(int tcp_clients[], udp_conn_list_t *n_udp_conn_list, uint8_t data[], uint16_t data_length) {
     if (DB_WIFI_MODE != DB_WIFI_MODE_ESPNOW_AIR && DB_WIFI_MODE != DB_WIFI_MODE_ESPNOW_GND) {
-        send_to_all_tcp_clients(tcp_clients, data, data_length);
-        send_to_all_udp_clients(n_udp_conn_list, data, data_length);
+        db_send_to_all_tcp_clients(tcp_clients, data, data_length);
+        db_send_to_all_udp_clients(n_udp_conn_list, data, data_length);
     } else {
         // ESP-NOW mode
-        db_espnow_queue_event_t evt;
-        evt.data = malloc(data_length);
-        memcpy(evt.data, data, data_length);
-        evt.data_len = data_length;
-        evt.packet_type = DB_ESP_NOW_PACKET_TYPE_DATA;
-        if (xQueueSend(db_espnow_send_queue, &evt, ESPNOW_MAXDELAY) != pdTRUE) {
-            ESP_LOGW(TAG, "Send to db_espnow_send_queue queue fail");
-            free(evt.data);
+        // Check if payload fits into one ESP-NOW packet
+        if (data_length > DB_ESPNOW_PAYLOAD_MAXSIZE) {
+            // data not properly sized (MAVLink implementation already sends properly sized chunks but MSP parser will not)
+            // split into multiple packets
+            uint16_t sent_bytes = 0;
+            uint16_t next_chunk_len = 0;
+            do {
+                next_chunk_len = data_length - sent_bytes;
+                if (next_chunk_len > DB_ESPNOW_PAYLOAD_MAXSIZE) {
+                    next_chunk_len = DB_ESPNOW_PAYLOAD_MAXSIZE;
+                } else {
+                    // do nothing - chunk will fit into the ESP-NOW payload field
+                }
+                db_send_to_all_espnow(&data[sent_bytes], &next_chunk_len);
+                sent_bytes += next_chunk_len;
+            } while (sent_bytes < data_length);
         } else {
-            // all good
+            // packet is properly sized - send to ESP-NOW outbound queue
+            db_send_to_all_espnow(data, &data_length);
         }
     }
 }
@@ -416,7 +449,7 @@ _Noreturn void control_module_esp_now(){
         if (db_uart_write_queue != NULL && xQueueReceive(db_uart_write_queue, &db_espnow_uart_evt, 0) == pdTRUE) {
             if (DB_SERIAL_PROTOCOL == DB_SERIAL_PROTOCOL_MAVLINK) {
                 // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
-                // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existign packet
+                // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existing packet
                 db_parse_mavlink_from_radio(NULL, NULL, db_espnow_uart_evt.data, db_espnow_uart_evt.data_len);
             } else {
                 // no parsing with any other protocol - transparent here - just pass through

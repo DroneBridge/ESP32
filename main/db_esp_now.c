@@ -544,7 +544,7 @@ esp_err_t db_espnow_init() {
     if (!esp_now_is_peer_exist(BROADCAST_MAC)) ESP_ERROR_CHECK(esp_now_add_peer(&peer));
 
     /* Limit payload size to the max we can do */
-    if (DB_TRANS_BUF_SIZE > DB_ESPNOW_PAYLOAD_MAXSIZE) {
+    if (DB_TRANS_BUF_SIZE > DB_ESPNOW_PAYLOAD_MAXSIZE || DB_TRANS_BUF_SIZE < 1) {
         DB_TRANS_BUF_SIZE = DB_ESPNOW_PAYLOAD_MAXSIZE;
     } else {
         // all good

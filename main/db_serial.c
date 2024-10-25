@@ -48,8 +48,9 @@
 #define TAG "DB_SERIAL"
 
 uint8_t DB_MAV_SYS_ID = 1;
-
 uint32_t serial_total_byte_count = 0;
+uint16_t DB_SERIAL_READ_TIMEOUT_MS = DB_SERIAL_READ_TIMEOUT_MS_DEFAULT;
+
 uint8_t ltm_frame_buffer[MAX_LTM_FRAMES_IN_BUFFER * LTM_MAX_FRAME_SIZE];
 uint ltm_frames_in_buffer = 0;
 uint ltm_frames_in_buffer_pnt = 0;
@@ -60,7 +61,7 @@ fmav_message_t msg;
  * Opens UART socket.
  * Enables UART flow control if RTS and CTS pins do NOT match.
  * Only open serial socket/UART if PINs are not matching - matching PIN nums mean they still need to be defined by
- * the user no pre-defined pins as of this release since ESP32 boards have wildly different pin configurations
+ * the user. No pre-defined pins since ESP32 boards have wildly different pin configurations
  *
  * 8 data bits, no parity, 1 stop bit
  * @return ESP_ERROR or ESP_OK
@@ -89,6 +90,11 @@ esp_err_t open_uart_serial_socket() {
     return uart_driver_install(UART_NUM, 1024, 0, 10, NULL, 0);
 }
 
+/**
+ * Configures the onboard USB/JTAG interface for serial communication (instead of an UART). Board must support this interface.
+ *
+ * @return result of usb_serial_jtag_driver_install()
+ */
 esp_err_t open_jtag_serial_socket() {
     // Configure USB SERIAL JTAG
     usb_serial_jtag_driver_config_t usb_serial_jtag_config = {
@@ -145,7 +151,7 @@ void write_to_serial(const uint8_t data_buffer[], const unsigned int data_length
 }
 
 /**
- * Read data from the open serial interface
+ * Read data from the open serial interface in non-blocking fashion.
  * @param uart_read_buf Pointer to buffer to put the read bytes into
  * @param length Max length to read
  * @return number of read bytes
@@ -154,13 +160,13 @@ int db_read_serial(uint8_t *uart_read_buf, uint length) {
 #ifdef CONFIG_DB_SERIAL_OPTION_JTAG
     return usb_serial_jtag_read_bytes(uart_read_buf, length, 0);
 #else
-    // UART based serial socket for comms with FC or GCS via FTDI - configured by pins in the web interface
+    // UART based serial socket for communication with FC or GCS via FTDI - configured by pins in the web interface
     return uart_read_bytes(UART_NUM, uart_read_buf, length, 0);
 #endif
 }
 
 /**
- * @brief Parses & sends complete MSP & LTM messages
+ * @brief Reads serial interface, parses & sends complete MSP & LTM messages over the air.
  */
 void db_parse_msp_ltm(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_t msp_message_buffer[],
                       unsigned int *serial_read_bytes,
@@ -175,7 +181,7 @@ void db_parse_msp_ltm(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_
             if (parse_msp_ltm_byte(db_msp_ltm_port, serial_byte)) {
                 msp_message_buffer[(*serial_read_bytes - 1)] = serial_byte;
                 if (db_msp_ltm_port->parse_state == MSP_PACKET_RECEIVED) {
-                    send_to_all_clients(tcp_clients, udp_connection, msp_message_buffer, *serial_read_bytes);
+                    db_send_to_all_clients(tcp_clients, udp_connection, msp_message_buffer, *serial_read_bytes);
                     *serial_read_bytes = 0;
                 } else if (db_msp_ltm_port->parse_state == LTM_PACKET_RECEIVED) {
                     memcpy(&ltm_frame_buffer[ltm_frames_in_buffer_pnt], db_msp_ltm_port->ltm_frame_buffer,
@@ -184,7 +190,7 @@ void db_parse_msp_ltm(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_
                     ltm_frames_in_buffer++;
                     if (ltm_frames_in_buffer == DB_LTM_FRAME_NUM_BUFFER &&
                         (DB_LTM_FRAME_NUM_BUFFER <= MAX_LTM_FRAMES_IN_BUFFER)) {
-                        send_to_all_clients(tcp_clients, udp_connection, ltm_frame_buffer, *serial_read_bytes);
+                        db_send_to_all_clients(tcp_clients, udp_connection, ltm_frame_buffer, *serial_read_bytes);
                         ESP_LOGD(TAG, "Sent %i LTM message(s) to telemetry port!", DB_LTM_FRAME_NUM_BUFFER);
                         ltm_frames_in_buffer = 0;
                         ltm_frames_in_buffer_pnt = 0;
@@ -211,7 +217,7 @@ void db_route_mavlink_response(uint8_t *buffer, uint16_t length, enum DB_MAVLINK
     if (origin == DB_MAVLINK_DATA_ORIGIN_SERIAL) {
         write_to_serial(buffer, length);
     } else if (origin == DB_MAVLINK_DATA_ORIGIN_RADIO) {
-        send_to_all_clients(tcp_clients, udp_conns, buffer, length);
+        db_send_to_all_clients(tcp_clients, udp_conns, buffer, length);
     } else {
         ESP_LOGE(TAG, "Unknown msg origin. Do not know on which link to respond!");
     }
@@ -274,7 +280,8 @@ void db_parse_mavlink_from_radio(int *tcp_clients, udp_conn_list_t *udp_conns, u
 /**
  * Parses MAVLink messages and sends them via the radio link.
  * This function reads data from the serial interface, parses it for complete MAVLink messages, and sends those messages in a buffer.
- * It ensures that only complete messages are sent and that the buffer does not exceed TRANS_BUFF_SIZE
+ * It ensures that only complete messages are sent and that the buffer does not exceed TRANS_BUFF_SIZE.
+ * Checks for a serial read timeout. In case timeout is reached all data read from serial so far will be flushed to radio interface
  * The parsing is done semi-transparent as in: parser understands the MavLink frame format but performs no further checks
  *
  * @param tcp_clients Array of connected TCP clients
@@ -288,9 +295,34 @@ void db_read_serial_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, 
     static uint8_t mav_parser_rx_buf[296];  // at least 280 bytes which is the max len for a MAVLink v2 packet
     static fmav_status_t fmav_status_serial;    // fmav parser status struct for serial parser
     uint8_t uart_read_buf[DB_TRANS_BUF_SIZE];
+    // timeout variables
+    static TickType_t last_tick = 0;    // time when we received something from the serial interface for the last time
+    static TickType_t current_tick = 0;
+    current_tick = xTaskGetTickCount(); // get current time
 
     // Read bytes from serial link (UART or USB/JTAG interface)
     int bytes_read = db_read_serial(uart_read_buf, DB_TRANS_BUF_SIZE);
+
+    if (bytes_read == 0) {
+        // did not read anything this cycle -> check serial read timeout
+        if (current_tick - last_tick >= pdMS_TO_TICKS(DB_SERIAL_READ_TIMEOUT_MS)) {
+            // serial read timeout detected
+            last_tick = current_tick;   // reset timeout
+            // flush buffer to air interface -> send what we have in the buffer (already parsed)
+            if (*serial_buff_pos > 0) {
+                db_send_to_all_clients(tcp_clients, udp_conns, serial_buffer, *serial_buff_pos);
+                *serial_buff_pos = 0;
+            } else {
+                // do nothing since buffer is empty anyway
+            }
+        } else {
+            // nothing received but no timeout yet -> do nothing
+        }
+    } else {
+        // have received something -> reset timeout
+        last_tick = current_tick;
+    }
+
     serial_total_byte_count += bytes_read; // increase total bytes read via serial interface
     // Parse each byte received
     for (int i = 0; i < bytes_read; ++i) {
@@ -302,20 +334,21 @@ void db_read_serial_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, 
             mav_msg_counter++;
             // Check if the new message will fit in the buffer
             if (*serial_buff_pos == 0 && result.frame_len > DB_TRANS_BUF_SIZE) {
-                // frame_len is bigger than DB_TRANS_BUF_SIZE -> Split into multiple messages since e.g. ESP-NOW can only handle 250 bytes which is less than MAVLink max msg length
+                // frame_len is bigger than DB_TRANS_BUF_SIZE -> Split into multiple messages since
+                // e.g. ESP-NOW can only handle DB_ESPNOW_PAYLOAD_MAXSIZE bytes which is less than MAVLink max msg length
                 uint16_t sent_bytes = 0;
-                uint16_t next_chuck_len = 0;
+                uint16_t next_chunk_len = 0;
                 do {
-                    next_chuck_len = result.frame_len - sent_bytes;
-                    if (next_chuck_len > DB_TRANS_BUF_SIZE) {
-                        next_chuck_len = DB_TRANS_BUF_SIZE;
+                    next_chunk_len = result.frame_len - sent_bytes;
+                    if (next_chunk_len > DB_TRANS_BUF_SIZE) {
+                        next_chunk_len = DB_TRANS_BUF_SIZE;
                     } else {}
-                    send_to_all_clients(tcp_clients, udp_conns, &mav_parser_rx_buf[sent_bytes], next_chuck_len);
-                    sent_bytes += next_chuck_len;
+                    db_send_to_all_clients(tcp_clients, udp_conns, &mav_parser_rx_buf[sent_bytes], next_chunk_len);
+                    sent_bytes += next_chunk_len;
                 } while (sent_bytes < result.frame_len);
             } else if (*serial_buff_pos + result.frame_len > DB_TRANS_BUF_SIZE) {
                 // New message won't fit into the buffer, send buffer first
-                send_to_all_clients(tcp_clients, udp_conns, serial_buffer, *serial_buff_pos);
+                db_send_to_all_clients(tcp_clients, udp_conns, serial_buffer, *serial_buff_pos);
                 *serial_buff_pos = 0;
                 // copy the new message to the uart send buffer and set buffer position
                 memcpy(&serial_buffer[*serial_buff_pos], mav_parser_rx_buf, result.frame_len);
@@ -350,7 +383,8 @@ void db_read_serial_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, 
 
 /**
  * Reads TRANS_RD_BYTES_NUM bytes from serial interface and checks if we already got enough bytes to send them out.
- * Requires a continuous stream of data.
+ * Timeout ensures that no data is getting stuck in the buffer. Once serial read timeout is reached, the buffer will be
+ * flushed to the radio interface (send what we have)
  *
  * @param tcp_clients Array of connected TCP clients
  * @param udp_connection Structure containing all UDP connection data including the sockets
@@ -360,14 +394,29 @@ void db_read_serial_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, 
 void db_read_serial_parse_transparent(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_t serial_buffer[],
                                       unsigned int *serial_read_bytes) {
     uint16_t read;
+    static bool serial_read_timeout_reached = false;
+    static TickType_t last_tick = 0;    // time when we received something from the serial interface for the last time
+    static TickType_t current_tick = 0;
+    current_tick = xTaskGetTickCount(); // get current time
     // read from UART directly into TCP & UDP send buffer
     if ((read = db_read_serial(&serial_buffer[*serial_read_bytes], (DB_TRANS_BUF_SIZE - *serial_read_bytes))) > 0) {
         serial_total_byte_count += read;    // increase total bytes read via UART
         *serial_read_bytes += read; // set new buffer position
+        serial_read_timeout_reached = false;    // reset serial read timeout
+        last_tick = current_tick;               // reset time for serial read timeout
+    } else {
+        /* did not read anything this cycle -> check serial read timeout */
+        if (current_tick - last_tick >= pdMS_TO_TICKS(DB_SERIAL_READ_TIMEOUT_MS)) {
+            serial_read_timeout_reached = true;
+            last_tick = current_tick;
+        } else {
+            // no timeout detected
+        }
     }
-    // TODO: Support UART data streams that are not continuous. Use timer to check how long we waited for data already
-    if (*serial_read_bytes >= DB_TRANS_BUF_SIZE) {
-        send_to_all_clients(tcp_clients, udp_connection, serial_buffer, *serial_read_bytes);
+    // send serial data over the air interface
+    if (*serial_read_bytes >= DB_TRANS_BUF_SIZE || (serial_read_timeout_reached && *serial_read_bytes > 0)) {
+        db_send_to_all_clients(tcp_clients, udp_connection, serial_buffer, *serial_read_bytes);
         *serial_read_bytes = 0; // reset buffer position
+        serial_read_timeout_reached = false;    // reset serial read timeout
     }
 }

@@ -165,7 +165,7 @@
                 </div>
             </div>
             <div id="trans_pack_size_div" class="row">
-                <div class="twelve columns">
+                <div class="six columns">
                     <label for="trans_pack_size">Maximum packet size</label>
                     <select id="trans_pack_size" name="trans_pack_size" form="settings_form">
                         <option value="16">16</option>
@@ -176,6 +176,10 @@
                         <option value="512">512</option>
                         <option value="768">768</option>
                     </select>
+                </div>
+                <div class="six columns">
+                    <label for="serial_timeout">Serial read timeout [ms]</label>
+                    <input type="number" id="serial_timeout" name="serial_timeout" min="1" max="65535" value="50">
                 </div>
             </div>
             <div class="row">

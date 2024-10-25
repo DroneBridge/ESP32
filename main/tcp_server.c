@@ -56,7 +56,7 @@ int open_tcp_server(int port) {
     return listen_sock;
 }
 
-void send_to_all_tcp_clients(const int tcp_clients[], uint8_t data[], uint data_length) {
+void db_send_to_all_tcp_clients(const int tcp_clients[], uint8_t data[], uint data_length) {
     for (int i = 0; i < CONFIG_LWIP_MAX_ACTIVE_TCP; i++) {
         if (tcp_clients[i] > 0) {
             ESP_LOGD(TCP_TAG, "Sending %i bytes", data_length);

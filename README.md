@@ -14,7 +14,7 @@ A firmware for the popular ESP32 modules from Espressif Systems. Probably the ch
 communicate with your drone, UAV, UAS, ground-based vehicle or whatever you may call them.
 
 It also allows for a fully transparent serial to WiFi pass-through link with variable packet size
-(Continuous stream of data required).
+(As of release v2.0RC4 no continuous stream of data required anymore in MAVLink and transparent mode).
 
 DroneBridge for ESP32 is a telemetry/low data rate-only solution. There is no support for cameras connected to the ESP32 
 since it does not support video encoding.
@@ -34,7 +34,7 @@ since it does not support video encoding.
 -   Fully configurable through an easy-to-use web interface
 -   Parsing of LTM & MSPv2 for more reliable connection and less packet loss
 -   Parsing of MAVLink with the injection of Radio Status packets for the display of RSSI in the GCS
--   Fully transparent telemetry down-link option for continuous streams
+-   Fully transparent telemetry down-link option
 -   Reliable, low latency
 
 <div align="center">

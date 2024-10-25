@@ -42,6 +42,7 @@
 #include "db_esp_now.h"
 #include "iot_button.h"
 #include "db_serial.h"
+#include "globals.h"
 
 #define NVS_NAMESPACE "settings"
 
@@ -80,7 +81,7 @@ uint8_t DB_UART_RTS_THRESH = 64;
 #endif
 
 int32_t DB_UART_BAUD_RATE = 57600;
-uint16_t DB_TRANS_BUF_SIZE = 64;
+uint16_t DB_TRANS_BUF_SIZE = 128;
 uint8_t DB_LTM_FRAME_NUM_BUFFER = 2;
 db_esp_signal_quality_t db_esp_signal_quality = {.air_rssi = -127, .air_noise_floor = -1, .gnd_rssi= -127, .gnd_noise_floor = -1};
 wifi_sta_list_t wifi_sta_list = {.num = 0};
@@ -457,6 +458,7 @@ void db_write_settings_to_nvs() {
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "rts_thresh", DB_UART_RTS_THRESH));
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "proto", DB_SERIAL_PROTOCOL));
     ESP_ERROR_CHECK(nvs_set_u16(my_handle, "trans_pack_size", DB_TRANS_BUF_SIZE));
+    ESP_ERROR_CHECK(nvs_set_u16(my_handle, "serial_timeout", DB_SERIAL_READ_TIMEOUT_MS));
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "ltm_per_packet", DB_LTM_FRAME_NUM_BUFFER));
     ESP_ERROR_CHECK(nvs_set_str(my_handle, "ap_ip", DEFAULT_AP_IP));
     ESP_ERROR_CHECK(nvs_set_str(my_handle, "ip_sta", DB_STATIC_STA_IP));
@@ -550,6 +552,7 @@ void db_read_settings_nvs() {
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "rts_thresh", &DB_UART_RTS_THRESH));
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "proto", &DB_SERIAL_PROTOCOL));
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u16(my_handle, "trans_pack_size", &DB_TRANS_BUF_SIZE));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u16(my_handle, "serial_timeout", &DB_SERIAL_READ_TIMEOUT_MS));
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "ltm_per_packet", &DB_LTM_FRAME_NUM_BUFFER));
         // get saved UDP client
         char udp_client_ip_str[INET_ADDRSTRLEN + 6];
@@ -562,10 +565,10 @@ void db_read_settings_nvs() {
         nvs_close(my_handle);
         ESP_LOGI(TAG,
                  "\tWifi Mode: %i\n\twifi_chan %i\n\tbaud %liu\n\tgpio_tx %i\n\tgpio_rx %i\n\tgpio_cts %i\n\t"
-                 "gpio_rts %i\n\trts_thresh %i\n\tproto %i\n\ttrans_pack_size %i\n\tltm_per_packet %i",
+                 "gpio_rts %i\n\trts_thresh %i\n\tproto %i\n\ttrans_pack_size %i\n\tltm_per_packet %i\n\tserial_timeout %i",
                  DB_WIFI_MODE, DB_WIFI_CHANNEL, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
                  DB_UART_PIN_CTS, DB_UART_PIN_RTS, DB_UART_RTS_THRESH, DB_SERIAL_PROTOCOL, DB_TRANS_BUF_SIZE,
-                 DB_LTM_FRAME_NUM_BUFFER);
+                 DB_LTM_FRAME_NUM_BUFFER, DB_SERIAL_READ_TIMEOUT_MS);
         if (strlen(udp_client_ip_str) > 0 && udp_client_port != 0) {
             // there was a saved UDP client in the NVM - add it to the udp clients list
             ESP_LOGI(TAG, "Adding %s:%i to known UDP clients.", udp_client_ip_str, udp_client_port);
@@ -620,8 +623,9 @@ void long_press_callback(void *arg,void *usr_data) {
     DB_UART_PIN_CTS = GPIO_NUM_0;
     DB_UART_PIN_RTS = GPIO_NUM_0;
     DB_SERIAL_PROTOCOL = DB_SERIAL_PROTOCOL_MAVLINK;
-    DB_TRANS_BUF_SIZE = 64;
+    DB_TRANS_BUF_SIZE = 128;
     DB_UART_RTS_THRESH = 64;
+    DB_SERIAL_READ_TIMEOUT_MS = DB_SERIAL_READ_TIMEOUT_MS_DEFAULT;
     db_write_settings_to_nvs();
     esp_restart();
 }
@@ -655,10 +659,10 @@ void set_reset_trigger() {
 void db_jtag_serial_info_print() {
     uint8_t buffer[512];
     int len = sprintf((char *) buffer, "\tWifi Mode: %i\n\twifi_chan %i\n\tbaud %liu\n\tgpio_tx %i\n\tgpio_rx %i\n\tgpio_cts %i\n\t"
-                                       "gpio_rts %i\n\trts_thresh %i\n\tproto %i\n\ttrans_pack_size %i\n\tltm_per_packet %i\n",
+                                       "gpio_rts %i\n\trts_thresh %i\n\tproto %i\n\ttrans_pack_size %i\n\tltm_per_packet %i\n\tserial_timeout %i\n",
                       DB_WIFI_MODE, DB_WIFI_CHANNEL, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
                       DB_UART_PIN_CTS, DB_UART_PIN_RTS, DB_UART_RTS_THRESH, DB_SERIAL_PROTOCOL, DB_TRANS_BUF_SIZE,
-                      DB_LTM_FRAME_NUM_BUFFER);
+                      DB_LTM_FRAME_NUM_BUFFER, DB_SERIAL_READ_TIMEOUT_MS);
     write_to_serial(buffer, len);
     len = sprintf((char *) buffer, "\tSSID: %s\n", DB_WIFI_SSID);
     write_to_serial(buffer, len);
