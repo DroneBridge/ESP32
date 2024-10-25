@@ -3,6 +3,8 @@ const ROOT_URL = window.location.href       // for production code
 let conn_status = 0;		// connection status to the ESP32
 let old_conn_status = 0;	// connection status before last update of UI to know when it changed
 let serial_via_JTAG = 0;	// set to 1 if ESP32 is using the USB interface as serial interface for data and not using the UART. If 0 we set UART config to invisible for the user.
+let last_byte_count = 0;
+let last_timestamp_byte_count = 0;
 
 function change_ap_ip_visibility(){
 	let ap_ip_div = document.getElementById("ap_ip_div");
@@ -176,12 +178,22 @@ function update_conn_status() {
 function get_stats() {
 	get_json("api/system/stats").then(json_data => {
 		conn_status = 1
+		let d = new Date();
 		let bytes = parseInt(json_data["read_bytes"])
-		if (!isNaN(bytes) && bytes > 1000) {
-			document.getElementById("read_bytes").innerHTML = (bytes / 1000) + " kb"
-		} else if (!isNaN(bytes)) {
-			document.getElementById("read_bytes").innerHTML = bytes + " bytes"
+		let bytes_per_second = 0;
+		let current_time = d.getTime();
+		if (last_byte_count > 0 && last_timestamp_byte_count > 0 && !isNaN(bytes)) {
+			bytes_per_second = (bytes - last_byte_count) / ((current_time - last_timestamp_byte_count) / 1000);
 		}
+		last_timestamp_byte_count = current_time;
+		if (!isNaN(bytes) && bytes > 1000000) {
+			document.getElementById("read_bytes").innerHTML = (bytes / 1000000).toFixed(3) + " MB (" + ((bytes_per_second*8)/1000).toFixed(2) + " kbit/s)"
+		} else if (!isNaN(bytes) && bytes > 1000) {
+			document.getElementById("read_bytes").innerHTML = (bytes / 1000).toFixed(2) + " kB (" + ((bytes_per_second*8)/1000).toFixed(2) + " kbit/s)"
+		} else if (!isNaN(bytes)) {
+			document.getElementById("read_bytes").innerHTML = bytes + " bytes (" + Math.round(bytes_per_second) + " byte/s)"
+		}
+		last_byte_count = bytes;
 
 		let tcp_clients = parseInt(json_data["tcp_connected"])
 		if (!isNaN(tcp_clients) && tcp_clients === 1) {
