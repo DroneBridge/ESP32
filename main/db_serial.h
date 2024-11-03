@@ -41,6 +41,10 @@ typedef union {
     int32_t int32;
 } float_int_union;
 
+// Definitions for additional UART interfaces
+#define UART_NUM_2 UART_NUM_2
+#define UART_NUM_3 UART_NUM_3
+
 int open_serial_socket();
 void write_to_serial(const uint8_t data_buffer[], unsigned int data_length);
 void db_parse_msp_ltm(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_t msp_message_buffer[],
@@ -52,5 +56,10 @@ void db_read_serial_parse_transparent(int tcp_clients[], udp_conn_list_t *udp_co
 void db_parse_mavlink_from_radio(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *buffer, int bytes_read);
 void db_route_mavlink_response(uint8_t *buffer, uint16_t length, enum DB_MAVLINK_DATA_ORIGIN origin, int *tcp_clients,
                                udp_conn_list_t *udp_conns);
+
+// Function prototypes for initializing multiple UART interfaces
+esp_err_t open_uart_serial_socket(uart_port_t uart_num, int tx_pin, int rx_pin, int rts_pin, int cts_pin, int baud_rate);
+esp_err_t open_jtag_serial_socket();
+esp_err_t open_serial_socket();
 
 #endif //DB_ESP32_DB_SERIAL_H
