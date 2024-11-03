@@ -66,28 +66,28 @@ fmav_message_t msg;
  * 8 data bits, no parity, 1 stop bit
  * @return ESP_ERROR or ESP_OK
  */
-esp_err_t open_uart_serial_socket() {
+esp_err_t open_uart_serial_socket(uart_port_t uart_num, int tx_pin, int rx_pin, int rts_pin, int cts_pin, int baud_rate) {
     // only open serial socket/UART if PINs are not matching - matching PIN nums mean they still need to be defined by
     // the user no pre-defined pins as of this release since ESP32 boards have wildly different pin configurations
-    if (DB_UART_PIN_RX == DB_UART_PIN_TX) {
+    if (rx_pin == tx_pin) {
         ESP_LOGW(TAG, "Init UART socket aborted. TX GPIO == RX GPIO - Configure first!");
         return ESP_FAIL;
     }
-    bool flow_control = DB_UART_PIN_CTS != DB_UART_PIN_RTS;
+    bool flow_control = cts_pin != rts_pin;
     ESP_LOGI(TAG, "Flow control enabled: %s", flow_control ? "true" : "false");
     uart_config_t uart_config = {
-            .baud_rate = DB_UART_BAUD_RATE,
+            .baud_rate = baud_rate,
             .data_bits = UART_DATA_8_BITS,
             .parity    = UART_PARITY_DISABLE,
             .stop_bits = UART_STOP_BITS_1,
             .flow_ctrl = flow_control ? UART_HW_FLOWCTRL_CTS_RTS : UART_HW_FLOWCTRL_DISABLE,
             .rx_flow_ctrl_thresh = DB_UART_RTS_THRESH,
     };
-    ESP_ERROR_CHECK(uart_param_config(UART_NUM, &uart_config));
-    ESP_ERROR_CHECK(uart_set_pin(UART_NUM, DB_UART_PIN_TX, DB_UART_PIN_RX,
-                                 flow_control ? DB_UART_PIN_RTS : UART_PIN_NO_CHANGE,
-                                 flow_control ? DB_UART_PIN_CTS : UART_PIN_NO_CHANGE));
-    return uart_driver_install(UART_NUM, 1024, 0, 10, NULL, 0);
+    ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
+    ESP_ERROR_CHECK(uart_set_pin(uart_num, tx_pin, rx_pin,
+                                 flow_control ? rts_pin : UART_PIN_NO_CHANGE,
+                                 flow_control ? cts_pin : UART_PIN_NO_CHANGE));
+    return uart_driver_install(uart_num, 1024, 0, 10, NULL, 0);
 }
 
 /**
@@ -119,7 +119,7 @@ esp_err_t open_serial_socket() {
     return open_jtag_serial_socket();
 #else
     // open UART based serial socket for comms with FC or GCS via FTDI - configured by pins in the web interface
-    return open_uart_serial_socket();
+    return open_uart_serial_socket(UART_NUM, DB_UART_PIN_TX, DB_UART_PIN_RX, DB_UART_PIN_RTS, DB_UART_PIN_CTS, DB_UART_BAUD_RATE);
 #endif
 }
 
@@ -160,7 +160,7 @@ int db_read_serial(uint8_t *uart_read_buf, uint length) {
 #ifdef CONFIG_DB_SERIAL_OPTION_JTAG
     return usb_serial_jtag_read_bytes(uart_read_buf, length, 0);
 #else
-    // UART based serial socket for communication with FC or GCS via FTDI - configured by pins in the web interface
+    // UART based serial socket for comms with FC or GCS via FTDI - configured by pins in the web interface
     return uart_read_bytes(UART_NUM, uart_read_buf, length, 0);
 #endif
 }
