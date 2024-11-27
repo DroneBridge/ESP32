@@ -138,12 +138,20 @@
     const button_pcb_files = document.getElementById("button_pcb_files");
 
     button_official_board.onclick = async () => {
-        sa_event("click_get_board", {});
+        try {
+            sa_event("click_get_board", {});
+        } catch (e) {
+            console.log("Could not run simpleanalytics: " + e);
+        }
         window.open("https://www.ebay.com/itm/116227992460?mkcid=16&mkevt=1&mkrid=711-127632-2357-0&ssspo=nhzOOuH_QF2&sssrc=2047675&ssuid=&widget_ver=artemis&media=COPY", '_blank').focus();
     }
 
     button_pcb_files.onclick = async () => {
-        sa_event("click_get_pcb", {});
+        try {
+            sa_event("click_get_pcb", {});
+        } catch (e) {
+            console.log("Could not run simpleanalytics: " + e);
+        }
         window.open("https://buymeacoffee.com/seeul8er/e/301194", '_blank').focus();
     }
 </script>
