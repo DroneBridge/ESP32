@@ -46,6 +46,41 @@
 
 #define NVS_NAMESPACE "settings"
 
+/* used to reset ESP to defaults and force restart or to reset the mode to access point mode */
+#ifdef CONFIG_IDF_TARGET_ESP32C3
+#define DB_RESET_PIN GPIO_NUM_9
+#elif CONFIG_IDF_TARGET_ESP32S2
+#define DB_RESET_PIN GPIO_NUM_0
+#elif CONFIG_IDF_TARGET_ESP32S3
+    #define DB_RESET_PIN GPIO_NUM_0
+#elif CONFIG_IDF_TARGET_ESP32
+    #define DB_RESET_PIN GPIO_NUM_0
+#else
+    #define DB_RESET_PIN GPIO_NUM_0
+#endif
+
+#ifdef CONFIG_DB_OFFICIAL_BOARD_1_X
+#define DB_DEFAULT_UART_TX_PIN GPIO_NUM_5
+#define DB_DEFAULT_UART_RX_PIN GPIO_NUM_4
+#define DB_DEFAULT_UART_RTS_PIN GPIO_NUM_6
+#define DB_DEFAULT_UART_CTS_PIN GPIO_NUM_7
+#define DB_DEFAULT_UART_BAUD_RATE 115200
+#elif CONFIG_DB_GENERIC_BOARD
+// initially set pins to 0 to allow the start of the system on all boards. User has to set the correct pins
+#define DB_DEFAULT_UART_TX_PIN GPIO_NUM_0
+#define DB_DEFAULT_UART_RX_PIN GPIO_NUM_0
+#define DB_DEFAULT_UART_RTS_PIN GPIO_NUM_0
+#define DB_DEFAULT_UART_CTS_PIN GPIO_NUM_0
+#define DB_DEFAULT_UART_BAUD_RATE 57600
+#else
+// someone fucked up the config - fallback to generic config
+#define DB_DEFAULT_UART_TX_PIN GPIO_NUM_0
+#define DB_DEFAULT_UART_RX_PIN GPIO_NUM_0
+#define DB_DEFAULT_UART_RTS_PIN GPIO_NUM_0
+#define DB_DEFAULT_UART_CTS_PIN GPIO_NUM_0
+#define DB_DEFAULT_UART_BAUD_RATE 57600
+#endif
+
 static const char *TAG = "DB_ESP32";
 
 uint8_t DB_WIFI_MODE = DB_WIFI_MODE_AP;
@@ -60,27 +95,13 @@ char CURRENT_CLIENT_IP[IP4ADDR_STRLEN_MAX] = "192.168.2.1";
 uint8_t DB_WIFI_CHANNEL = 6;
 uint8_t DB_SERIAL_PROTOCOL = DB_SERIAL_PROTOCOL_MAVLINK;
 
-// initially set pins to 0 to allow the start of the system on all boards. User has to set the correct pins
-uint8_t DB_UART_PIN_TX = GPIO_NUM_0;
-uint8_t DB_UART_PIN_RX = GPIO_NUM_0;
-uint8_t DB_UART_PIN_RTS = GPIO_NUM_0;
-uint8_t DB_UART_PIN_CTS = GPIO_NUM_0;
+uint8_t DB_UART_PIN_TX = DB_DEFAULT_UART_TX_PIN;
+uint8_t DB_UART_PIN_RX = DB_DEFAULT_UART_RX_PIN;
+uint8_t DB_UART_PIN_RTS = DB_DEFAULT_UART_RTS_PIN;
+uint8_t DB_UART_PIN_CTS = DB_DEFAULT_UART_CTS_PIN;
 uint8_t DB_UART_RTS_THRESH = 64;
+int32_t DB_UART_BAUD_RATE = DB_DEFAULT_UART_BAUD_RATE;
 
-/* used to reset ESP to defaults and force restart or to reset the mode to access point mode */
-#ifdef CONFIG_IDF_TARGET_ESP32C3
-    #define DB_RESET_PIN GPIO_NUM_9
-#elif CONFIG_IDF_TARGET_ESP32S2
-    #define DB_RESET_PIN GPIO_NUM_0
-#elif CONFIG_IDF_TARGET_ESP32S3
-    #define DB_RESET_PIN GPIO_NUM_0
-#elif CONFIG_IDF_TARGET_ESP32
-    #define DB_RESET_PIN GPIO_NUM_0
-#else
-    #define DB_RESET_PIN GPIO_NUM_0
-#endif
-
-int32_t DB_UART_BAUD_RATE = 57600;
 uint16_t DB_TRANS_BUF_SIZE = 128;
 uint8_t DB_LTM_FRAME_NUM_BUFFER = 2;
 db_esp_signal_quality_t db_esp_signal_quality = {.air_rssi = -127, .air_noise_floor = -1, .gnd_rssi= -127, .gnd_noise_floor = -1};
@@ -618,10 +639,11 @@ void long_press_callback(void *arg,void *usr_data) {
     memset(DB_STATIC_STA_IP_GW, 0, strlen(DB_STATIC_STA_IP_GW));
     memset(DB_STATIC_STA_IP_NETMASK, 0, strlen(DB_STATIC_STA_IP_NETMASK));
     DB_WIFI_CHANNEL = 6;
-    DB_UART_PIN_TX = GPIO_NUM_0;
-    DB_UART_PIN_RX = GPIO_NUM_0;
-    DB_UART_PIN_CTS = GPIO_NUM_0;
-    DB_UART_PIN_RTS = GPIO_NUM_0;
+    DB_UART_PIN_TX = DB_DEFAULT_UART_TX_PIN;
+    DB_UART_PIN_RX = DB_DEFAULT_UART_RX_PIN;
+    DB_UART_PIN_CTS = DB_DEFAULT_UART_CTS_PIN;
+    DB_UART_PIN_RTS = DB_DEFAULT_UART_RTS_PIN; //
+    DB_UART_BAUD_RATE = DB_DEFAULT_UART_BAUD_RATE;
     DB_SERIAL_PROTOCOL = DB_SERIAL_PROTOCOL_MAVLINK;
     DB_TRANS_BUF_SIZE = 128;
     DB_UART_RTS_THRESH = 64;
