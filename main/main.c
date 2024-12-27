@@ -67,6 +67,16 @@ uint8_t DB_UART_PIN_RTS = GPIO_NUM_0;
 uint8_t DB_UART_PIN_CTS = GPIO_NUM_0;
 uint8_t DB_UART_RTS_THRESH = 64;
 
+// Definitions for additional UART interfaces
+uint8_t DB_UART2_PIN_TX = GPIO_NUM_0;
+uint8_t DB_UART2_PIN_RX = GPIO_NUM_0;
+uint8_t DB_UART2_PIN_RTS = GPIO_NUM_0;
+uint8_t DB_UART2_PIN_CTS = GPIO_NUM_0;
+uint8_t DB_UART3_PIN_TX = GPIO_NUM_0;
+uint8_t DB_UART3_PIN_RX = GPIO_NUM_0;
+uint8_t DB_UART3_PIN_RTS = GPIO_NUM_0;
+uint8_t DB_UART3_PIN_CTS = GPIO_NUM_0;
+
 /* used to reset ESP to defaults and force restart or to reset the mode to access point mode */
 #ifdef CONFIG_IDF_TARGET_ESP32C3
     #define DB_RESET_PIN GPIO_NUM_9
@@ -465,6 +475,16 @@ void db_write_settings_to_nvs() {
     ESP_ERROR_CHECK(nvs_set_str(my_handle, "ip_sta_gw", DB_STATIC_STA_IP_GW));
     ESP_ERROR_CHECK(nvs_set_str(my_handle, "ip_sta_netmsk", DB_STATIC_STA_IP_NETMASK));
 
+    // Save additional UART settings
+    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "gpio_tx2", DB_UART2_PIN_TX));
+    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "gpio_rx2", DB_UART2_PIN_RX));
+    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "gpio_cts2", DB_UART2_PIN_CTS));
+    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "gpio_rts2", DB_UART2_PIN_RTS));
+    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "gpio_tx3", DB_UART3_PIN_TX));
+    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "gpio_rx3", DB_UART3_PIN_RX));
+    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "gpio_cts3", DB_UART3_PIN_CTS));
+    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "gpio_rts3", DB_UART3_PIN_RTS));
+
     ESP_ERROR_CHECK(nvs_commit(my_handle));
     nvs_close(my_handle);
 }
@@ -560,7 +580,17 @@ void db_read_settings_nvs() {
         db_read_str_nvs(my_handle, "udp_client_ip", udp_client_ip_str);
         uint16_t udp_client_port = 0;
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u16(my_handle, "udp_client_port", &udp_client_port));
-        
+
+        // Read additional UART settings
+        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "gpio_tx2", &DB_UART2_PIN_TX));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "gpio_rx2", &DB_UART2_PIN_RX));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "gpio_cts2", &DB_UART2_PIN_CTS));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "gpio_rts2", &DB_UART2_PIN_RTS));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "gpio_tx3", &DB_UART3_PIN_TX));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "gpio_rx3", &DB_UART3_PIN_RX));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "gpio_cts3", &DB_UART3_PIN_CTS));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "gpio_rts3", &DB_UART3_PIN_RTS));
+
         // close NVM
         nvs_close(my_handle);
         ESP_LOGI(TAG,
@@ -626,6 +656,17 @@ void long_press_callback(void *arg,void *usr_data) {
     DB_TRANS_BUF_SIZE = 128;
     DB_UART_RTS_THRESH = 64;
     DB_SERIAL_READ_TIMEOUT_MS = DB_SERIAL_READ_TIMEOUT_MS_DEFAULT;
+
+    // Reset additional UART settings
+    DB_UART2_PIN_TX = GPIO_NUM_0;
+    DB_UART2_PIN_RX = GPIO_NUM_0;
+    DB_UART2_PIN_CTS = GPIO_NUM_0;
+    DB_UART2_PIN_RTS = GPIO_NUM_0;
+    DB_UART3_PIN_TX = GPIO_NUM_0;
+    DB_UART3_PIN_RX = GPIO_NUM_0;
+    DB_UART3_PIN_CTS = GPIO_NUM_0;
+    DB_UART3_PIN_RTS = GPIO_NUM_0;
+
     db_write_settings_to_nvs();
     esp_restart();
 }
