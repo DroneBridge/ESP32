@@ -1,8 +1,8 @@
 ﻿# Execute in an esp-idf enabled PowerShell
 # This script will create a combined zip file containing binaries for all supported esp32 boards
 
-$release_foldername = "DroneBridge_ESP32_v2.0RC3"
-$release_name_zip = "DroneBridge_ESP32_v2.0RC3.zip"
+$release_foldername = "DroneBridge_ESP32_v2.0"
+$release_name_zip = "DroneBridge_ESP32_v2.0.zip"
 
 mkdir $release_foldername
 mkdir build
@@ -18,6 +18,17 @@ cp .\build\db_esp32.bin $release_foldername\esp32
 cp .\build\bootloader\bootloader.bin $release_foldername\esp32
 cp .\build\www.bin $release_foldername\esp32
 cp .\build\partition_table\partition-table.bin $release_foldername\esp32
+
+rm -Recurse .\build
+idf.py fullclean
+cp .\sdkconfig_esp32_noUARTConsole .\sdkconfig
+idf.py build
+mkdir $release_foldername\esp32_noUARTConsole
+cp .\build\flash_args $release_foldername\esp32_noUARTConsole\flash_args.txt
+cp .\build\db_esp32.bin $release_foldername\esp32_noUARTConsole
+cp .\build\bootloader\bootloader.bin $release_foldername\esp32_noUARTConsole
+cp .\build\www.bin $release_foldername\esp32_noUARTConsole
+cp .\build\partition_table\partition-table.bin $release_foldername\esp32_noUARTConsole
 
 rm -Recurse .\build
 idf.py fullclean
@@ -65,6 +76,17 @@ cp .\build\partition_table\partition-table.bin $release_foldername\esp32c3_USBSe
 
 rm -Recurse .\build
 idf.py fullclean
+cp .\sdkconfig_c3_noUARTConsole .\sdkconfig
+idf.py build
+mkdir $release_foldername\esp32c3_noUARTConsole
+cp .\build\flash_args $release_foldername\esp32c3_noUARTConsole\flash_args.txt
+cp .\build\db_esp32.bin $release_foldername\esp32c3_noUARTConsole
+cp .\build\bootloader\bootloader.bin $release_foldername\esp32c3_noUARTConsole
+cp .\build\www.bin $release_foldername\esp32c3_noUARTConsole
+cp .\build\partition_table\partition-table.bin $release_foldername\esp32c3_noUARTConsole
+
+rm -Recurse .\build
+idf.py fullclean
 cp .\sdkconfig_c6 .\sdkconfig
 idf.py build
 mkdir $release_foldername\esp32c6
@@ -73,6 +95,17 @@ cp .\build\db_esp32.bin $release_foldername\esp32c6
 cp .\build\bootloader\bootloader.bin $release_foldername\esp32c6
 cp .\build\www.bin $release_foldername\esp32c6
 cp .\build\partition_table\partition-table.bin $release_foldername\esp32c6
+
+rm -Recurse .\build
+idf.py fullclean
+cp .\sdkconfig_c6_serial_via_JTAG .\sdkconfig
+idf.py build
+mkdir $release_foldername\esp32c6_USBSerial
+cp .\build\flash_args $release_foldername\esp32c6_USBSerial\flash_args.txt
+cp .\build\db_esp32.bin $release_foldername\esp32c6_USBSerial
+cp .\build\bootloader\bootloader.bin $release_foldername\esp32c6_USBSerial
+cp .\build\www.bin $release_foldername\esp32c6_USBSerial
+cp .\build\partition_table\partition-table.bin $release_foldername\esp32c6_USBSerial
 
 if (Test-Path $release_name_zip) {
    Remove-Item $release_name_zip -verbose
