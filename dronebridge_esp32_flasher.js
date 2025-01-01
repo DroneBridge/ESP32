@@ -1,7 +1,8 @@
 // import { ESPLoader, Transport } from './ESP32/esptool/bundle.js';
 // import { serial } from './ESP32/web-serial-polyfill/serial.js';
-import { ESPLoader, Transport } from './esptool/bundle.js';
-import { serial } from './web-serial-polyfill/serial.js';
+import {ESPLoader, Transport} from './esptool/bundle.js';
+import {serial} from './web-serial-polyfill/serial.js';
+
 if (!navigator.serial && navigator.usb) navigator.serial = serial;  // switch to WebSerial over WebUSB by polyfill
 
 const not_compatible_warning = document.getElementById('not_compatible_warning');
@@ -22,7 +23,7 @@ const flash_curr_file = document.getElementById("flash_curr_file");
 
 class DBTarget {
     constructor(chip_name, target_display_name, target_folder_name, target_files, target_addresses, target_flash_mode,
-                target_flash_freq) {
+                target_flash_freq, target_flash_size = "keep") {
         this.chip_name = chip_name;
         this.target_display_name = target_display_name;
         this.target_folder_name = target_folder_name;
@@ -30,6 +31,7 @@ class DBTarget {
         this.target_file_addresses = target_addresses;
         this.flash_mode = target_flash_mode;
         this.flash_freq = target_flash_freq;
+        this.flash_size = target_flash_size;
     }
 }
 
@@ -92,8 +94,29 @@ let t2RC4_esp32s3 = new DBTarget("ESP32-S3", "ESP32-S3", "esp32s3/", ["bootloade
 let release_20RC4 = new DBRelease("v2.0RC4 (pre-release)", "./db_releases/2_0RC4/",
     [t2RC4_esp32, t2RC4_espc3, t2RC4_espc3_usbserial, t2RC4_espc6, t2RC4_esps2, t2RC4_esp32s3]);
 
+// v2.0 stable release
+let t2stable_esp32 = new DBTarget("ESP32", "ESP32", "esp32/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x1000, 0x8000, 0x10000, 0x190000], "DIO", "40MHz");
+let t2stable_espc3 = new DBTarget("ESP32-C3", "ESP32-C3", "esp32c3/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let t2stable_espc3_official = new DBTarget("ESP32-C3", "ESP32-C3 Official HW", "esp32c3_official/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz", "4MB");
+let t2stable_espc3_usbserial = new DBTarget("ESP32-C3", "ESP32-C3 (USBSerial)", "esp32c3_USBSerial/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let t2stable_espc3_noUARTConsole = new DBTarget("ESP32-C3", "ESP32-C3 (noUARTConsole)", "esp32c3_noUARTConsole/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let t2stable_espc6 = new DBTarget("ESP32-C6", "ESP32-C6", "esp32c6/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let t2stable_espc6_usbserial = new DBTarget("ESP32-C6", "ESP32-C6 (USBSerial)", "esp32c6_USBSerial/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let t2stable_espc6_noUARTConsole = new DBTarget("ESP32-C6", "ESP32-C6 (noUARTConsole)", "esp32c6_noUARTConsole/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let t2stable_esps2 = new DBTarget("ESP32-S2", "ESP32-S2", "esp32s2/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x1000, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let t2stable_esps2_noUARTConsole = new DBTarget("ESP32-S2", "ESP32-S2 (noUARTConsole)", "esp32s2_noUARTConsole/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x1000, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let t2stable_esps3 = new DBTarget("ESP32-S3", "ESP32-S3", "esp32s3/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let t2stable_esps3_usbserial = new DBTarget("ESP32-S3", "ESP32-S3 (USBSerial)", "esp32s3_USBSerial/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let t2stable_esps3_noUARTConsole = new DBTarget("ESP32-S3", "ESP32-S3 (noUARTConsole)", "esp32s3_noUARTConsole/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let release_20_stable = new DBRelease("v2.0 (stable)", "./db_releases/2_0/",
+    [t2stable_esp32,
+        t2stable_espc3, t2stable_espc3_official, t2stable_espc3_noUARTConsole, t2stable_espc3_usbserial,
+        t2stable_espc6, t2stable_espc6_usbserial, t2stable_espc6_noUARTConsole,
+        t2stable_esps2, t2stable_esps2_noUARTConsole,
+        t2stable_esps3, t2stable_esps3_usbserial, t2stable_esps3_noUARTConsole]);
+
 // overall array containing all releases with flashing instructions
-let db_releases = [release_20RC4, release_20RC3, release_20RC2, release_15];
+let db_releases = [release_20_stable, release_20RC4, release_20RC3, release_20RC2, release_15];
 
 
 let device = null;
@@ -162,10 +185,10 @@ async function read_file(url) {
         // Return a promise that resolves with the read file
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
-            reader.onload = function(event) {
+            reader.onload = function (event) {
                 resolve(event.target.result); // Resolve the promise with the result
             };
-            reader.onerror = function(error) {
+            reader.onerror = function (error) {
                 reject(error); // Reject the promise if there's an error
             };
             reader.readAsBinaryString(blob);
@@ -185,12 +208,12 @@ async function read_file(url) {
  * @param offsets_array
  * @returns {Promise<*[]>}
  */
-async function create_file_array(release_folder_name, target_folder_name, files_array, offsets_array){
+async function create_file_array(release_folder_name, target_folder_name, files_array, offsets_array) {
     let esptool_file_array = [];
     for (let i = 0; i < files_array.length; i++) {
         const url = release_folder_name + target_folder_name + files_array[i];
         await read_file(url).then(result => {
-            esptool_file_array.push({ data: result, address: offsets_array[i]});
+                esptool_file_array.push({data: result, address: offsets_array[i]});
             }
         );
     }
@@ -217,7 +240,7 @@ flash_button.onclick = async () => {
         if (db_target == null) {
             // That should never happen
             console.error("Could not find selected target name in the DroneBridge targets" + target_name_selected);
-            return ;
+            return;
         }
         try {
             let esptool_file_array = await create_file_array(
@@ -228,14 +251,14 @@ flash_button.onclick = async () => {
             );
             const flashOptions = {
                 fileArray: esptool_file_array,
-                flashSize: "keep",
+                flashSize: db_target.flash_size,
                 flashMode: db_target.flash_mode,
                 flashFreq: db_target.flash_freq,
                 eraseAll: false,
                 compress: true,
                 reportProgress: (fileIndex, written, total) => {
                     progress_bar1.value = (written / total) * 100;
-                    flash_curr_file.innerText = "Flashing ("+(fileIndex+1)+"/"+esptool_file_array.length+") " + db_target.target_files[fileIndex];
+                    flash_curr_file.innerText = "Flashing (" + (fileIndex + 1) + "/" + esptool_file_array.length + ") " + db_target.target_files[fileIndex];
                 },
             };
             await esploader.writeFlash(flashOptions);
@@ -245,7 +268,7 @@ flash_button.onclick = async () => {
         } finally {
             display_ui_success();
             // simple analytics event
-            sa_event("click_flash", { release: db_rel.display_name, chip: db_target.target_display_name });
+            sa_event("click_flash", {release: db_rel.display_name, chip: db_target.target_display_name});
         }
     } else {
         // we are not connected
@@ -261,7 +284,7 @@ software_version_selector.onchange = async (ev) => {
     if (ev.type === 'change') {
         // Clear list
         let i, L = flavor_selector.options.length - 1;
-        for(i = L; i >= 0; i--) {
+        for (i = L; i >= 0; i--) {
             flavor_selector.remove(i);
         }
         add_new_falvors(software_version_selector.selectedIndex);
@@ -320,7 +343,7 @@ function display_ui_connected() {
 }
 
 function display_ui_not_connected() {
-    conn_status_label.innerHTML = "Not connected";
+    conn_status_label.innerHTML = "Not connected.<br>In case you previously flashed the USBSerial firmware: Press and hold the BOOT button while reconnecting the ESP32.";
     software_selection.style.display = "none";
     hw_selection.style.display = "none";
     connectButton.style.display = "block";
