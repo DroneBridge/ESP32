@@ -73,6 +73,10 @@ esp_err_t open_uart_serial_socket() {
         ESP_LOGW(TAG, "Init UART socket aborted. TX GPIO == RX GPIO - Configure first!");
         return ESP_FAIL;
     }
+    if (DB_UART_PIN_TX > SOC_GPIO_IN_RANGE_MAX || DB_UART_PIN_RX > SOC_GPIO_IN_RANGE_MAX || DB_UART_PIN_CTS > SOC_GPIO_IN_RANGE_MAX || DB_UART_PIN_RTS > SOC_GPIO_IN_RANGE_MAX) {
+        ESP_LOGW(TAG, "UART GPIO numbers out of range %i. Configure first!", SOC_GPIO_IN_RANGE_MAX);
+        return ESP_FAIL;
+    }
     bool flow_control = DB_UART_PIN_CTS != DB_UART_PIN_RTS;
     ESP_LOGI(TAG, "Flow control enabled: %s", flow_control ? "true" : "false");
     uart_config_t uart_config = {
