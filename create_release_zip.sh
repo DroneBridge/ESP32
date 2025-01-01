@@ -16,8 +16,9 @@ build_and_copy() {
     folder=$2
 
     rm -rf ./build
+	cp $config sdkconfig
     idf.py fullclean
-    cp ./$config ./.sdkconfig
+    cp $config sdkconfig
     idf.py build
     mkdir -p $release_foldername/$folder
     cp ./build/flash_args $release_foldername/$folder/flash_args.txt
