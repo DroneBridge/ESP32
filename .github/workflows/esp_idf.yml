@@ -8,24 +8,7 @@ on:
     branches: [ master ]
 
 jobs:
-  build_esp32_v5_1:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target: ["esp32", "esp32s2", "esp32s3", "esp32c3"]
-      fail-fast: false
-    steps:
-    - name: Checkout repo
-      uses: actions/checkout@v4
-      with:
-        ref: ${{ github.ref }}
-        submodules: 'recursive'
-    - name: ESP-IDF v5.1 build
-      uses: ./.github/actions/esp-idf-with-node
-      with:
-        target: "${{ matrix.target }}"
-        command: "idf.py set-target ${{matrix.target}} build"
-  build_esp32_v5_2:
+  build_idf_v5_3_generic:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -37,25 +20,24 @@ jobs:
       with:
         ref: ${{ github.ref }}
         submodules: 'recursive'
-    - name: ESP-IDF v5.2 build
-      uses: ./.github/actions/esp-idf-5_2-with-node
-      with:
-        target: "${{ matrix.target }}"
-        command: "idf.py set-target ${{matrix.target}} build"
-  build_esp32_v5_3:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target: ["esp32", "esp32s2", "esp32s3", "esp32c3", "esp32c6"]
-      fail-fast: false
-    steps:
-    - name: Checkout repo
-      uses: actions/checkout@v4
-      with:
-        ref: ${{ github.ref }}
-        submodules: 'recursive'
-    - name: ESP-IDF v5.3 build
+    - name: Generic ESP-IDF v5.3 target build
       uses: ./.github/actions/esp-idf-5_3-with-node
       with:
         target: "${{ matrix.target }}"
         command: "idf.py set-target ${{matrix.target}} build"
+  build_idf_v5_3_nightly_release:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.ref }}
+        submodules: 'recursive'
+    - name: Release config build ESP-IDF v5.3
+      uses: ./.github/actions/esp-idf-5_3-with-node_nightly
+      with:
+        command: "bash ./create_release_zip.sh"
+    - uses: actions/upload-artifact@v4
+      with:
+        name: DroneBridge_ESP32_nightly.zip
+        path: DroneBridge_ESP32_nightly.zip
