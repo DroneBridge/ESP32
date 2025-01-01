@@ -39,5 +39,5 @@ jobs:
         command: "bash ./create_release_zip.sh"
     - uses: actions/upload-artifact@v4
       with:
-        name: DroneBridge_ESP32_nightly.zip
-        path: DroneBridge_ESP32_nightly.zip
+        name: DroneBridge_ESP32_nightly
+        path: DroneBridge_ESP32_nightly

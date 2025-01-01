@@ -58,4 +58,4 @@ fi
 zip -r $release_name_zip $release_foldername
 
 # Clean up
-rm -rf $release_foldername
+# rm -rf $release_foldername
