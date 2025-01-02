@@ -1,81 +1,62 @@
 #!/bin/bash
 
-release_foldername="DroneBridge_ESP32_vXX"
-release_name_zip="DroneBridge_ESP32_vXX.zip"
+# Execute in an esp-idf enabled shell
+# This script will create a combined zip file containing binaries for all supported esp32 boards
 
-mkdir "$release_foldername"
-mkdir build
-cp flashing_instructions.txt "$release_foldername"
+release_foldername="DroneBridge_ESP32_nightly"
+release_name_zip="DroneBridge_ESP32_nightly.zip"
 
-rm -rf build
-idf.py fullclean
-cp sdkconfig_esp32 sdkconfig
-idf.py build
-mkdir "$release_foldername/esp32"
-cp build/flash_args "$release_foldername/esp32/flash_args.txt"
-cp build/db_esp32.bin "$release_foldername/esp32"
-cp build/bootloader/bootloader.bin "$release_foldername/esp32"
-cp build/www.bin "$release_foldername/esp32"
-cp build/partition_table/partition-table.bin "$release_foldername/esp32"
+mkdir -p $release_foldername
+mkdir -p build
+cp ./flashing_instructions.txt $release_foldername
 
-rm -rf build
-idf.py fullclean
-cp sdkconfig_s2 sdkconfig
-idf.py build
-mkdir "$release_foldername/esp32s2"
-cp build/flash_args "$release_foldername/esp32s2/flash_args.txt"
-cp build/db_esp32.bin "$release_foldername/esp32s2"
-cp build/bootloader/bootloader.bin "$release_foldername/esp32s2"
-cp build/www.bin "$release_foldername/esp32s2"
-cp build/partition_table/partition-table.bin "$release_foldername/esp32s2"
+# Function to build and copy binaries for different configurations
+build_and_copy() {
+    config=$1
+    folder=$2
 
-rm -rf build
-idf.py fullclean
-cp sdkconfig_s3 sdkconfig
-idf.py build
-mkdir "$release_foldername/esp32s3"
-cp build/flash_args "$release_foldername/esp32s3/flash_args.txt"
-cp build/db_esp32.bin "$release_foldername/esp32s3"
-cp build/bootloader/bootloader.bin "$release_foldername/esp32s3"
-cp build/www.bin "$release_foldername/esp32s3"
-cp build/partition_table/partition-table.bin "$release_foldername/esp32s3"
+    rm -rf ./build
+	cp $config sdkconfig
+    idf.py fullclean
+    cp $config sdkconfig
+    idf.py build
+    mkdir -p $release_foldername/$folder
+    cp ./build/flash_args $release_foldername/$folder/flash_args.txt
+    cp ./build/db_esp32.bin $release_foldername/$folder
+    cp ./build/bootloader/bootloader.bin $release_foldername/$folder
+    cp ./build/www.bin $release_foldername/$folder
+    cp ./build/partition_table/partition-table.bin $release_foldername/$folder
+}
 
-rm -rf build
-idf.py fullclean
-cp sdkconfig_c3 sdkconfig
-idf.py build
-mkdir "$release_foldername/esp32c3"
-cp build/flash_args "$release_foldername/esp32c3/flash_args.txt"
-cp build/db_esp32.bin "$release_foldername/esp32c3"
-cp build/bootloader/bootloader.bin "$release_foldername/esp32c3"
-cp build/www.bin "$release_foldername/esp32c3"
-cp build/partition_table/partition-table.bin "$release_foldername/esp32c3"
+# ESP32
+build_and_copy sdkconfig_esp32 esp32
+# build_and_copy sdkconfig_esp32_noUARTConsole esp32_noUARTConsole # Build issue - ESP-NOW wants a console for debugging
 
-rm -rf build
-idf.py fullclean
-cp sdkconfig_c3_serial_via_JTAG sdkconfig
-idf.py build
-mkdir "$release_foldername/esp32c3_USBSerial"
-cp build/flash_args "$release_foldername/esp32c3_USBSerial/flash_args.txt"
-cp build/db_esp32.bin "$release_foldername/esp32c3_USBSerial"
-cp build/bootloader/bootloader.bin "$release_foldername/esp32c3_USBSerial"
-cp build/www.bin "$release_foldername/esp32c3_USBSerial"
-cp build/partition_table/partition-table.bin "$release_foldername/esp32c3_USBSerial"
+# ESP32-S2
+build_and_copy sdkconfig_s2 esp32s2
+build_and_copy sdkconfig_s2_noUARTConsole esp32s2_noUARTConsole
 
-rm -rf build
-idf.py fullclean
-cp sdkconfig_c6 sdkconfig
-idf.py build
-mkdir "$release_foldername/esp32c6"
-cp build/flash_args "$release_foldername/esp32c6/flash_args.txt"
-cp build/db_esp32.bin "$release_foldername/esp32c6"
-cp build/bootloader/bootloader.bin "$release_foldername/esp32c6"
-cp build/www.bin "$release_foldername/esp32c6"
-cp build/partition_table/partition-table.bin "$release_foldername/esp32c6"
+# ESP32-S3
+build_and_copy sdkconfig_s3 esp32s3
+build_and_copy sdkconfig_s3_noUARTConsole esp32s3_noUARTConsole
+build_and_copy sdkconfig_s3_serial_via_JTAG esp32s3_USBSerial
 
-if [ -f "$release_name_zip" ]; then
-   rm "$release_name_zip"
+# ESP32-C3
+build_and_copy sdkconfig_c3 esp32c3
+build_and_copy sdkconfig_c3_official esp32c3_official
+build_and_copy sdkconfig_c3_serial_via_JTAG esp32c3_USBSerial
+build_and_copy sdkconfig_c3_noUARTConsole esp32c3_noUARTConsole
+
+# ESP32-C6
+build_and_copy sdkconfig_c6 esp32c6
+build_and_copy sdkconfig_c6_serial_via_JTAG esp32c6_USBSerial
+build_and_copy sdkconfig_c6_noUARTConsole esp32c6_noUARTConsole
+
+# Create the zip file
+if [ -f $release_name_zip ]; then
+    rm -v $release_name_zip
 fi
-zip -r "$release_name_zip" "$release_foldername"
+zip -r $release_name_zip $release_foldername
 
-rm -rf "$release_foldername"
+# Clean up
+# rm -rf $release_foldername

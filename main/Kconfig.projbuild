@@ -1,6 +1,24 @@
 menu "DroneBridge for ESP32 Configuration"
 
     choice
+        prompt "ESP32 board type"
+        default DB_GENERIC_BOARD
+        help
+            Select the DroneBridge ESP32 board type.
+            Depending on the chosen option the UART pins will be pre-configured (official boards) or not (generic boards)
+        config DB_GENERIC_BOARD
+            bool "Generic ESP32 board (no pre-configuration)"
+            help
+                For all types of ESP32 boards. UART pins must be set in the web interface.
+                If in doubt choose this option.
+        config DB_OFFICIAL_BOARD_1_X
+            bool "Official DroneBridge for ESP32 HWv1.x board"
+            help
+                The correct UART pins are set as defaults. No need to configure them manually.
+                Choose this if you have the official DroneBridge for ESP32 HWv1.x board.
+    endchoice
+
+    choice
         prompt "Serial interface for data."
         default DB_SERIAL_OPTION_UART
         help
