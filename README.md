@@ -1,4 +1,3 @@
-
 [![Contributors][contributors-shield]][contributors-url]
 [![Forks][forks-shield]][forks-url]
 [![Stargazers][stars-shield]][stars-url]
@@ -95,6 +94,20 @@ In any other case there are multiple ways how to flash the firmware.
 -   Connect via **TCP on port 5760** or **UDP on port 14550** to the ESP32 to send & receive data with a GCS of your choice. 
 -   **In case of a UDP connection the GCS must send at least one packet (e.g. MAVLink heart beat etc.) to the UDP port of the ESP32 to register as an endpoint. Add ESP32 as an UDP target in the GCS**
 -   Manually add a UDP target using the web interface
+
+## OTA Firmware Updates
+
+DroneBridge for ESP32 now supports over-the-air (OTA) firmware updates. This allows you to update the firmware without needing to physically connect the ESP32 to your computer.
+
+### How to Perform OTA Updates
+
+1. Connect to the WiFi `DroneBridge ESP32` with password `dronebridge`.
+2. In your browser, type: `dronebridge.local` (Chrome: `http://dronebridge.local`) or `192.168.2.1` into the address bar.
+3. Navigate to the OTA update section in the web interface.
+4. Upload the new firmware file via the web interface.
+5. The ESP32 will automatically restart and apply the new firmware.
+
+**[For further info please check the wiki!](https://dronebridge.gitbook.io/docs/dronebridge-for-esp32/ota-updates)**
 
 ## Further Support & Donations
 
