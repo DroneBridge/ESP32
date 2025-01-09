@@ -30,6 +30,7 @@
 #include "globals.h"
 #include "main.h"
 #include "db_serial.h"
+#include "ota.h"
 
 static const char *REST_TAG = "DB_HTTP_REST";
 #define REST_CHECK(a, str, goto_tag, ...)                                              \
@@ -571,6 +572,41 @@ static esp_err_t settings_get_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
+/**
+ * Handle OTA update requests
+ * @param req
+ * @return ESP_OK on successfully handling the request
+ */
+static esp_err_t ota_update_post_handler(httpd_req_t *req) {
+    int total_len = req->content_len;
+    int cur_len = 0;
+    char *buf = ((rest_server_context_t *) (req->user_ctx))->scratch;
+    int received = 0;
+    if (total_len >= SCRATCH_BUFSIZE) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "content too long");
+        return ESP_FAIL;
+    }
+    while (cur_len < total_len) {
+        received = httpd_req_recv(req, buf + cur_len, total_len);
+        if (received <= 0) {
+            /* Respond with 500 Internal Server Error */
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to receive OTA update");
+            return ESP_FAIL;
+        }
+        cur_len += received;
+    }
+    buf[total_len] = '\0';
+
+    // Start OTA update task
+    xTaskCreate(&ota_update_task, "ota_update_task", 8192, buf, 5, NULL);
+
+    httpd_resp_sendstr(req, "{\n"
+                            "    \"status\": \"success\",\n"
+                            "    \"msg\": \"OTA update started!\"\n"
+                            "  }");
+    return ESP_OK;
+}
+
 esp_err_t start_rest_server(const char *base_path) {
     REST_CHECK(base_path, "wrong base path", err);
     rest_server_context_t *rest_context = calloc(1, sizeof(rest_server_context_t));
@@ -580,7 +616,7 @@ esp_err_t start_rest_server(const char *base_path) {
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.uri_match_fn = httpd_uri_match_wildcard;
-    config.max_uri_handlers = 9;
+    config.max_uri_handlers = 10;
 
     ESP_LOGI(REST_TAG, "Starting HTTP Server");
     REST_CHECK(httpd_start(&server, &config) == ESP_OK, "Start server failed", err_start);
@@ -655,6 +691,15 @@ esp_err_t start_rest_server(const char *base_path) {
             .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &settings_static_ip_port_uri);
+
+    /* URI handler for handling OTA update requests */
+    httpd_uri_t ota_update_post_uri = {
+            .uri = "/api/ota/update",
+            .method = HTTP_POST,
+            .handler = ota_update_post_handler,
+            .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &ota_update_post_uri);
 
     /* URI handler for getting web server files */
     httpd_uri_t common_get_uri = {
