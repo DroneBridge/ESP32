@@ -1,36 +1,40 @@
 {
   "stats": {
-	  "read_bytes":	46585,
-	  "tcp_connected":	0,
-	  "udp_connected":	2,
-	  "udp_clients":	["192.168.10.55:14550", "192.168.10.6:14550"],
-	  "current_client_ip":	"192.168.10.17",
-	  "esp_rssi":	-45
+    "read_bytes": 46585,
+    "tcp_connected": 0,
+    "udp_connected": 2,
+    "udp_clients": [
+      "192.168.10.55:14550",
+      "192.168.10.6:14550"
+    ],
+    "current_client_ip": "192.168.10.17",
+    "esp_rssi": -45
   },
   "settings": {
-	"esp32_mode":	2,
-	"wifi_ssid":	"DroneBridge",
-	"wifi_pass":	"dronebridge",
-	"ap_channel":	6,
-	"trans_pack_size":	128,
-	"tx_pin":	4,
-	"rx_pin":	5,
-	"cts_pin":	0,
-	"rts_pin":	0,
-	"rts_thresh":	64,
-	"baud":	115200,
-	"telem_proto":	4,
-	"ltm_pp":	2,
-	"ap_ip":	"192.168.2.1",
-	"static_client_ip":	"",
-	"static_netmask":	"",
-	"static_gw_ip":	""
+    "esp32_mode": 1,
+    "wifi_ssid": "DroneBridge",
+    "wifi_pass": "dronebridge",
+    "ap_channel": 6,
+    "ap_ip": "192.168.2.1",
+    "dis_wifi_arm": 0,
+    "tx_pin": 4,
+    "rx_pin": 5,
+    "rts_pin": 0,
+    "cts_pin": 0,
+    "rts_thresh": 64,
+    "telem_proto": 1,
+    "baud": 115200,
+    "ltm_pp": 2,
+    "trans_pack_size": 128,
+    "serial_timeout": 50
   },
   "info": {
-	"idf_version":	"v5.1.2",
-	"db_build_version":	11,
-	"major_version":	2,
-	"minor_version":	0,
-	"esp_mac":	"EC:DA:3B:BC:XX:XX"
+    "idf_version": "v5.1.2",
+    "db_build_version": 14,
+    "major_version": 2,
+    "minor_version": 1,
+    "esp_chip_model": 5,
+    "esp_mac": "EC:DA:3B:BC:XX:XX",
+    "serial_via_JTAG": 0
   }
 }
