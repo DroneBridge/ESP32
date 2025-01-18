@@ -5,6 +5,17 @@ let old_conn_status = 0;	// connection status before last update of UI to know w
 let serial_via_JTAG = 0;	// set to 1 if ESP32 is using the USB interface as serial interface for data and not using the UART. If 0 we set UART config to invisible for the user.
 let last_byte_count = 0;
 let last_timestamp_byte_count = 0;
+let esp_chip_model = 0;		// according to get_esp_chip_model_str()
+
+function change_wifi_dis_arm_visibility() {
+	// we only support this feature when MAVLink or LTM are set AND when a standard Wi-Fi mode is enabled
+	let dis_wifi_arm_div = document.getElementById("dis_wifi_arm_div")
+	if (document.getElementById("esp32_mode").value > "2" || document.getElementById("telem_proto").value === "5") {
+		dis_wifi_arm_div.style.display = "none";
+	} else {
+		dis_wifi_arm_div.style.display = "block";
+	}
+}
 
 function change_ap_ip_visibility(){
 	let ap_ip_div = document.getElementById("ap_ip_div");
@@ -29,18 +40,22 @@ function change_ap_ip_visibility(){
 	} else {
 		wifi_ssid_div.style.visibility = "visible";
 	}
+	change_wifi_dis_arm_visibility();
 }
 
 function change_msp_ltm_visibility(){
 	let msp_ltm_div = document.getElementById("msp_ltm_div");
 	let trans_pack_size_div = document.getElementById("trans_pack_size_div");
-	if (document.getElementById("telem_proto").value === "1") {
+	let telem_proto = document.getElementById("telem_proto");
+	let dis_wifi_arm_div = document.getElementById("dis_wifi_arm_div");
+	if (telem_proto.value === "1") {
 		msp_ltm_div.style.display = "block";
 		trans_pack_size_div.style.display = "none";
 	} else {
 		msp_ltm_div.style.display = "none";
 		trans_pack_size_div.style.display = "block";
 	}
+	change_wifi_dis_arm_visibility();
 }
 
 function change_uart_visibility() {
@@ -71,7 +86,7 @@ function toJSONString(form) {
 	let elements = form.querySelectorAll("input, select")
 	for (let i = 0; i < elements.length; ++i) {
 		let element = elements[i]
-		let name = element.name
+		let name = element.name;
 		let value = element.value;
 		// parse numbers as numbers except for the SSID and the password fields
 		if (!isNaN(Number(value)) && (name.localeCompare("wifi_ssid") !== 0) && (name.localeCompare("wifi_pass") !== 0)) {
@@ -80,7 +95,13 @@ function toJSONString(form) {
 			}
 		} else {
 			if (name) {
-				obj[name] = value
+				if (element.type === "checkbox") {
+					// convert checked/not checked to 1 & 0 as value
+					obj[name] = element.checked ? 1 : 0;
+				} else {
+					// just get the value specified by the input/select
+					obj[name] = value
+				}
 			}
 		}
 	}
@@ -139,11 +160,31 @@ async function send_json(api_path, json_data = undefined) {
 	return await response.json();
 }
 
+function get_esp_chip_model_str(esp_model_index) {
+	switch (esp_model_index) {
+		default:
+		case 0:
+			return "unknown/unsupported ESP32 chip";
+		case 1:
+			return "ESP32";
+		case 2:
+			return "ESP32-S2";
+		case 9:
+			return "ESP32-S3";
+		case 5:
+			return "ESP32-C3";
+		case 13:
+			return "ESP32-C6";
+		case 12:
+			return "ESP32-C5";
+	}
+}
+
 function get_system_info() {
 	get_json("api/system/info").then(json_data => {
 		console.log("Received settings: " + json_data)
-		document.getElementById("about").innerHTML = "DroneBridge for ESP32 - v" + json_data["major_version"] +
-			"." + json_data["minor_version"] + " - esp-idf " + json_data["idf_version"]
+		document.getElementById("about").innerHTML = "DroneBridge for ESP32 v" + json_data["major_version"] +
+			"." + json_data["minor_version"] + " - esp-idf " + json_data["idf_version"] + " - " + get_esp_chip_model_str(json_data["esp_chip_model"])
 		document.getElementById("esp_mac").innerHTML = json_data["esp_mac"]
 		serial_via_JTAG = json_data["serial_via_JTAG"];
 	}).catch(error => {
@@ -258,7 +299,12 @@ function get_settings() {
 			if (json_data.hasOwnProperty(key)) {
 				let elem = document.getElementById(key)
 				if (elem != null) {
-					elem.value = json_data[key] + ""
+					if (elem.type === "checkbox") {
+						// translate 1 & 0 to checked and not checked
+						elem.checked = json_data[key] === 1;
+					} else {
+						elem.value = json_data[key] + ""
+					}
 				}
 			}
 		}

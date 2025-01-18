@@ -195,14 +195,32 @@ static esp_err_t settings_post_handler(httpd_req_t *req) {
     } else {
         ESP_LOGE(REST_TAG,"Serial read timeout must be >0 - ignoring");
     }
+
     json = cJSON_GetObjectItem(root, "tx_pin");
-    if (json) DB_UART_PIN_TX = json->valueint;
+    if (json && json->valueint <= SOC_GPIO_IN_RANGE_MAX) {
+        DB_UART_PIN_TX = json->valueint;
+    } else {
+        ESP_LOGW(REST_TAG, "GPIO pin must be in range of %i", SOC_GPIO_IN_RANGE_MAX);
+    }
     json = cJSON_GetObjectItem(root, "rx_pin");
-    if (json) DB_UART_PIN_RX = json->valueint;
+    if (json && json->valueint <= SOC_GPIO_IN_RANGE_MAX) {
+        DB_UART_PIN_RX = json->valueint;
+    } else {
+        ESP_LOGW(REST_TAG, "GPIO pin must be in range of %i", SOC_GPIO_IN_RANGE_MAX);
+    }
     json = cJSON_GetObjectItem(root, "rts_pin");
-    if (json) DB_UART_PIN_RTS = json->valueint;
+    if (json && json->valueint <= SOC_GPIO_IN_RANGE_MAX) {
+        DB_UART_PIN_RTS = json->valueint;
+    } else {
+        ESP_LOGW(REST_TAG, "GPIO pin must be in range of %i", SOC_GPIO_IN_RANGE_MAX);
+    }
     json = cJSON_GetObjectItem(root, "cts_pin");
-    if (json) DB_UART_PIN_CTS = json->valueint;
+    if (json && json->valueint <= SOC_GPIO_IN_RANGE_MAX) {
+        DB_UART_PIN_CTS = json->valueint;
+    } else {
+        ESP_LOGW(REST_TAG, "GPIO pin must be in range of %i", SOC_GPIO_IN_RANGE_MAX);
+    }
+
     json = cJSON_GetObjectItem(root, "rts_thresh");
     if (json) DB_UART_RTS_THRESH = json->valueint;
 
@@ -215,6 +233,14 @@ static esp_err_t settings_post_handler(httpd_req_t *req) {
     } else if (json) {
         ESP_LOGW(REST_TAG, "telem_proto is not 1 (LTM/MSP) or 4 (MAVLink) or 5 (Transparent). Changing to transparent");
         DB_SERIAL_PROTOCOL = DB_SERIAL_PROTOCOL_TRANSPARENT;
+    }
+
+    json = cJSON_GetObjectItem(root, "dis_wifi_arm");
+    if (json && (json->valueint == 1 || json->valueint == 0)) {
+        DB_DISABLE_WIFI_ARMED = json->valueint;
+    } else if (json) {
+        ESP_LOGW(REST_TAG, "dis_wifi_arm is not 1 (turn WiFi off on arm) or 0 (keep WiFi on)");
+        DB_DISABLE_WIFI_ARMED = false;
     }
 
     json = cJSON_GetObjectItem(root, "ltm_pp");
@@ -231,7 +257,7 @@ static esp_err_t settings_post_handler(httpd_req_t *req) {
     cJSON_Delete(root);
     httpd_resp_sendstr(req, "{\n"
                             "    \"status\": \"success\",\n"
-                            "    \"msg\": \"Settings changed!\"\n"
+                            "    \"msg\": \"Settings changed! Rebooting ...\"\n"
                             "  }");
     vTaskDelay(1000 / portTICK_PERIOD_MS);  // wait to allow the website displaying the success message
     // Send reboot message
@@ -443,6 +469,7 @@ static esp_err_t system_info_get_handler(httpd_req_t *req) {
     cJSON_AddNumberToObject(root, "db_build_version", DB_BUILD_VERSION);
     cJSON_AddNumberToObject(root, "major_version", DB_MAJOR_VERSION);
     cJSON_AddNumberToObject(root, "minor_version", DB_MINOR_VERSION);
+    cJSON_AddNumberToObject(root, "esp_chip_model", chip_info.model);
     char mac_str[18];
     sprintf(mac_str, "%02X:%02X:%02X:%02X:%02X:%02X",
             LOCAL_MAC_ADDRESS[0], LOCAL_MAC_ADDRESS[1], LOCAL_MAC_ADDRESS[2], LOCAL_MAC_ADDRESS[3], LOCAL_MAC_ADDRESS[4], LOCAL_MAC_ADDRESS[5]);
@@ -559,6 +586,7 @@ static esp_err_t settings_get_handler(httpd_req_t *req) {
     cJSON_AddNumberToObject(root, "rts_thresh", DB_UART_RTS_THRESH);
     cJSON_AddNumberToObject(root, "baud", DB_UART_BAUD_RATE);
     cJSON_AddNumberToObject(root, "telem_proto", DB_SERIAL_PROTOCOL);
+    cJSON_AddNumberToObject(root, "dis_wifi_arm", DB_DISABLE_WIFI_ARMED);
     cJSON_AddNumberToObject(root, "ltm_pp", DB_LTM_FRAME_NUM_BUFFER);
     cJSON_AddStringToObject(root, "ap_ip", DEFAULT_AP_IP);
     cJSON_AddStringToObject(root, "static_client_ip", DB_STATIC_STA_IP);

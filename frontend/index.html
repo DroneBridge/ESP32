@@ -58,7 +58,7 @@
             <h3>Wi-Fi</h3>
             <div class="row">
                 <div class="twelve columns">
-                    <label for="esp32_mode">ESP32 Mode (requires save & reboot)</label>
+                    <label for="esp32_mode">ESP32 Mode</label>
                     <select id="esp32_mode" name="esp32_mode" form="settings_form" onchange="change_ap_ip_visibility()">
                         <option value="1">WiFi Access Point Mode</option>
                         <option value="2">WiFi Client Mode</option>
@@ -66,9 +66,9 @@
                         <option value="4">ESP-NOW LR Mode AIR</option>
                         <option value="5">ESP-NOW LR Mode GND</option>
                     </select>
-                    <div id="esp-lr-ap-disclaimer" style="color: #ff881a; margin-bottom: 0.8rem">LR Mode makes the
-                        device invisible for non-LR enabled devices!</br>You will not be able to change the config!</br>
-                        Data rate is reduced to ~0.25Mbps. Range may be increase by a factor of ~2.</br>Press boot
+                    <div class="note" id="esp-lr-ap-disclaimer"><h4>Attention:</h4>
+                        LR Mode makes the device invisible for non-LR enabled devices!</br>You will not be able to change the config!</br></br>
+                        The data rate is reduced to ~0.25Mbps. The range may be increase by a factor of ~2.</br>Press the boot
                         button (short press for AP-Mode with password "dronebridge" or long press for reset to defaults)
                         or erase the flash memory of the ESP32 and re-flash DroneBridge for ESP32 to get back into
                         normal Wi-Fi Mode!
@@ -86,12 +86,24 @@
                 </div>
             </div>
             <div class="row">
-                <div id="ap_channel_div" class="twelve columns">
+                <div id="ap_channel_div" class="six columns">
                     <label for="ap_channel">Channel</label>
                     <input type="text" name="ap_channel" value="" id="ap_channel">
                 </div>
+                <div class="six columns" id="ap_ip_div">
+                    <label for="ap_ip">Gateway IP address</label>
+                    <input type="text" name="ap_ip" value="" id="ap_ip">
+                </div>
             </div>
-            <h3>Serial</h3>
+            <div id="dis_wifi_arm_div" class="row">
+                <div class="twelve columns">
+                    <div class="checkbox-wrapper-14">
+                        <input id="dis_wifi_arm" name="dis_wifi_arm" type="checkbox" class="switch">
+                        <label for="dis_wifi_arm">Disable Wi-Fi when autopilot is armed</label>
+                    </div>
+                </div>
+            </div>
+            <h3 style="margin-top: 2rem">Serial</h3>
             <div class="row" id="tx_rx_div">
                 <div class="six columns">
                     <label for="tx_pin">UART TX Pin</label>
@@ -186,10 +198,7 @@
                 </div>
             </div>
             <div class="row">
-                <div class="six columns" id="ap_ip_div">
-                    <label for="ap_ip">Gateway IP address</label>
-                    <input type="text" name="ap_ip" value="" id="ap_ip">
-                </div>
+
             </div>
         </div>
     </form>

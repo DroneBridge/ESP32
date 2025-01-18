@@ -170,6 +170,25 @@ int db_read_serial(uint8_t *uart_read_buf, uint length) {
 }
 
 /**
+ * Check armed state of LTM packet if feature DB_DISABLE_WIFI_ARMED is set and we got a status frame.
+ * Triggers the enabling or disabling of the Wi-Fi.
+ * @param db_msp_ltm_port MSP/LTM parser struct
+ */
+void db_ltm_check_arm_state_set_wifi(const msp_ltm_port_t *db_msp_ltm_port) {
+    if (DB_DISABLE_WIFI_ARMED && db_msp_ltm_port->ltm_type == LTM_TYPE_S) {
+        if (db_msp_ltm_port->ltm_frame_buffer[2 + LTM_TYPE_S_PAYLOAD_SIZE] & LTM_ARMED_BIT_MASK) {
+            // autopilot says it is armed
+            db_set_wifi_status(false);  // disable Wi-Fi
+        } else {
+            // autopilot says it is <<not>> armed
+            db_set_wifi_status(true);   // enable Wi-Fi
+        }
+    } else {
+        // nothing to do
+    }
+}
+
+/**
  * @brief Reads serial interface, parses & sends complete MSP & LTM messages over the air.
  */
 void db_parse_msp_ltm(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_t msp_message_buffer[],
@@ -192,6 +211,7 @@ void db_parse_msp_ltm(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_
                            (db_msp_ltm_port->ltm_payload_cnt + 4));
                     ltm_frames_in_buffer_pnt += (db_msp_ltm_port->ltm_payload_cnt + 4);
                     ltm_frames_in_buffer++;
+                    db_ltm_check_arm_state_set_wifi(db_msp_ltm_port);
                     if (ltm_frames_in_buffer == DB_LTM_FRAME_NUM_BUFFER &&
                         (DB_LTM_FRAME_NUM_BUFFER <= MAX_LTM_FRAMES_IN_BUFFER)) {
                         db_send_to_all_clients(tcp_clients, udp_connection, ltm_frame_buffer, *serial_read_bytes);

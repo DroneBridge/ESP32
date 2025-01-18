@@ -85,6 +85,7 @@
 
 static const char *TAG = "DB_ESP32";
 
+/* DroneBridge Parameters */
 uint8_t DB_WIFI_MODE = DB_WIFI_MODE_AP;
 uint8_t DB_WIFI_MODE_DESIGNATED = DB_WIFI_MODE_AP;  // initially assign the same value as DB_WIFI_MODE
 uint8_t DB_WIFI_SSID[32] = "DroneBridge for ESP32";
@@ -96,16 +97,16 @@ char DB_STATIC_STA_IP_NETMASK[IP4ADDR_STRLEN_MAX] = "";
 char CURRENT_CLIENT_IP[IP4ADDR_STRLEN_MAX] = "192.168.2.1";
 uint8_t DB_WIFI_CHANNEL = 6;
 uint8_t DB_SERIAL_PROTOCOL = DB_SERIAL_PROTOCOL_MAVLINK;
-
+uint8_t DB_DISABLE_WIFI_ARMED = false;
 uint8_t DB_UART_PIN_TX = DB_DEFAULT_UART_TX_PIN;
 uint8_t DB_UART_PIN_RX = DB_DEFAULT_UART_RX_PIN;
 uint8_t DB_UART_PIN_RTS = DB_DEFAULT_UART_RTS_PIN;
 uint8_t DB_UART_PIN_CTS = DB_DEFAULT_UART_CTS_PIN;
 uint8_t DB_UART_RTS_THRESH = 64;
 int32_t DB_UART_BAUD_RATE = DB_DEFAULT_UART_BAUD_RATE;
-
 uint16_t DB_TRANS_BUF_SIZE = 128;
 uint8_t DB_LTM_FRAME_NUM_BUFFER = 2;
+
 db_esp_signal_quality_t db_esp_signal_quality = {.air_rssi = -127, .air_noise_floor = -1, .gnd_rssi= -127, .gnd_noise_floor = -1};
 wifi_sta_list_t wifi_sta_list = {.num = 0};
 uint8_t LOCAL_MAC_ADDRESS[6];
@@ -212,14 +213,6 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         ESP_ERROR_CHECK(esp_wifi_connect());
         s_retry_num++;
         ESP_LOGI(TAG, "Retry to connect to the AP (%i)", s_retry_num);
-//        if (s_retry_num < WIFI_ESP_MAXIMUM_RETRY) {
-//            ESP_ERROR_CHECK(esp_wifi_connect());
-//            s_retry_num++;
-//            ESP_LOGI(TAG, "Retry to connect to the AP (%i/%i)", s_retry_num, WIFI_ESP_MAXIMUM_RETRY);
-//        } else {
-//            ESP_LOGI(TAG,"Connecting to the AP failed");
-//            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
-//        }
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *) event_data;
         ESP_LOGI(TAG, "WIFI_EVENT - Got IP:" IPSTR, IP2STR(&event->ip_info.ip));
@@ -230,7 +223,6 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
 }
 
 void start_mdns_service() {
-    //initialize mDNS service
     esp_err_t err = mdns_init();
     if (err) {
         printf("MDNS Init failed: %d\n", err);
@@ -296,7 +288,7 @@ esp_err_t init_fs(void) {
 /**
  * Launches an access point where ground stations can connect to
  *
- * @param wifi_mode Allowes to overwrite an AP mode from traditional WiFi to LR Mode
+ * @param wifi_mode Allows to overwrite an AP mode from traditional WiFi to LR Mode
  */
 void init_wifi_apmode(int wifi_mode) {
     ESP_ERROR_CHECK(esp_netif_init());
@@ -463,12 +455,12 @@ void init_wifi_espnow() {
 void db_write_settings_to_nvs() {
     ESP_LOGI(TAG,
              "Trying to save:\nWifi Mode: %i\nssid %s\nwifi_pass %s\nwifi_chan %i\nbaud %liu\ngpio_tx %i\ngpio_rx %i\ngpio_cts %i\ngpio_rts %i\nrts_thresh %i\nproto %i\n"
-             "trans_pack_size %i\nltm_per_packet %i\nap_ip %s\nip_sta %s\nip_sta_gw %s\nip_sta_netmsk %s",
+             "trans_pack_size %i\nltm_per_packet %i\nap_ip %s\nip_sta %s\nip_sta_gw %s\nip_sta_netmsk %s\ndis_wifi_arm %i",
              DB_WIFI_MODE_DESIGNATED, DB_WIFI_SSID, DB_WIFI_PWD, DB_WIFI_CHANNEL, DB_UART_BAUD_RATE, DB_UART_PIN_TX,
              DB_UART_PIN_RX,
              DB_UART_PIN_CTS, DB_UART_PIN_RTS, DB_UART_RTS_THRESH,
              DB_SERIAL_PROTOCOL, DB_TRANS_BUF_SIZE, DB_LTM_FRAME_NUM_BUFFER,
-             DEFAULT_AP_IP, DB_STATIC_STA_IP, DB_STATIC_STA_IP_GW, DB_STATIC_STA_IP_NETMASK);
+             DEFAULT_AP_IP, DB_STATIC_STA_IP, DB_STATIC_STA_IP_GW, DB_STATIC_STA_IP_NETMASK, DB_DISABLE_WIFI_ARMED);
     ESP_LOGI(TAG, "Saving to NVS %s", NVS_NAMESPACE);
     nvs_handle my_handle;
     ESP_ERROR_CHECK(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &my_handle));
@@ -487,6 +479,7 @@ void db_write_settings_to_nvs() {
     ESP_ERROR_CHECK(nvs_set_u16(my_handle, "trans_pack_size", DB_TRANS_BUF_SIZE));
     ESP_ERROR_CHECK(nvs_set_u16(my_handle, "serial_timeout", DB_SERIAL_READ_TIMEOUT_MS));
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "ltm_per_packet", DB_LTM_FRAME_NUM_BUFFER));
+    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "dis_wifi_arm", DB_DISABLE_WIFI_ARMED));
     ESP_ERROR_CHECK(nvs_set_str(my_handle, "ap_ip", DEFAULT_AP_IP));
     ESP_ERROR_CHECK(nvs_set_str(my_handle, "ip_sta", DB_STATIC_STA_IP));
     ESP_ERROR_CHECK(nvs_set_str(my_handle, "ip_sta_gw", DB_STATIC_STA_IP_GW));
@@ -582,7 +575,8 @@ void db_read_settings_nvs() {
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u16(my_handle, "trans_pack_size", &DB_TRANS_BUF_SIZE));
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u16(my_handle, "serial_timeout", &DB_SERIAL_READ_TIMEOUT_MS));
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "ltm_per_packet", &DB_LTM_FRAME_NUM_BUFFER));
-        // get saved UDP client
+        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "dis_wifi_arm", &DB_DISABLE_WIFI_ARMED));
+        // get saved UDP client - this read might result in an error if no client was saved prev. by the user
         char udp_client_ip_str[INET_ADDRSTRLEN + 6];
         udp_client_ip_str[0] = '\0';
         db_read_str_nvs(my_handle, "udp_client_ip", udp_client_ip_str);
@@ -652,6 +646,7 @@ void long_press_callback(void *arg, void *usr_data) {
     DB_UART_PIN_RTS = DB_DEFAULT_UART_RTS_PIN; //
     DB_UART_BAUD_RATE = DB_DEFAULT_UART_BAUD_RATE;
     DB_SERIAL_PROTOCOL = DB_SERIAL_PROTOCOL_MAVLINK;
+    DB_DISABLE_WIFI_ARMED = false;
     DB_TRANS_BUF_SIZE = 128;
     DB_UART_RTS_THRESH = 64;
     DB_SERIAL_READ_TIMEOUT_MS = DB_SERIAL_READ_TIMEOUT_MS_DEFAULT;
@@ -689,10 +684,10 @@ void db_jtag_serial_info_print() {
     uint8_t buffer[512];
     int len = sprintf((char *) buffer,
                       "\tWifi Mode: %i\n\twifi_chan %i\n\tbaud %liu\n\tgpio_tx %i\n\tgpio_rx %i\n\tgpio_cts %i\n\t"
-                      "gpio_rts %i\n\trts_thresh %i\n\tproto %i\n\ttrans_pack_size %i\n\tltm_per_packet %i\n\tserial_timeout %i\n",
+                      "gpio_rts %i\n\trts_thresh %i\n\tproto %i\n\ttrans_pack_size %i\n\tltm_per_packet %i\n\tserial_timeout %i\n\tdis_wifi_arm %i\n",
                       DB_WIFI_MODE, DB_WIFI_CHANNEL, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
                       DB_UART_PIN_CTS, DB_UART_PIN_RTS, DB_UART_RTS_THRESH, DB_SERIAL_PROTOCOL, DB_TRANS_BUF_SIZE,
-                      DB_LTM_FRAME_NUM_BUFFER, DB_SERIAL_READ_TIMEOUT_MS);
+                      DB_LTM_FRAME_NUM_BUFFER, DB_SERIAL_READ_TIMEOUT_MS, DB_DISABLE_WIFI_ARMED);
     write_to_serial(buffer, len);
     len = sprintf((char *) buffer, "\tSSID: %s\n", DB_WIFI_SSID);
     write_to_serial(buffer, len);
@@ -707,6 +702,29 @@ void db_jtag_serial_info_print() {
     len = sprintf((char *) buffer, "\tStatic IP netmask: %s\n", DB_STATIC_STA_IP_NETMASK);
     write_to_serial(buffer, len);
     ESP_LOGI(TAG, "Wrote to serial!");
+}
+
+/**
+ * Enables or disables (via reboot) the WiFi if the DB_DISABLE_WIFI_ARMED parameter is set. Not used during boot.
+ * Usually called when arm state change of the autopilot is detected. As internal check if the WiFi is already enabled/disabled
+ * WiFi must be inited first (done during boot).
+ * @param enable_wifi True to enable the WiFi and FALSE to disable it
+ */
+void db_set_wifi_status(uint8_t enable_wifi) {
+    static uint8_t db_wifi_is_off = false;  // keep track if we switched WiFi off already
+    if (DB_DISABLE_WIFI_ARMED) {    // check if that feature is enabled by the user
+        if (enable_wifi && db_wifi_is_off) {
+            esp_restart(); // enable WiFi by restarting ESP32 - easy way to make sure all things are set up right
+        } else if (!db_wifi_is_off) {
+            if (esp_wifi_stop() == ESP_OK) { // disable WiFi
+                db_wifi_is_off = true;
+            } else {
+                ESP_LOGW(TAG, "db_set_wifi_status tried to disable Wi-Fi. FAILED");
+            }
+        }
+    } else {
+        // nothing to do
+    }
 }
 
 /**
