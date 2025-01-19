@@ -162,7 +162,6 @@ div.note {
         display: inline-block;
         vertical-align: top;
         position: relative;
-        margin: 0;
         cursor: pointer;
         border: 1px solid var(--bc, var(--border));
         background: var(--b, var(--background));
@@ -256,6 +255,7 @@ div.note {
 }
 
 .checkbox-wrapper-14 * {
+    margin-top: 0.1rem;
     box-sizing: inherit;
 }
 .checkbox-wrapper-14 *:before,

@@ -1,5 +1,5 @@
-// const ROOT_URL = "http://localhost:3000/"   // for testing with local json server
 const ROOT_URL = window.location.href       // for production code
+// const ROOT_URL = "http://localhost:3000/"   // for testing with local json server
 let conn_status = 0;		// connection status to the ESP32
 let old_conn_status = 0;	// connection status before last update of UI to know when it changed
 let serial_via_JTAG = 0;	// set to 1 if ESP32 is using the USB interface as serial interface for data and not using the UART. If 0 we set UART config to invisible for the user.
@@ -187,6 +187,12 @@ function get_system_info() {
 			"." + json_data["minor_version"] + " - esp-idf " + json_data["idf_version"] + " - " + get_esp_chip_model_str(json_data["esp_chip_model"])
 		document.getElementById("esp_mac").innerHTML = json_data["esp_mac"]
 		serial_via_JTAG = json_data["serial_via_JTAG"];
+		// set external antenna option visible based on info if RF switch is available on the board
+		if (parseInt(json_data["has_rf_switch"]) === 1) {
+			document.getElementById("ant_use_ext_div").style.display = "block";
+		} else {
+			document.getElementById("ant_use_ext_div").style.display = "none";
+		}
 	}).catch(error => {
 		conn_status = 0
 		error.message;

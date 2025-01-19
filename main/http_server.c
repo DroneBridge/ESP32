@@ -182,6 +182,14 @@ static esp_err_t settings_post_handler(httpd_req_t *req) {
         ESP_LOGE(REST_TAG, "No a valid wifi channel (1-13). Not changing!");
     }
 
+    json = cJSON_GetObjectItem(root, "ant_use_ext");
+    if (json && (json->valueint == 1 || json->valueint == 0)) {
+        DB_EN_EXT_ANT = json->valueint;
+    } else if (json) {
+        ESP_LOGW(REST_TAG, "ant_use_ext is not 1 (external antenna) nor 0 (on-board antenna)");
+        DB_EN_EXT_ANT = false;
+    }
+
     json = cJSON_GetObjectItem(root, "trans_pack_size");
     if (json && json->valueint > 0 && json->valueint < 1024) {
         DB_TRANS_BUF_SIZE = json->valueint;
@@ -470,6 +478,7 @@ static esp_err_t system_info_get_handler(httpd_req_t *req) {
     cJSON_AddNumberToObject(root, "major_version", DB_MAJOR_VERSION);
     cJSON_AddNumberToObject(root, "minor_version", DB_MINOR_VERSION);
     cJSON_AddNumberToObject(root, "esp_chip_model", chip_info.model);
+    cJSON_AddNumberToObject(root, "has_rf_switch", DB_HAS_RF_SWITCH);
     char mac_str[18];
     sprintf(mac_str, "%02X:%02X:%02X:%02X:%02X:%02X",
             LOCAL_MAC_ADDRESS[0], LOCAL_MAC_ADDRESS[1], LOCAL_MAC_ADDRESS[2], LOCAL_MAC_ADDRESS[3], LOCAL_MAC_ADDRESS[4], LOCAL_MAC_ADDRESS[5]);
@@ -577,6 +586,7 @@ static esp_err_t settings_get_handler(httpd_req_t *req) {
     cJSON_AddStringToObject(root, "wifi_ssid", (char *) DB_WIFI_SSID);
     cJSON_AddStringToObject(root, "wifi_pass", (char *) DB_WIFI_PWD);
     cJSON_AddNumberToObject(root, "ap_channel", DB_WIFI_CHANNEL);
+    cJSON_AddNumberToObject(root, "ant_use_ext", DB_EN_EXT_ANT);
     cJSON_AddNumberToObject(root, "trans_pack_size", DB_TRANS_BUF_SIZE);
     cJSON_AddNumberToObject(root, "serial_timeout", DB_SERIAL_READ_TIMEOUT_MS);
     cJSON_AddNumberToObject(root, "tx_pin", DB_UART_PIN_TX);

@@ -12,11 +12,38 @@ menu "DroneBridge for ESP32 Configuration"
                 For all types of ESP32 boards. UART pins must be set in the web interface.
                 If in doubt choose this option.
         config DB_OFFICIAL_BOARD_1_X
-            bool "Official DroneBridge for ESP32 HWv1.x board"
+            bool "Official DroneBridge for ESP32 HWv1.x ESP32-C3 board"
             help
                 The correct UART pins are set as defaults. No need to configure them manually.
-                Choose this if you have the official DroneBridge for ESP32 HWv1.x board.
+                Choose this if you have the official DroneBridge for ESP32 HWv1.x board with an ESP32-C3.
+        config DB_OFFICIAL_BOARD_1_X_C6
+            bool "Official DroneBridge for ESP32 HWv1.x ESP32-C6 board"
+            select DB_HAS_RF_SWITCH
+            help
+                The correct UART pins are set as defaults. No need to configure them manually.
+                Choose this if you have the official DroneBridge for ESP32 HWv1.x board with an ESP32-C6.
+                Enables RF switch via GPIO 13 and antenna selection on GPIO 14
     endchoice
+
+    config DB_HAS_RF_SWITCH
+          bool "Enable support for an external antenna/RF switch"
+          default n
+          depends on !DB_OFFICIAL_BOARD_1_X
+          help
+            Enable this option to allow the use of an external antenna switch (need to configure GPIO).
+            The UI will then allow you to choose between antennas. At the moment only two antennas are supported.
+            Beware that for some boards the antenna switch sometimes must be activated first by setting a GPIO.
+            Do that in code. Enabling of the switch is done automatically for the official HW 1.x based on the ESP32C6.
+
+    config DB_RF_SWITCH_GPIO
+          int "Define pin to use for switching between external and internal antenna"
+          depends on DB_HAS_RF_SWITCH
+          default 14 if DB_OFFICIAL_BOARD_1_X_C6
+          default 0
+          help
+            This GPIOs high/low state is used to indicate to the RF switch what antenna to choose.
+            Official HW v1.x ESP32-C6 boards use GPIO 14.
+            Set to 0 equals not configured.
 
     choice
         prompt "Serial interface for data."
@@ -37,7 +64,7 @@ menu "DroneBridge for ESP32 Configuration"
 			depends on ESP_CONSOLE_SECONDARY_NONE
             help
                 Use the JTAG interface for serial communication. 
-                This inferface is attached to the USB port of the official DroneBridge for ESP32 PCB in HW v1.x versions.
+                This interface is attached to the USB port of the official DroneBridge for ESP32 PCB in HW v1.x versions.
                 A ground control station can connect to the USB port directly without having to use a FTDI in between.
                 Not intended for connecting to a UAV etc. Use native UART instead.
                 WARNING: No logging available via USB port.

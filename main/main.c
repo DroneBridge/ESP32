@@ -67,6 +67,12 @@
 #define DB_DEFAULT_UART_RTS_PIN GPIO_NUM_6
 #define DB_DEFAULT_UART_CTS_PIN GPIO_NUM_7
 #define DB_DEFAULT_UART_BAUD_RATE 115200
+#elif DB_OFFICIAL_BOARD_1_X_C6
+#define DB_DEFAULT_UART_TX_PIN GPIO_NUM_21
+#define DB_DEFAULT_UART_RX_PIN GPIO_NUM_2
+#define DB_DEFAULT_UART_RTS_PIN GPIO_NUM_22
+#define DB_DEFAULT_UART_CTS_PIN GPIO_NUM_23
+#define DB_DEFAULT_UART_BAUD_RATE 115200
 #elif CONFIG_DB_GENERIC_BOARD
 // initially set pins to 0 to allow the start of the system on all boards. User has to set the correct pins
 #define DB_DEFAULT_UART_TX_PIN GPIO_NUM_0
@@ -106,6 +112,7 @@ uint8_t DB_UART_RTS_THRESH = 64;
 int32_t DB_UART_BAUD_RATE = DB_DEFAULT_UART_BAUD_RATE;
 uint16_t DB_TRANS_BUF_SIZE = 128;
 uint8_t DB_LTM_FRAME_NUM_BUFFER = 2;
+uint8_t DB_EN_EXT_ANT = false;
 
 db_esp_signal_quality_t db_esp_signal_quality = {.air_rssi = -127, .air_noise_floor = -1, .gnd_rssi= -127, .gnd_noise_floor = -1};
 wifi_sta_list_t wifi_sta_list = {.num = 0};
@@ -469,6 +476,7 @@ void db_write_settings_to_nvs() {
     ESP_ERROR_CHECK(nvs_set_str(my_handle, "ssid", (char *) DB_WIFI_SSID));
     ESP_ERROR_CHECK(nvs_set_str(my_handle, "wifi_pass", (char *) DB_WIFI_PWD));
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "wifi_chan", DB_WIFI_CHANNEL));
+    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "ant_use_ext", DB_EN_EXT_ANT));
     ESP_ERROR_CHECK(nvs_set_i32(my_handle, "baud", DB_UART_BAUD_RATE));
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "gpio_tx", DB_UART_PIN_TX));
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "gpio_rx", DB_UART_PIN_RX));
@@ -565,6 +573,7 @@ void db_read_settings_nvs() {
         db_read_str_nvs(my_handle, "ip_sta_netmsk", DB_STATIC_STA_IP_NETMASK);
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "esp32_mode", &DB_WIFI_MODE));
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "wifi_chan", &DB_WIFI_CHANNEL));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "ant_use_ext", &DB_EN_EXT_ANT));
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_i32(my_handle, "baud", &DB_UART_BAUD_RATE));
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "gpio_tx", &DB_UART_PIN_TX));
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "gpio_rx", &DB_UART_PIN_RX));
@@ -586,9 +595,9 @@ void db_read_settings_nvs() {
         // close NVM
         nvs_close(my_handle);
         ESP_LOGI(TAG,
-                 "\tWifi Mode: %i\n\twifi_chan %i\n\tbaud %liu\n\tgpio_tx %i\n\tgpio_rx %i\n\tgpio_cts %i\n\t"
+                 "\tWifi Mode: %i\n\twifi_chan %i\n\tant_use_ext %i\n\tbaud %liu\n\tgpio_tx %i\n\tgpio_rx %i\n\tgpio_cts %i\n\t"
                  "gpio_rts %i\n\trts_thresh %i\n\tproto %i\n\ttrans_pack_size %i\n\tltm_per_packet %i\n\tserial_timeout %i",
-                 DB_WIFI_MODE, DB_WIFI_CHANNEL, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
+                 DB_WIFI_MODE, DB_WIFI_CHANNEL, DB_EN_EXT_ANT, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
                  DB_UART_PIN_CTS, DB_UART_PIN_RTS, DB_UART_RTS_THRESH, DB_SERIAL_PROTOCOL, DB_TRANS_BUF_SIZE,
                  DB_LTM_FRAME_NUM_BUFFER, DB_SERIAL_READ_TIMEOUT_MS);
         if (strlen(udp_client_ip_str) > 0 && udp_client_port != 0) {
@@ -649,6 +658,7 @@ void long_press_callback(void *arg, void *usr_data) {
     DB_DISABLE_WIFI_ARMED = false;
     DB_TRANS_BUF_SIZE = 128;
     DB_UART_RTS_THRESH = 64;
+    DB_EN_EXT_ANT = false; // on-board antenna by default
     DB_SERIAL_READ_TIMEOUT_MS = DB_SERIAL_READ_TIMEOUT_MS_DEFAULT;
     db_write_settings_to_nvs();
     esp_restart();
@@ -683,9 +693,9 @@ void set_reset_trigger() {
 void db_jtag_serial_info_print() {
     uint8_t buffer[512];
     int len = sprintf((char *) buffer,
-                      "\tWifi Mode: %i\n\twifi_chan %i\n\tbaud %liu\n\tgpio_tx %i\n\tgpio_rx %i\n\tgpio_cts %i\n\t"
+                      "\tWifi Mode: %i\n\twifi_chan %i\n\tant_use_ext %i\n\tbaud %liu\n\tgpio_tx %i\n\tgpio_rx %i\n\tgpio_cts %i\n\t"
                       "gpio_rts %i\n\trts_thresh %i\n\tproto %i\n\ttrans_pack_size %i\n\tltm_per_packet %i\n\tserial_timeout %i\n\tdis_wifi_arm %i\n",
-                      DB_WIFI_MODE, DB_WIFI_CHANNEL, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
+                      DB_WIFI_MODE, DB_WIFI_CHANNEL, DB_EN_EXT_ANT, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
                       DB_UART_PIN_CTS, DB_UART_PIN_RTS, DB_UART_RTS_THRESH, DB_SERIAL_PROTOCOL, DB_TRANS_BUF_SIZE,
                       DB_LTM_FRAME_NUM_BUFFER, DB_SERIAL_READ_TIMEOUT_MS, DB_DISABLE_WIFI_ARMED);
     write_to_serial(buffer, len);
@@ -728,6 +738,20 @@ void db_set_wifi_status(uint8_t enable_wifi) {
 }
 
 /**
+ * 1. Checks if RF Switch is configured.
+ * 2. Enables RF switch (necessary on some boards).
+ * 3. Sets RF switch according to user setting.
+ */
+void db_configure_antenna() {
+#if defined(CONFIG_DB_HAS_RF_SWITCH) && defined(CONFIG_DB_RF_SWITCH_GPIO) && (CONFIG_DB_RF_SWITCH_GPIO != 0)
+    #ifdef DB_OFFICIAL_BOARD_1_X_C6
+        gpio_set_level(GPIO_NUM_13, 0); // set to low to enable RF switching
+    #endif
+    gpio_set_level(CONFIG_DB_RF_SWITCH_GPIO, DB_EN_EXT_ANT);   // set level to enable external/internal antenna
+#endif
+}
+
+/**
  * Main entry point.
  * Client Mode: ESP32 connects to a known access point.
  * If the ESP32 could not connect to the specified access point using WIFI_ESP_MAXIMUM_RETRY retries, the
@@ -765,7 +789,7 @@ void app_main() {
         netbiosns_init();
         netbiosns_set_name("dronebridge");
     }
-
+    db_configure_antenna();
     ESP_ERROR_CHECK(init_fs());
     control_module();
 

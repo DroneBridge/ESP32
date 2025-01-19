@@ -28,7 +28,7 @@
 
 #define TAG "DB_MAV_MSGS"
 
-uint16_t DB_MAV_PARAM_CNT = 13; // Number of MAVLink parameters returned by ESP32 in the PARAM message. Needed by GCS.
+uint16_t DB_MAV_PARAM_CNT = 14; // Number of MAVLink parameters returned by ESP32 in the PARAM message. Needed by GCS.
 
 /**
  * Based on the system architecture and configured wifi mode the ESP32 may have a different role and system id.
@@ -231,6 +231,13 @@ bool db_write_mavlink_parameter(fmav_param_set_t *param_set_payload) {
             success = true;
         } else {
             ESP_LOGW(TAG, "WIFI_DIS_ON_ARM must be 1 or 0");
+        }
+    } else if (strncmp(param_set_payload->param_id, "WIFI_EN_EXT_ANT", 16) == 0) {
+        if (float_int.uint8 == 1 || float_int.uint8 == 0) {
+            DB_EN_EXT_ANT = float_int.uint8;
+            success = true;
+        } else {
+            ESP_LOGW(TAG, "WIFI_EN_EXT_ANT must be 1 or 0");
         }
     } else {
         ESP_LOGE(TAG, "Unknown parameter value. Ignoring!");
@@ -456,6 +463,10 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
 
             float_int.uint8 = DB_DISABLE_WIFI_ARMED;
             len = db_get_mavmsg_param(buff, fmav_status, 12, &float_int, MAV_PARAM_TYPE_UINT8, "WIFI_DIS_ON_ARM");
+            db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
+
+            float_int.uint8 = DB_EN_EXT_ANT;
+            len = db_get_mavmsg_param(buff, fmav_status, 13, &float_int, MAV_PARAM_TYPE_UINT8, "WIFI_EN_EXT_ANT");
             db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
         }
             break;

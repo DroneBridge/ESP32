@@ -17,6 +17,7 @@
     "ap_channel": 6,
     "ap_ip": "192.168.2.1",
     "dis_wifi_arm": 0,
+    "ant_use_ext": 0,
     "tx_pin": 4,
     "rx_pin": 5,
     "rts_pin": 0,
@@ -35,6 +36,7 @@
     "minor_version": 1,
     "esp_chip_model": 5,
     "esp_mac": "EC:DA:3B:BC:XX:XX",
-    "serial_via_JTAG": 0
+    "serial_via_JTAG": 0,
+    "has_rf_switch": 1
   }
 }

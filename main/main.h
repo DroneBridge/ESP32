@@ -21,6 +21,11 @@
 #ifndef DB_ESP32_MAIN_H
 #define DB_ESP32_MAIN_H
 
+#ifdef CONFIG_DB_HAS_RF_SWITCH
+#define DB_HAS_RF_SWITCH 1
+#else
+#define DB_HAS_RF_SWITCH 0
+#endif
 
 enum E_DB_WIFI_MODE {
     DB_WIFI_MODE_AP = 1,            // Wi-Fi access point mode with Wi-Fi B mode enabled
