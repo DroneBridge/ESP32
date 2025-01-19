@@ -67,7 +67,7 @@
 #define DB_DEFAULT_UART_RTS_PIN GPIO_NUM_6
 #define DB_DEFAULT_UART_CTS_PIN GPIO_NUM_7
 #define DB_DEFAULT_UART_BAUD_RATE 115200
-#elif DB_OFFICIAL_BOARD_1_X_C6
+#elif CONFIG_DB_OFFICIAL_BOARD_1_X_C6
 #define DB_DEFAULT_UART_TX_PIN GPIO_NUM_21
 #define DB_DEFAULT_UART_RX_PIN GPIO_NUM_2
 #define DB_DEFAULT_UART_RTS_PIN GPIO_NUM_22
@@ -595,9 +595,9 @@ void db_read_settings_nvs() {
         // close NVM
         nvs_close(my_handle);
         ESP_LOGI(TAG,
-                 "\tWifi Mode: %i\n\twifi_chan %i\n\tant_use_ext %i\n\tbaud %liu\n\tgpio_tx %i\n\tgpio_rx %i\n\tgpio_cts %i\n\t"
+                 "\tWifi Mode: %i\n\twifi_chan %i\n\tant_use_ext %i\n\tdis_wifi_arm %i\n\tbaud %liu\n\tgpio_tx %i\n\tgpio_rx %i\n\tgpio_cts %i\n\t"
                  "gpio_rts %i\n\trts_thresh %i\n\tproto %i\n\ttrans_pack_size %i\n\tltm_per_packet %i\n\tserial_timeout %i",
-                 DB_WIFI_MODE, DB_WIFI_CHANNEL, DB_EN_EXT_ANT, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
+                 DB_WIFI_MODE, DB_WIFI_CHANNEL, DB_EN_EXT_ANT, DB_DISABLE_WIFI_ARMED, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
                  DB_UART_PIN_CTS, DB_UART_PIN_RTS, DB_UART_RTS_THRESH, DB_SERIAL_PROTOCOL, DB_TRANS_BUF_SIZE,
                  DB_LTM_FRAME_NUM_BUFFER, DB_SERIAL_READ_TIMEOUT_MS);
         if (strlen(udp_client_ip_str) > 0 && udp_client_port != 0) {
@@ -725,7 +725,7 @@ void db_set_wifi_status(uint8_t enable_wifi) {
     if (DB_DISABLE_WIFI_ARMED) {    // check if that feature is enabled by the user
         if (enable_wifi && db_wifi_is_off) {
             esp_restart(); // enable WiFi by restarting ESP32 - easy way to make sure all things are set up right
-        } else if (!db_wifi_is_off) {
+        } else if (!enable_wifi && !db_wifi_is_off) {
             if (esp_wifi_stop() == ESP_OK) { // disable WiFi
                 db_wifi_is_off = true;
             } else {
@@ -744,7 +744,7 @@ void db_set_wifi_status(uint8_t enable_wifi) {
  */
 void db_configure_antenna() {
 #if defined(CONFIG_DB_HAS_RF_SWITCH) && defined(CONFIG_DB_RF_SWITCH_GPIO) && (CONFIG_DB_RF_SWITCH_GPIO != 0)
-    #ifdef DB_OFFICIAL_BOARD_1_X_C6
+    #ifdef CONFIG_DB_OFFICIAL_BOARD_1_X_C6
         gpio_set_level(GPIO_NUM_13, 0); // set to low to enable RF switching
     #endif
     gpio_set_level(CONFIG_DB_RF_SWITCH_GPIO, DB_EN_EXT_ANT);   // set level to enable external/internal antenna

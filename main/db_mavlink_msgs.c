@@ -132,7 +132,7 @@ MAV_TYPE db_mav_get_parameter_value(float_int_union *float_int, char *param_id, 
     } else if (strncmp(param_id, "SERIAL_T_OUT_MS", 16) == 0 || param_index == 11) {
         float_int->uint16 = DB_SERIAL_READ_TIMEOUT_MS;
         type = MAV_PARAM_TYPE_UINT16;
-    } else if (strncmp(param_id, "WIFI_DIS_ON_ARM", 16) == 0 || param_index == 12) {
+    } else if (strncmp(param_id, "WIFI_EN_EXT_ANT", 16) == 0 || param_index == 12) {
         float_int->uint8 = DB_DISABLE_WIFI_ARMED;
         type = MAV_PARAM_TYPE_UINT8;
     } else {

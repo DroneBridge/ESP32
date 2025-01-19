@@ -704,7 +704,7 @@ _Noreturn void control_module_udp_tcp() {
                     db_esp_signal_quality.air_rssi = -127;
                 } else {/* all good */}
             } else if (DB_WIFI_MODE == DB_WIFI_MODE_AP || DB_WIFI_MODE == DB_WIFI_MODE_AP_LR) {
-                ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_ap_get_sta_list(&wifi_sta_list)); // update list of connected stations
+                ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_ap_get_sta_list(&wifi_sta_list)); // update list of connected stations   // ToDo: Crashes when WiFi is switched off on arm
                 db_send_internal_telemetry_to_stations(db_internal_telem_udp_sock, &wifi_sta_list, udp_conn_list);
             } else {
                 // no way of getting RSSI here. Do nothing
