@@ -114,6 +114,7 @@ uint16_t DB_TRANS_BUF_SIZE = 128;
 uint8_t DB_LTM_FRAME_NUM_BUFFER = 2;
 uint8_t DB_EN_EXT_ANT = false;
 
+uint8_t DB_WIFI_IS_OFF = false;  // keep track if we switched Wi-Fi off already
 db_esp_signal_quality_t db_esp_signal_quality = {.air_rssi = -127, .air_noise_floor = -1, .gnd_rssi= -127, .gnd_noise_floor = -1};
 wifi_sta_list_t wifi_sta_list = {.num = 0};
 uint8_t LOCAL_MAC_ADDRESS[6];
@@ -193,13 +194,13 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         remove_from_known_udp_clients(udp_conn_list, db_udp_client);
         ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_ap_get_sta_list(&wifi_sta_list)); // update list of connected stations
     } else if (event_id == WIFI_EVENT_AP_START) {
-        ESP_LOGI(TAG, "WIFI_EVENT - AP started! (SSID: %s PASS: %s)", DB_WIFI_SSID, DB_WIFI_PWD);
+        ESP_LOGI(TAG, "WIFI_EVENT_AP_START (SSID: %s PASS: %s)", DB_WIFI_SSID, DB_WIFI_PWD);
     } else if (event_id == WIFI_EVENT_AP_STOP) {
         ESP_LOGI(TAG, "WIFI_EVENT - AP stopped!");
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_AP_STAIPASSIGNED) {
         ip_event_ap_staipassigned_t *event = (ip_event_ap_staipassigned_t *) event_data;
-        ESP_LOGI(TAG, "WIFI_EVENT - New station IP:" IPSTR, IP2STR(&event->ip));
-        ESP_LOGI(TAG, "WIFI_EVENT - MAC: " MACSTR, MAC2STR(event->mac));
+        ESP_LOGI(TAG, "IP_EVENT_AP_STAIPASSIGNED - New station IP:" IPSTR, IP2STR(&event->ip));
+        ESP_LOGI(TAG, "IP_EVENT_AP_STAIPASSIGNED - MAC: " MACSTR, MAC2STR(event->mac));
         struct db_udp_client_t db_udp_client;
         db_udp_client.udp_client.sin_family = PF_INET;
         db_udp_client.udp_client.sin_port = htons(APP_PORT_PROXY_UDP);
@@ -210,19 +211,27 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
     }
     // Wifi client mode events
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
-        ESP_LOGI(TAG, "WIFI_EVENT - Wifi Started");
-        ESP_ERROR_CHECK(esp_wifi_connect());
+        ESP_LOGI(TAG, "WIFI_EVENT_STA_START - Wifi Started");
+        if (!DB_WIFI_IS_OFF) {  // maybe the other task did set it in the meantime
+            ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_connect());
+        } else {
+            ESP_LOGW(TAG, "Did not start Wi-Fi since autopilot told us he is armed (WIFI_EVENT_STA_START)");
+        }
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_CONNECTED) {
         set_client_static_ip();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        ESP_LOGI(TAG, "WIFI_EVENT - Lost connection to access point");
-        // Disabled failsafe - keep on trying
-        ESP_ERROR_CHECK(esp_wifi_connect());
-        s_retry_num++;
-        ESP_LOGI(TAG, "Retry to connect to the AP (%i)", s_retry_num);
+        ESP_LOGI(TAG, "WIFI_EVENT_STA_DISCONNECTED - Lost connection to access point");
+        // Keep on trying
+        if (!DB_WIFI_IS_OFF) {
+            ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_connect());
+            s_retry_num++;
+            ESP_LOGI(TAG, "Retry to connect to the AP (%i)", s_retry_num);
+        } else {
+            ESP_LOGD(TAG, "WIFI_EVENT_STA_DISCONNECTED - did not try to re-connect since WiFi was commanded off");
+        }
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *) event_data;
-        ESP_LOGI(TAG, "WIFI_EVENT - Got IP:" IPSTR, IP2STR(&event->ip_info.ip));
+        ESP_LOGI(TAG, "IP_EVENT_STA_GOT_IP:" IPSTR, IP2STR(&event->ip_info.ip));
         sprintf(CURRENT_CLIENT_IP, IPSTR, IP2STR(&event->ip_info.ip));
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
@@ -342,6 +351,7 @@ void init_wifi_apmode(int wifi_mode) {
     ESP_ERROR_CHECK(esp_wifi_set_country(&wifi_country));
     ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
     ESP_ERROR_CHECK(esp_wifi_start());
+    DB_WIFI_IS_OFF = false; // just to be sure, but should not be necessary
 
     /* Assign IP to ap/gateway */
     esp_netif_ip_info_t ip;
@@ -399,6 +409,7 @@ int init_wifi_clientmode() {
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE)); // disable power saving
     ESP_ERROR_CHECK(esp_wifi_start());
+    DB_WIFI_IS_OFF = false; // just to be sure, but should not be necessary
     // consider connection lost after 1s of no beacon - triggers reconnect via WIFI_EVENT_STA_DISCONNECTED event
     ESP_ERROR_CHECK(esp_wifi_set_inactive_time(WIFI_IF_STA, 3));
 
@@ -453,6 +464,30 @@ void init_wifi_espnow() {
     ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_LR));
     ESP_LOGI(TAG, "Enabled ESP-NOW WiFi Mode! LR Mode is set. This device will be invisible to non-ESP32 devices!");
     ESP_ERROR_CHECK(esp_read_mac(LOCAL_MAC_ADDRESS, ESP_MAC_WIFI_STA));
+}
+
+/**
+ * Enables or disables (via reboot) the WiFi if the DB_DISABLE_WIFI_ARMED parameter is set. Not used during boot.
+ * Usually called when arm state change of the autopilot is detected. As internal check if the WiFi is already enabled/disabled
+ * WiFi must be inited first (done during boot).
+ * @param enable_wifi True to enable the WiFi and FALSE to disable it
+ */
+void db_set_wifi_status(uint8_t enable_wifi) {
+    if (DB_DISABLE_WIFI_ARMED) {    // check if that feature is enabled by the user
+        if (enable_wifi && DB_WIFI_IS_OFF) {
+            ESP_LOGI(TAG, "Rebooting ESP32 to re-enable Wi-Fi");
+            esp_restart(); // enable Wi-Fi by restarting ESP32 - easy way to make sure all things are set up right
+        } else if (!enable_wifi && !DB_WIFI_IS_OFF) {
+            ESP_LOGI(TAG, "Disabling Wi-Fi");
+            if (esp_wifi_stop() == ESP_OK) { // disable WiFi
+                DB_WIFI_IS_OFF = true;
+            } else {
+                ESP_LOGW(TAG, "db_set_wifi_status tried to disable Wi-Fi. FAILED");
+            }
+        }
+    } else {
+        // nothing to do
+    }
 }
 
 /**
@@ -712,29 +747,6 @@ void db_jtag_serial_info_print() {
     len = sprintf((char *) buffer, "\tStatic IP netmask: %s\n", DB_STATIC_STA_IP_NETMASK);
     write_to_serial(buffer, len);
     ESP_LOGI(TAG, "Wrote to serial!");
-}
-
-/**
- * Enables or disables (via reboot) the WiFi if the DB_DISABLE_WIFI_ARMED parameter is set. Not used during boot.
- * Usually called when arm state change of the autopilot is detected. As internal check if the WiFi is already enabled/disabled
- * WiFi must be inited first (done during boot).
- * @param enable_wifi True to enable the WiFi and FALSE to disable it
- */
-void db_set_wifi_status(uint8_t enable_wifi) {
-    static uint8_t db_wifi_is_off = false;  // keep track if we switched WiFi off already
-    if (DB_DISABLE_WIFI_ARMED) {    // check if that feature is enabled by the user
-        if (enable_wifi && db_wifi_is_off) {
-            esp_restart(); // enable WiFi by restarting ESP32 - easy way to make sure all things are set up right
-        } else if (!enable_wifi && !db_wifi_is_off) {
-            if (esp_wifi_stop() == ESP_OK) { // disable WiFi
-                db_wifi_is_off = true;
-            } else {
-                ESP_LOGW(TAG, "db_set_wifi_status tried to disable Wi-Fi. FAILED");
-            }
-        }
-    } else {
-        // nothing to do
-    }
 }
 
 /**
