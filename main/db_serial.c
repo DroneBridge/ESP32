@@ -30,7 +30,7 @@
 #include <sys/cdefs.h>
 #include <stdint-gcc.h>
 #include <driver/usb_serial_jtag.h>
-#include "common/common.h"
+#include "fastmavlink/c_library/common/common.h"
 #include "db_serial.h"
 #include "main.h"
 #include "db_esp32_control.h"
@@ -42,7 +42,7 @@
 #define FASTMAVLINK_ROUTER_LINKS_MAX  3
 #define FASTMAVLINK_ROUTER_COMPONENTS_MAX  5
 
-#include "lib/fastmavlink_router.h"
+#include "fastmavlink/c_library/lib/fastmavlink_router.h"
 #include "db_mavlink_msgs.h"
 
 #define TAG "DB_SERIAL"

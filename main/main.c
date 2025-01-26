@@ -32,15 +32,11 @@
 #include "esp_event.h"
 #include "db_esp32_control.h"
 #include "http_server.h"
-#include "db_esp32_comm.h"
 #include "db_protocol.h"
 #include "esp_vfs_semihost.h"
 #include "esp_spiffs.h"
 #include "http_server.h"
 #include "main.h"
-#ifdef CONFIG_DB_BL_MODE_ENABLED
-#include <db_bluetooth.h>
-#endif
 #include "mdns.h"
 #include "db_esp_now.h"
 #include "iot_button.h"
@@ -785,11 +781,6 @@ void app_main() {
     } else if (DB_RADIO_MODE == DB_WIFI_MODE_ESPNOW_AIR || DB_RADIO_MODE == DB_WIFI_MODE_ESPNOW_GND) {
         db_init_wifi_espnow();
         db_start_espnow_module();
-#ifdef CONFIG_DB_BL_MODE_ENABLED
-    } else if (DB_RADIO_MODE == DB_WIFI_MODE_BL) {
-        // setup Bluetooth mode
-        db_init_bluetooth();
-#endif
     } else {
         // Wi-Fi client mode with LR mode enabled
         if (db_init_wifi_clientmode() < 0) {

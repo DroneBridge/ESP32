@@ -25,15 +25,6 @@ menu "DroneBridge for ESP32 Configuration"
                 Enables RF switch via GPIO 13 and antenna selection on GPIO 14
     endchoice
 
-    config DB_BL_MODE_ENABLED
-        bool "Enable support for Bluetooth connections"
-        depends on BT_ENABLED
-        default n if !BT_ENABLED
-        default y if BT_ENABLED
-        help
-            Allows external devices to connect to the ESP32 via Bluetooth when the specific mode is chosen in the config.
-            UART-to-Bluetooth bridge for short range connections.
-
     config DB_HAS_RF_SWITCH
         bool "Enable support for an external antenna/RF switch"
         default n

@@ -21,7 +21,7 @@
 #define DB_ESP32_DB_MAVLINK_MSGS_H
 
 #include <stdint.h>
-#include "common/common.h"
+#include "fastmavlink/c_library/common/common.h"
 #include "db_serial.h"
 
 //typedef struct  {

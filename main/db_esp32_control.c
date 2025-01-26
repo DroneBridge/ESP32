@@ -148,7 +148,7 @@ int db_open_int_telemetry_udp_socket() {
 
     fcntl(sock, F_SETFL, O_NONBLOCK);
 
-    if (DB_WIFI_MODE == DB_WIFI_MODE_STA) {
+    if (DB_RADIO_MODE == DB_WIFI_MODE_STA) {
         // Configure for listening when in station mode
         struct ip_mreq imreq = {0};
         struct in_addr iaddr = {0};
@@ -239,7 +239,7 @@ void db_send_to_all_espnow(uint8_t data[], const uint16_t *data_length) {
  * @param data_length Length of payload to send
  */
 void db_send_to_all_clients(int tcp_clients[], udp_conn_list_t *n_udp_conn_list, uint8_t data[], uint16_t data_length) {
-    if (DB_WIFI_MODE != DB_WIFI_MODE_ESPNOW_AIR && DB_WIFI_MODE != DB_WIFI_MODE_ESPNOW_GND) {
+    if (DB_RADIO_MODE != DB_WIFI_MODE_ESPNOW_AIR && DB_RADIO_MODE != DB_WIFI_MODE_ESPNOW_GND) {
         db_send_to_all_tcp_clients(tcp_clients, data, data_length);
         db_send_to_all_udp_clients(n_udp_conn_list, data, data_length);
     } else {
@@ -480,7 +480,7 @@ _Noreturn void control_module_esp_now(){
  * @param sta_list
  */
 void db_send_internal_telemetry_to_stations(int tel_sock, wifi_sta_list_t *sta_list, udp_conn_list_t *udp_conns) {
-    if (DB_WIFI_MODE == DB_WIFI_MODE_AP_LR && udp_conns->size > 0 && sta_list->num > 0) {
+    if (DB_RADIO_MODE == DB_WIFI_MODE_AP_LR && udp_conns->size > 0 && sta_list->num > 0) {
         char addr_buf[32] = { 0 };
         struct addrinfo hints = {
                 .ai_flags = AI_PASSIVE,
@@ -589,14 +589,14 @@ _Noreturn void control_module_udp_tcp() {
     udp_conn_list->udp_socket = db_open_serial_udp_socket();
 #ifdef CONFIG_DB_SKYBRUSH_SUPPORT
     int udp_broadcast_skybrush_socket = -1;
-    if (DB_WIFI_MODE == DB_WIFI_MODE_STA) {
+    if (DB_RADIO_MODE == DB_WIFI_MODE_STA) {
         udp_broadcast_skybrush_socket = db_open_serial_udp_broadcast_socket();
     } else {
         // we do only support Skybrush WiFi and the broadcast port when in WiFi client mode
     }
 #endif
     int db_internal_telem_udp_sock = -1;
-    if (DB_WIFI_MODE == DB_WIFI_MODE_AP_LR || DB_WIFI_MODE == DB_WIFI_MODE_STA) {
+    if (DB_RADIO_MODE == DB_WIFI_MODE_AP_LR || DB_RADIO_MODE == DB_WIFI_MODE_STA) {
         db_internal_telem_udp_sock = db_open_int_telemetry_udp_socket();
     } else {
         // other WiFi modes do not need this. Only WiFi stations will receive if connected to LR access point.
@@ -669,7 +669,7 @@ _Noreturn void control_module_udp_tcp() {
             // received nothing, keep on going
         }
 #ifdef CONFIG_DB_SKYBRUSH_SUPPORT
-        if (DB_WIFI_MODE == DB_WIFI_MODE_STA && udp_broadcast_skybrush_socket != -1) {
+        if (DB_RADIO_MODE == DB_WIFI_MODE_STA && udp_broadcast_skybrush_socket != -1) {
             // This is special support for Skybrush. Skybrush sends some UDP broadcast msgs to 14555 in addition to regular msgs to 14550
             // We only read and directly forward here. No parsing and no adding to known UDP clients
             recv_length = recvfrom(udp_broadcast_skybrush_socket, udp_buffer, UDP_BUF_SIZE, 0,
@@ -681,7 +681,7 @@ _Noreturn void control_module_udp_tcp() {
         }
 #endif
 
-        if (DB_WIFI_MODE == DB_WIFI_MODE_STA) {
+        if (DB_RADIO_MODE == DB_WIFI_MODE_STA) {
             handle_internal_telemetry(db_internal_telem_udp_sock, udp_buffer, &udp_socklen, &new_db_udp_client.udp_client);
         } else {
             // internal telemetry only received when in STA mode. Coming from the ESP32 AP. Nothing to do here
@@ -698,12 +698,12 @@ _Noreturn void control_module_udp_tcp() {
             vTaskDelay(10 / portTICK_PERIOD_MS);
             delay_timer_cnt = 0;
             // Use the opportunity to get some regular status information like rssi and send them via internal telemetry
-            if (DB_WIFI_MODE == DB_WIFI_MODE_STA) {
+            if (DB_RADIO_MODE == DB_WIFI_MODE_STA) {
                 // update rssi variable - set to -127 when not available
                 if (esp_wifi_sta_get_rssi((int *) &db_esp_signal_quality.air_rssi) != ESP_OK) {
                     db_esp_signal_quality.air_rssi = -127;
                 } else {/* all good */}
-            } else if (!DB_WIFI_IS_OFF && (DB_WIFI_MODE == DB_WIFI_MODE_AP || DB_WIFI_MODE == DB_WIFI_MODE_AP_LR)) {
+            } else if (!DB_WIFI_IS_OFF && (DB_RADIO_MODE == DB_WIFI_MODE_AP || DB_RADIO_MODE == DB_WIFI_MODE_AP_LR)) {
                 ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_ap_get_sta_list(&wifi_sta_list)); // update list of connected stations
                 db_send_internal_telemetry_to_stations(db_internal_telem_udp_sock, &wifi_sta_list, udp_conn_list);
             } else {
@@ -720,13 +720,13 @@ _Noreturn void control_module_udp_tcp() {
 }
 
 /**
- * @brief DroneBridge control module implementation for a ESP32 device. Bi-directional link between FC and ground. Can
+ * @brief DroneBridge control module implementation for a ESP32 device. Bidirectional link between FC and ground. Can
  * handle MSPv1, MSPv2, LTM and MAVLink.
  * MSP & LTM is parsed and sent packet/frame by frame to ground
  * MAVLink is passed through (fully transparent). Can be used with any protocol.
  */
 void db_start_control_module() {
-    if (DB_WIFI_MODE != DB_WIFI_MODE_ESPNOW_GND && DB_WIFI_MODE != DB_WIFI_MODE_ESPNOW_AIR) {
+    if (DB_RADIO_MODE != DB_WIFI_MODE_ESPNOW_GND && DB_RADIO_MODE != DB_WIFI_MODE_ESPNOW_AIR) {
         xTaskCreate(&control_module_udp_tcp, "control_wifi", 46080, NULL, 5, NULL);
     } else {
         xTaskCreate(&control_module_esp_now, "control_espnow", 40960, NULL, 5, NULL);
