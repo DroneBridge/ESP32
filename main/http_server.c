@@ -160,7 +160,7 @@ static esp_err_t settings_post_handler(httpd_req_t *req) {
     cJSON *root = cJSON_Parse(buf);
 
     cJSON *json = cJSON_GetObjectItem(root, "esp32_mode");
-    if (json) DB_WIFI_MODE_DESIGNATED = json->valueint;    // do not directly change DB_WIFI_MODE since it is not safe and constantly processed by other tasks. Save settings and reboot will assign DB_WIFI_MODE_DESIGNATED to DB_WIFI_MODE
+    if (json) DB_RADIO_MODE_DESIGNATED = json->valueint;    // do not directly change DB_WIFI_MODE since it is not safe and constantly processed by other tasks. Save settings and reboot will assign DB_RADIO_MODE_DESIGNATED to DB_WIFI_MODE
 
     json = cJSON_GetObjectItem(root, "wifi_ssid");
     if (json && strlen(json->valuestring) < 32 && strlen(json->valuestring) > 0)
@@ -245,10 +245,10 @@ static esp_err_t settings_post_handler(httpd_req_t *req) {
 
     json = cJSON_GetObjectItem(root, "dis_wifi_arm");
     if (json && (json->valueint == 1 || json->valueint == 0)) {
-        DB_DISABLE_WIFI_ARMED = json->valueint;
+        DB_DISABLE_RADIO_ARMED = json->valueint;
     } else if (json) {
         ESP_LOGW(REST_TAG, "dis_wifi_arm is not 1 (turn WiFi off on arm) or 0 (keep WiFi on)");
-        DB_DISABLE_WIFI_ARMED = false;
+        DB_DISABLE_RADIO_ARMED = false;
     }
 
     json = cJSON_GetObjectItem(root, "ltm_pp");
@@ -518,10 +518,10 @@ static esp_err_t system_stats_get_handler(httpd_req_t *req) {
     }
     cJSON_AddItemToObject(root, "udp_clients", udp_clients);
     // add RSSI and IP info
-    if (DB_WIFI_MODE == DB_WIFI_MODE_STA) {
+    if (DB_RADIO_MODE == DB_WIFI_MODE_STA) {
         cJSON_AddStringToObject(root, "current_client_ip", CURRENT_CLIENT_IP);
         cJSON_AddNumberToObject(root, "esp_rssi", db_esp_signal_quality.air_rssi);
-    } else if (DB_WIFI_MODE == DB_WIFI_MODE_AP || DB_WIFI_MODE == DB_WIFI_MODE_AP_LR) {
+    } else if (DB_RADIO_MODE == DB_WIFI_MODE_AP || DB_RADIO_MODE == DB_WIFI_MODE_AP_LR) {
         cJSON *sta_array = cJSON_AddArrayToObject(root, "connected_sta");
         for (int i = 0; i < wifi_sta_list.num; i++) {
             cJSON *connected_stations_status = cJSON_CreateObject();
@@ -582,7 +582,7 @@ static esp_err_t system_clients_get_handler(httpd_req_t *req) {
 static esp_err_t settings_get_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "application/json");
     cJSON *root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "esp32_mode", DB_WIFI_MODE);
+    cJSON_AddNumberToObject(root, "esp32_mode", DB_RADIO_MODE);
     cJSON_AddStringToObject(root, "wifi_ssid", (char *) DB_WIFI_SSID);
     cJSON_AddStringToObject(root, "wifi_pass", (char *) DB_WIFI_PWD);
     cJSON_AddNumberToObject(root, "ap_channel", DB_WIFI_CHANNEL);
@@ -596,7 +596,7 @@ static esp_err_t settings_get_handler(httpd_req_t *req) {
     cJSON_AddNumberToObject(root, "rts_thresh", DB_UART_RTS_THRESH);
     cJSON_AddNumberToObject(root, "baud", DB_UART_BAUD_RATE);
     cJSON_AddNumberToObject(root, "telem_proto", DB_SERIAL_PROTOCOL);
-    cJSON_AddNumberToObject(root, "dis_wifi_arm", DB_DISABLE_WIFI_ARMED);
+    cJSON_AddNumberToObject(root, "dis_wifi_arm", DB_DISABLE_RADIO_ARMED);
     cJSON_AddNumberToObject(root, "ltm_pp", DB_LTM_FRAME_NUM_BUFFER);
     cJSON_AddStringToObject(root, "ap_ip", DEFAULT_AP_IP);
     cJSON_AddStringToObject(root, "static_client_ip", DB_STATIC_STA_IP);

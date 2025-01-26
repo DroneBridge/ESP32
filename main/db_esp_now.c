@@ -215,7 +215,7 @@ bool db_read_uart_queue_and_send() {
     // Receive data from Queue that was put there by other tasks to be sent via ESP-NOW
     if (db_espnow_send_queue != NULL && xQueueReceive(db_espnow_send_queue, &evt, 0) == pdTRUE) {
         db_esp_now_packet_global.db_esp_now_packet_header.packet_type = evt.packet_type;
-        if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND) {
+        if (DB_RADIO_MODE == DB_WIFI_MODE_ESPNOW_GND) {
             db_esp_now_packet_global.db_esp_now_packet_header.origin = DB_ESPNOW_ORIGIN_GND;
         } else {
             db_esp_now_packet_global.db_esp_now_packet_header.origin = DB_ESPNOW_ORIGIN_AIR;
@@ -300,7 +300,7 @@ void db_espnow_process_rcv_data(uint8_t *data, uint16_t data_len, uint8_t *src_a
         /* Check if we know that peer already */
         int16_t peer_index = update_peer_list(db_esp_now_clients_list, src_addr);
         if (peer_index != -1) {
-            if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND) {
+            if (DB_RADIO_MODE == DB_WIFI_MODE_ESPNOW_GND) {
                 // update the list with the rssi only if we are GND
                 db_esp_now_clients_list->db_esp_now_bpeer_info[peer_index].gnd_rssi = rssi;
             } else {
@@ -416,7 +416,7 @@ static void db_espnow_receive_callback(const esp_now_recv_info_t *recv_info, con
         return;
     }
 
-    if (data[0] == DB_ESPNOW_ORIGIN_GND && DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND) {
+    if (data[0] == DB_ESPNOW_ORIGIN_GND && DB_RADIO_MODE == DB_WIFI_MODE_ESPNOW_GND) {
         // Ignoring packet - Came from another GND station
         return;
     } else {
@@ -427,7 +427,7 @@ static void db_espnow_receive_callback(const esp_now_recv_info_t *recv_info, con
 #endif
     }
 
-    if (data[0] == DB_ESPNOW_ORIGIN_AIR && DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_AIR) {
+    if (data[0] == DB_ESPNOW_ORIGIN_AIR && DB_RADIO_MODE == DB_WIFI_MODE_ESPNOW_AIR) {
         // Ignoring packet - Came from another AIR station
         return;
     } else {
@@ -560,7 +560,7 @@ esp_err_t db_espnow_init() {
     }
     ESP_ERROR_CHECK(esp_now_set_pmk(aes_key));  // only first 16 bytes will be used
 
-    if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND) {
+    if (DB_RADIO_MODE == DB_WIFI_MODE_ESPNOW_GND) {
         ESP_LOGI(TAG, "ESP-NOW for DroneBridge init done - acting as ESP-NOW GND station");
     } else {
         ESP_LOGI(TAG, "ESP-NOW for DroneBridge init done - acting as ESP-NOW AIR station");
@@ -574,7 +574,7 @@ esp_err_t db_espnow_init() {
  * @return true when packet was scheduled for sending, false if it will not be sent
  */
 bool db_espnow_schedule_internal_telemetry_packet() {
-    if (DB_WIFI_MODE != DB_WIFI_MODE_ESPNOW_GND) {
+    if (DB_RADIO_MODE != DB_WIFI_MODE_ESPNOW_GND) {
         // Only GND sends internal telemetry. This function was called wrongly
         return false;
     } else {
@@ -632,7 +632,7 @@ _Noreturn void process_espnow_data() {
                     // indicate that we can send next packet - the last sending callback has returned, so we keep the order
                     // of packets. ESP-NOW by default does not guarantee the order when many packets are sent in quick succession
                     ready_to_send = true;
-                    if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND && send_internal_telemetry_frame) {
+                    if (DB_RADIO_MODE == DB_WIFI_MODE_ESPNOW_GND && send_internal_telemetry_frame) {
                         send_internal_telemetry_frame = !db_espnow_schedule_internal_telemetry_packet();
                     } else {
                         // try to immediately send the next packet if available and set ready_to_send accordingly
@@ -675,6 +675,6 @@ _Noreturn void process_espnow_data() {
 /**
  * Start task that handles ESP-NOW data
  */
-void db_espnow_module() {
+void db_start_espnow_module() {
     xTaskCreate(&process_espnow_data, "db_espnow", 40960, NULL, 5, NULL);
 }

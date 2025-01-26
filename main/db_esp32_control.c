@@ -725,7 +725,7 @@ _Noreturn void control_module_udp_tcp() {
  * MSP & LTM is parsed and sent packet/frame by frame to ground
  * MAVLink is passed through (fully transparent). Can be used with any protocol.
  */
-void control_module() {
+void db_start_control_module() {
     if (DB_WIFI_MODE != DB_WIFI_MODE_ESPNOW_GND && DB_WIFI_MODE != DB_WIFI_MODE_ESPNOW_AIR) {
         xTaskCreate(&control_module_udp_tcp, "control_wifi", 46080, NULL, 5, NULL);
     } else {

@@ -25,22 +25,31 @@ menu "DroneBridge for ESP32 Configuration"
                 Enables RF switch via GPIO 13 and antenna selection on GPIO 14
     endchoice
 
+    config DB_BL_MODE_ENABLED
+        bool "Enable support for Bluetooth connections"
+        depends on BT_ENABLED
+        default n if !BT_ENABLED
+        default y if BT_ENABLED
+        help
+            Allows external devices to connect to the ESP32 via Bluetooth when the specific mode is chosen in the config.
+            UART-to-Bluetooth bridge for short range connections.
+
     config DB_HAS_RF_SWITCH
-          bool "Enable support for an external antenna/RF switch"
-          default n
-          depends on !DB_OFFICIAL_BOARD_1_X
-          help
+        bool "Enable support for an external antenna/RF switch"
+        default n
+        depends on !DB_OFFICIAL_BOARD_1_X
+        help
             Enable this option to allow the use of an external antenna switch (need to configure GPIO).
             The UI will then allow you to choose between antennas. At the moment only two antennas are supported.
             Beware that for some boards the antenna switch sometimes must be activated first by setting a GPIO.
             Do that in code. Enabling of the switch is done automatically for the official HW 1.x based on the ESP32C6.
 
     config DB_RF_SWITCH_GPIO
-          int "Define pin to use for switching between external and internal antenna"
-          depends on DB_HAS_RF_SWITCH
-          default 14 if DB_OFFICIAL_BOARD_1_X_C6
-          default 0
-          help
+        int "Define pin to use for switching between external and internal antenna"
+        depends on DB_HAS_RF_SWITCH
+        default 14 if DB_OFFICIAL_BOARD_1_X_C6
+        default 0
+        help
             This GPIOs high/low state is used to indicate to the RF switch what antenna to choose.
             Official HW v1.x ESP32-C6 boards use GPIO 14.
             Set to 0 equals not configured.

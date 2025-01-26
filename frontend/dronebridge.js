@@ -7,13 +7,13 @@ let last_byte_count = 0;
 let last_timestamp_byte_count = 0;
 let esp_chip_model = 0;		// according to get_esp_chip_model_str()
 
-function change_wifi_dis_arm_visibility() {
+function change_radio_dis_arm_visibility() {
 	// we only support this feature when MAVLink or LTM are set AND when a standard Wi-Fi mode is enabled
-	let dis_wifi_arm_div = document.getElementById("dis_wifi_arm_div")
+	let dis_radio_arm_div = document.getElementById("dis_radio_arm_div")
 	if (document.getElementById("esp32_mode").value > "2" || document.getElementById("telem_proto").value === "5") {
-		dis_wifi_arm_div.style.display = "none";
+		dis_radio_arm_div.style.display = "none";
 	} else {
-		dis_wifi_arm_div.style.display = "block";
+		dis_radio_arm_div.style.display = "block";
 	}
 }
 
@@ -40,14 +40,14 @@ function change_ap_ip_visibility(){
 	} else {
 		wifi_ssid_div.style.visibility = "visible";
 	}
-	change_wifi_dis_arm_visibility();
+	change_radio_dis_arm_visibility();
 }
 
 function change_msp_ltm_visibility(){
 	let msp_ltm_div = document.getElementById("msp_ltm_div");
 	let trans_pack_size_div = document.getElementById("trans_pack_size_div");
 	let telem_proto = document.getElementById("telem_proto");
-	let dis_wifi_arm_div = document.getElementById("dis_wifi_arm_div");
+	let dis_radio_arm_div = document.getElementById("dis_radio_arm_div");
 	if (telem_proto.value === "1") {
 		msp_ltm_div.style.display = "block";
 		trans_pack_size_div.style.display = "none";
@@ -55,7 +55,7 @@ function change_msp_ltm_visibility(){
 		msp_ltm_div.style.display = "none";
 		trans_pack_size_div.style.display = "block";
 	}
-	change_wifi_dis_arm_visibility();
+	change_radio_dis_arm_visibility();
 }
 
 function change_uart_visibility() {

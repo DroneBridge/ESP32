@@ -170,12 +170,12 @@ int db_read_serial(uint8_t *uart_read_buf, uint length) {
 }
 
 /**
- * Check armed state of LTM packet if feature DB_DISABLE_WIFI_ARMED is set and we got a status frame.
+ * Check armed state of LTM packet if feature DB_DISABLE_RADIO_ARMED is set and we got a status frame.
  * Triggers the enabling or disabling of the Wi-Fi.
  * @param db_msp_ltm_port MSP/LTM parser struct
  */
 void db_ltm_check_arm_state_set_wifi(const msp_ltm_port_t *db_msp_ltm_port) {
-    if (DB_DISABLE_WIFI_ARMED && db_msp_ltm_port->ltm_type == LTM_TYPE_S) {
+    if (DB_DISABLE_RADIO_ARMED && db_msp_ltm_port->ltm_type == LTM_TYPE_S) {
         if (db_msp_ltm_port->ltm_frame_buffer[2 + LTM_TYPE_S_PAYLOAD_SIZE] & LTM_ARMED_BIT_MASK) {
             // autopilot says it is armed
             db_set_wifi_status(false);  // disable Wi-Fi
