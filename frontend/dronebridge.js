@@ -388,15 +388,29 @@ function show_toast(msg) {
 	}).showToast();
 }
 
+function check_validity() {
+	let valid = true;
+	let wifi_pass = document.getElementById("wifi_pass")
+	if (!wifi_pass.checkValidity()) {
+		show_toast("Error: 8<(password length)<64");
+		valid = false;
+	}
+	return valid;
+}
+
 function save_settings() {
 	let form = document.getElementById("settings_form")
-	let json_data = toJSONString(form)
-	send_json("api/settings", json_data).then(send_response => {
-		console.log(send_response);
-		conn_status = 1
-		show_toast(send_response["msg"])
-		get_settings()  // update UI with new settings
-	}).catch(error => {
-		show_toast(error.message);
-	});
+	if (check_validity()) {
+		let json_data = toJSONString(form)
+		send_json("api/settings", json_data).then(send_response => {
+			console.log(send_response);
+			conn_status = 1
+			show_toast(send_response["msg"])
+			get_settings()  // update UI with new settings
+		}).catch(error => {
+			show_toast(error.message);
+		});
+	} else {
+		console.log("Form was not filled out correctly.")
+	}
 }

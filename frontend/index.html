@@ -65,7 +65,6 @@
                         <option value="3">Wi-Fi Access Point LR Mode</option>
                         <option value="4">ESP-NOW LR Mode AIR</option>
                         <option value="5">ESP-NOW LR Mode GND</option>
-                        <option value="6">Bluetooth Serial Bridge</option>
                     </select>
                     <div class="note" id="esp-lr-ap-disclaimer"><h4>Attention:</h4>
                         LR Mode makes the device invisible for non-LR enabled devices!</br>You will not be able to change the config!</br></br>
@@ -86,11 +85,11 @@
             <div class="row">
                 <div class="six columns" id="wifi_ssid_div">
                     <label for="wifi_ssid">SSID</label>
-                    <input type="text" name="wifi_ssid" value="" id="wifi_ssid">
+                    <input type="text" name="wifi_ssid" value="" id="wifi_ssid" maxlength="31">
                 </div>
                 <div class="six columns">
                     <label for="wifi_pass">Password</label>
-                    <input type="text" name="wifi_pass" value="" id="wifi_pass">
+                    <input type="text" name="wifi_pass" value="" id="wifi_pass" minlength="8" maxlength="63" required>
                 </div>
             </div>
             <div class="row">
