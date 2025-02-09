@@ -43,22 +43,6 @@ class DBRelease {
     }
 }
 
-// const terminal = document.getElementById("terminal");
-// let Terminal; // Terminal is imported in HTML script
-// const term = new Terminal({ cols: 120, rows: 40 });
-// term.open(terminal);
-// const espLoaderTerminal = {
-//     clean() {
-//         term.clear();
-//     },
-//     writeLine(data) {
-//         term.writeln(data);
-//     },
-//     write(data) {
-//         term.write(data);
-//     },
-// };
-
 // Define DroneBridge for ESP32 releases manually here. No GitHub call etc. All locally available
 let t_esp32 = new DBTarget("ESP32", "ESP32", "esp32/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x1000, 0x8000, 0x10000, 0x110000], "DIO", "40MHz");
 let t_espc3 = new DBTarget("ESP32-C3", "ESP32-C3", "esp32c3/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x110000], "DIO", "80MHz");
