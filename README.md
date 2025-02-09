@@ -14,7 +14,7 @@ A firmware for the popular ESP32 modules from Espressif Systems. Probably the ch
 communicate with your drone, UAV, UAS, ground-based vehicle or whatever you may call them.
 
 It also allows for a fully transparent serial to WiFi pass-through link with variable packet size
-(As of release v2.0RC4 no continuous stream of data required anymore in MAVLink and transparent mode).
+(As of release v2.0 no continuous stream of data is required anymore in MAVLink and transparent mode).
 
 DroneBridge for ESP32 is a telemetry/low data rate-only solution. There is no support for cameras connected to the ESP32 
 since it does not support video encoding.
@@ -57,7 +57,7 @@ These boards are very low in price, have everything you need and are also very s
   - Back In Stock! Second batch, pre-installed and ready for use!  
   currently shipping from EU to selected countries only - contact seller for express shipping or non-listed destinations    
   <img src="https://github.com/DroneBridge/ESP32/assets/24637325/e3b2975d-7de4-41af-b052-e4fa024d905e" alt="Official Boadrd DroneBridge for ESP32" width="350">
-* **[Order the PCB yourself using the KiCAD PCB Project & Production files with private and commercial use options!](https://buymeacoffee.com/seeul8er/e/301194)**
+* **[Order the PCB yourself using the KiCAD PCB Project & Production files with private and commercial use options! Easy solder version now available!](https://buymeacoffee.com/seeul8er/extras)**
 * **Official board for easy use as ground station coming soon!**
 
 [For further info please check the wiki!](https://dronebridge.gitbook.io/docs/dronebridge-for-esp32/hardware-and-wiring)
