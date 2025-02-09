@@ -54,9 +54,9 @@ These boards are very low in price, have everything you need and are also very s
 
 * **[Official board for DroneBridge for ESP32 ebay DE/EU](https://www.ebay.de/itm/116429338440)**  
   **[Official board for DroneBridge for ESP32 ebay EU](https://www.ebay.com/itm/116429338440)**  
-  - Back In Stock! Second batch, pre-installed and ready for use!  
+  - Back In Stock! Second batch, DroneBridge is pre-installed and ready for use!  
   currently shipping from EU to selected countries only - contact seller for express shipping or non-listed destinations    
-  <img src="https://github.com/DroneBridge/ESP32/assets/24637325/e3b2975d-7de4-41af-b052-e4fa024d905e" alt="Official Boadrd DroneBridge for ESP32" width="350">
+  <img src="https://github.com/user-attachments/assets/efd2b305-8046-4431-a4a0-ec8de07fd264" alt="Official Boadrd DroneBridge for ESP32" width="350">
 * **[Order the PCB yourself using the KiCAD PCB Project & Production files with private and commercial use options! Easy solder version now available!](https://buymeacoffee.com/seeul8er/extras)**
 * **Official board for easy use as ground station coming soon!**
 
