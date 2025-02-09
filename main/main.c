@@ -404,7 +404,7 @@ int db_init_wifi_clientmode() {
     strncpy((char *) wifi_config.sta.password, (char *) DB_WIFI_PWD, 64);
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_LR));
+    ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N | WIFI_PROTOCOL_LR));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE)); // disable power saving
     ESP_ERROR_CHECK(esp_wifi_start());
@@ -752,13 +752,17 @@ void db_jtag_serial_info_print() {
  * 1. Checks if RF Switch is configured.
  * 2. Enables RF switch (necessary on some boards).
  * 3. Sets RF switch according to user setting.
+ * Must be called before radio/Wi-Fi gets initialized!
  */
 void db_configure_antenna() {
 #if defined(CONFIG_DB_HAS_RF_SWITCH) && defined(CONFIG_DB_RF_SWITCH_GPIO) && (CONFIG_DB_RF_SWITCH_GPIO != 0)
     #ifdef CONFIG_DB_OFFICIAL_BOARD_1_X_C6
-        gpio_set_level(GPIO_NUM_13, 0); // set to low to enable RF switching
+    gpio_set_direction(GPIO_NUM_3, GPIO_MODE_OUTPUT);
+    gpio_set_level(GPIO_NUM_3, 0); // set to low to enable RF switching
     #endif
+    gpio_set_direction(CONFIG_DB_RF_SWITCH_GPIO, GPIO_MODE_OUTPUT);
     gpio_set_level(CONFIG_DB_RF_SWITCH_GPIO, DB_EN_EXT_ANT);   // set level to enable external/internal antenna
+    ESP_LOGI(TAG, "External antenna usage: %i", DB_EN_EXT_ANT);
 #endif
 }
 
@@ -776,6 +780,7 @@ void app_main() {
     db_read_settings_nvs();
     DB_RADIO_MODE_DESIGNATED = DB_RADIO_MODE; // must always match, mismatch only allowed when changed by user action and not rebooted, yet.
     set_reset_trigger();
+    db_configure_antenna();
     if (DB_RADIO_MODE == DB_WIFI_MODE_AP || DB_RADIO_MODE == DB_WIFI_MODE_AP_LR) {
         db_init_wifi_apmode(DB_RADIO_MODE);
     } else if (DB_RADIO_MODE == DB_WIFI_MODE_ESPNOW_AIR || DB_RADIO_MODE == DB_WIFI_MODE_ESPNOW_GND) {
@@ -794,7 +799,6 @@ void app_main() {
         netbiosns_init();
         netbiosns_set_name("dronebridge");
     }
-    db_configure_antenna();
     ESP_ERROR_CHECK(init_fs());
     db_start_control_module();
 
