@@ -76,6 +76,16 @@ function change_uart_visibility() {
 	}
 }
 
+function flow_control_check() {
+	let rts_pin = document.getElementById("rts_pin");
+	let cts_pin = document.getElementById("cts_pin");
+	if (isNaN(rts_pin.value) || isNaN(cts_pin.value) || cts_pin.value === '' || rts_pin.value === '' || rts_pin.value === cts_pin.value) {
+		show_toast("UART flow control disabled.")
+	} else {
+		show_toast("UART flow control enabled. Make sure RTS & CTS pins are connected!");
+	}
+}
+
 /**
  * Convert a form into a JSON string
  * @param form The HTML form to convert
@@ -372,7 +382,7 @@ async function clear_udp_clients() {
 	}
 }
 
-function show_toast(msg) {
+function show_toast(msg, background_color = "#0058a6") {
 	Toastify({
 		text: msg,
 		duration: 5000,
@@ -380,10 +390,14 @@ function show_toast(msg) {
 		close: true,
 		gravity: "top", // `top` or `bottom`
 		position: "center", // `left`, `center` or `right`
-		// style: {
-		//     background: "linear-gradient(to right, #00b09b, #96c93d)"
-		// },
-		backgroundColor: "linear-gradient(to right, #b6e026, #abdc28)",
+		style: {
+			background: background_color,
+			color: "#ff9734",
+			borderColor: "#ff9734",
+			borderStyle: "solid",
+			borderRadius: "2px",
+			borderWidth: "1px",
+		},
 		stopOnFocus: true, // Prevents dismissing of toast on hover
 	}).showToast();
 }

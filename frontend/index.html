@@ -73,13 +73,6 @@
                         or erase the flash memory of the ESP32 and re-flash DroneBridge for ESP32 to get back into
                         normal Wi-Fi Mode!
                     </div>
-                    <div class="note" id="esp-bl-disclaimer"><h4>Attention:</h4>
-                        You will not be able to change the config via the web-interface!</br></br>
-                        The data rate is reduced to ~0.25Mbps. The range may be increase by a factor of ~2.</br>Press the boot
-                        button (short press for AP-Mode with password "dronebridge" or long press for reset to defaults)
-                        or erase the flash memory of the ESP32 and re-flash DroneBridge for ESP32 to get back into
-                        normal Wi-Fi Mode!
-                    </div>
                 </div>
             </div>
             <div class="row">
@@ -146,11 +139,11 @@
             <div class="row" id="rts_cts_div">
                 <div class="six columns">
                     <label for="rts_pin">UART RTS GPIO</label>
-                    <input type="number" name="rts_pin" value="" id="rts_pin">
+                    <input type="number" name="rts_pin" value="" id="rts_pin" onchange="flow_control_check()">
                 </div>
                 <div class="six columns">
                     <label for="cts_pin">UART CTS GPIO</label>
-                    <input type="number" name="cts_pin" value="" id="cts_pin">
+                    <input type="number" name="cts_pin" value="" id="cts_pin" onchange="flow_control_check()">
                 </div>
             </div>
             <div class="row" id="rts_thresh_div">
