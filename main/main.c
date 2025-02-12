@@ -43,6 +43,7 @@
 #include "iot_button.h"
 #include "db_serial.h"
 #include "globals.h"
+#include "ota.h"
 
 #define NVS_NAMESPACE "settings"
 
