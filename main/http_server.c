@@ -182,6 +182,13 @@ static esp_err_t settings_post_handler(httpd_req_t *req) {
         ESP_LOGE(REST_TAG, "No a valid wifi channel (1-13). Not changing!");
     }
 
+    json = cJSON_GetObjectItem(root, "wifi_en_gn");
+    if (json && (json->valueint == 1 || json->valueint == 0)) {
+        DB_WIFI_EN_GN = json->valueint;
+    } else if (json) {
+        ESP_LOGE(REST_TAG, "wifi_en_gn is not 1 (802.11bgn) nor 0 (802.11b) for WiFi client mode");
+    }
+
     json = cJSON_GetObjectItem(root, "ant_use_ext");
     if (json && (json->valueint == 1 || json->valueint == 0)) {
         DB_EN_EXT_ANT = json->valueint;
@@ -586,6 +593,7 @@ static esp_err_t settings_get_handler(httpd_req_t *req) {
     cJSON_AddStringToObject(root, "wifi_ssid", (char *) DB_WIFI_SSID);
     cJSON_AddStringToObject(root, "wifi_pass", (char *) DB_WIFI_PWD);
     cJSON_AddNumberToObject(root, "ap_channel", DB_WIFI_CHANNEL);
+    cJSON_AddNumberToObject(root, "wifi_en_gn", DB_WIFI_EN_GN);
     cJSON_AddNumberToObject(root, "ant_use_ext", DB_EN_EXT_ANT);
     cJSON_AddNumberToObject(root, "trans_pack_size", DB_TRANS_BUF_SIZE);
     cJSON_AddNumberToObject(root, "serial_timeout", DB_SERIAL_READ_TIMEOUT_MS);

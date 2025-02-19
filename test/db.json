@@ -18,6 +18,7 @@
     "ap_ip": "192.168.2.1",
     "dis_wifi_arm": 0,
     "ant_use_ext": 0,
+    "wifi_en_gn": 1,
     "tx_pin": 4,
     "rx_pin": 5,
     "rts_pin": 0,

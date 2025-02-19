@@ -38,6 +38,7 @@ extern uint8_t DB_WIFI_PWD[64];
 extern char DEFAULT_AP_IP[IP4ADDR_STRLEN_MAX];
 extern char CURRENT_CLIENT_IP[IP4ADDR_STRLEN_MAX];  // IP address of the ESP32 when we are in client mode connected
 extern uint8_t DB_WIFI_CHANNEL;
+extern uint8_t DB_WIFI_EN_GN;  // disabled: only 802.11b support for client mode - set to true: 802.11bgn mode support
 extern uint8_t DB_EN_EXT_ANT;      // set to 1 to use external antenna. Set to 0 to enable onboard antenna - board must have antenna switch
 extern uint8_t DB_SERIAL_PROTOCOL;  // 1=MSP, 4=MAVLink, 5=Transparent
 extern uint8_t DB_DISABLE_RADIO_ARMED;   // 0 = WiFi remains enabled always, 1 = WiFi will be turned off when armed state is detected on the telemetry stream. Does not work when DB_SERIAL_PROTOCOL is set to transparent
