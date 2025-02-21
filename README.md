@@ -52,13 +52,11 @@ DroneBridge for ESP32 supports ESP-NOW LR, enabling ranges of more than 1km with
 Do the project and yourself a favour and use one of the officially supported and tested boards below.   
 These boards are very low in price, have everything you need and are also very small. Perfect for use on any drone. 
 
-* **[Official board for DroneBridge for ESP32 ebay DE](https://www.ebay.de/itm/116476024529)**  
-  **[Official board for DroneBridge for ESP32 ebay EU/Int.](https://www.ebay.com/itm/116476024529)**  
-  - Back In Stock! Second batch, DroneBridge is pre-installed and ready for use!  
-  currently shipping from EU to selected countries only - contact seller for express shipping or non-listed destinations    
-  <img src="https://github.com/user-attachments/assets/efd2b305-8046-4431-a4a0-ec8de07fd264" alt="Official Boadrd DroneBridge for ESP32" width="350">
-* **[Order the PCB yourself using the KiCAD PCB Project & Production files with private and commercial use options! Easy solder version now available!](https://buymeacoffee.com/seeul8er/extras)**
-* **Official board for easy use as ground station coming soon!**
+**[You can find more info on how to get the official boards here!](https://dronebridge.gitbook.io/docs/dronebridge-for-esp32/hardware-and-wiring#officially-supported-boards)**
+
+<img src="https://github.com/user-attachments/assets/efd2b305-8046-4431-a4a0-ec8de07fd264" alt="Official Boadrd DroneBridge for ESP32 featuring the ESP32C3" width="350">
+  
+**[Order the PCB yourself using the KiCAD PCB Project & Production files with private and commercial use options! Easy solder version now available!](https://buymeacoffee.com/seeul8er/extras)**
 
 [For further info please check the wiki!](https://dronebridge.gitbook.io/docs/dronebridge-for-esp32/hardware-and-wiring)
 
