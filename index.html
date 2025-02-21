@@ -80,7 +80,12 @@
         <h5>Official Hardware</h5>
         <div class="row">
             <div class="six columns">
-                <button class="button-primary" id="button_official_board">
+                <b>External Antenna</b><br>
+                <button class="button-primary" id="button_official_board_c3">
+                    Get the official board!
+                </button><br>
+                <b>Onboard Antenna</b><br>
+                <button class="button-primary" id="button_official_board_c6">
                     Get the official board!
                 </button>
                 <div>Back in stock! Get started in no time!<br>Designed according to the DS-009 Pixhawk Connector Standard for easy Plug&Play integration.<br>Private limited sale. Currently shipping from Germany to the EU (EEA) and other selected countries (incl. USA, CAN).<br>For more non-EEA shipping destinations or express options please contact me via <a href="https://www.linkedin.com/in/wolfgang-christl/">LinkedIn</a>.</div>
@@ -134,16 +139,26 @@
 <script data-collect-dnt="true" async defer src="https://scripts.simpleanalyticscdn.com/latest.js"></script>
 <noscript><img src="https://queue.simpleanalyticscdn.com/noscript.gif?collect-dnt=true" alt="" referrerpolicy="no-referrer-when-downgrade" /></noscript>
 <script>
-    const button_official_board = document.getElementById("button_official_board");
+    const button_official_board_c3 = document.getElementById("button_official_board_c3");
+    const button_official_board_c6 = document.getElementById("button_official_board_c6");
     const button_pcb_files = document.getElementById("button_pcb_files");
 
-    button_official_board.onclick = async () => {
+    button_official_board_c3.onclick = async () => {
         try {
-            sa_event("click_get_board", {});
+            sa_event("click_get_board_c3", {});
         } catch (e) {
             console.log("Could not run simpleanalytics: " + e);
         }
         window.open("https://www.ebay.com/itm/116476024529", '_blank').focus();
+    }
+
+    button_official_board_c6.onclick = async () => {
+        try {
+            sa_event("click_get_board_c6", {});
+        } catch (e) {
+            console.log("Could not run simpleanalytics: " + e);
+        }
+        window.open("https://www.ebay.com/itm/116489338680", '_blank').focus();
     }
 
     button_pcb_files.onclick = async () => {
