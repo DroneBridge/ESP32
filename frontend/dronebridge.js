@@ -1,22 +1,36 @@
-// const ROOT_URL = "http://localhost:3000/"   // for testing with local json server
 const ROOT_URL = window.location.href       // for production code
+// const ROOT_URL = "http://localhost:3000/"   // for testing with local json server
 let conn_status = 0;		// connection status to the ESP32
 let old_conn_status = 0;	// connection status before last update of UI to know when it changed
 let serial_via_JTAG = 0;	// set to 1 if ESP32 is using the USB interface as serial interface for data and not using the UART. If 0 we set UART config to invisible for the user.
 let last_byte_count = 0;
 let last_timestamp_byte_count = 0;
+let esp_chip_model = 0;		// according to get_esp_chip_model_str()
+
+function change_radio_dis_arm_visibility() {
+	// we only support this feature when MAVLink or LTM are set AND when a standard Wi-Fi mode is enabled
+	let radio_dis_onarm_div = document.getElementById("radio_dis_onarm_div")
+	if (document.getElementById("esp32_mode").value > "2" || document.getElementById("telem_proto").value === "5") {
+		radio_dis_onarm_div.style.display = "none";
+	} else {
+		radio_dis_onarm_div.style.display = "block";
+	}
+}
 
 function change_ap_ip_visibility(){
 	let ap_ip_div = document.getElementById("ap_ip_div");
 	let ap_channel_div = document.getElementById("ap_channel_div");
 	let disclamer_div = document.getElementById("esp-lr-ap-disclaimer");
 	let wifi_ssid_div = document.getElementById("wifi_ssid_div");
+	let wifi_en_gn_div = document.getElementById("wifi_en_gn_div");
 	if (document.getElementById("esp32_mode").value === "2") {
 		ap_ip_div.style.display = "none";
 		ap_channel_div.style.display = "none";
+		wifi_en_gn_div.style.display = "block";
 	} else {
 		ap_ip_div.style.display = "block";
 		ap_channel_div.style.display = "block";
+		wifi_en_gn_div.style.display = "none";
 	}
 	if (document.getElementById("esp32_mode").value > "2") {
 		disclamer_div.style.display = "block";
@@ -29,18 +43,21 @@ function change_ap_ip_visibility(){
 	} else {
 		wifi_ssid_div.style.visibility = "visible";
 	}
+	change_radio_dis_arm_visibility();
 }
 
 function change_msp_ltm_visibility(){
 	let msp_ltm_div = document.getElementById("msp_ltm_div");
 	let trans_pack_size_div = document.getElementById("trans_pack_size_div");
-	if (document.getElementById("telem_proto").value === "1") {
+	let telem_proto = document.getElementById("telem_proto");
+	if (telem_proto.value === "1") {
 		msp_ltm_div.style.display = "block";
 		trans_pack_size_div.style.display = "none";
 	} else {
 		msp_ltm_div.style.display = "none";
 		trans_pack_size_div.style.display = "block";
 	}
+	change_radio_dis_arm_visibility();
 }
 
 function change_uart_visibility() {
@@ -61,6 +78,16 @@ function change_uart_visibility() {
 	}
 }
 
+function flow_control_check() {
+	let rts_pin = document.getElementById("rts_pin");
+	let cts_pin = document.getElementById("cts_pin");
+	if (isNaN(rts_pin.value) || isNaN(cts_pin.value) || cts_pin.value === '' || rts_pin.value === '' || rts_pin.value === cts_pin.value) {
+		show_toast("UART flow control disabled.")
+	} else {
+		show_toast("UART flow control enabled. Make sure RTS & CTS pins are connected!");
+	}
+}
+
 /**
  * Convert a form into a JSON string
  * @param form The HTML form to convert
@@ -71,7 +98,7 @@ function toJSONString(form) {
 	let elements = form.querySelectorAll("input, select")
 	for (let i = 0; i < elements.length; ++i) {
 		let element = elements[i]
-		let name = element.name
+		let name = element.name;
 		let value = element.value;
 		// parse numbers as numbers except for the SSID and the password fields
 		if (!isNaN(Number(value)) && (name.localeCompare("wifi_ssid") !== 0) && (name.localeCompare("wifi_pass") !== 0)) {
@@ -80,7 +107,13 @@ function toJSONString(form) {
 			}
 		} else {
 			if (name) {
-				obj[name] = value
+				if (element.type === "checkbox") {
+					// convert checked/not checked to 1 & 0 as value
+					obj[name] = element.checked ? 1 : 0;
+				} else {
+					// just get the value specified by the input/select
+					obj[name] = value
+				}
 			}
 		}
 	}
@@ -139,13 +172,40 @@ async function send_json(api_path, json_data = undefined) {
 	return await response.json();
 }
 
+function get_esp_chip_model_str(esp_model_index) {
+	switch (esp_model_index) {
+		default:
+		case 0:
+			return "unknown/unsupported ESP32 chip";
+		case 1:
+			return "ESP32";
+		case 2:
+			return "ESP32-S2";
+		case 9:
+			return "ESP32-S3";
+		case 5:
+			return "ESP32-C3";
+		case 13:
+			return "ESP32-C6";
+		case 12:
+			return "ESP32-C5";
+	}
+}
+
 function get_system_info() {
 	get_json("api/system/info").then(json_data => {
 		console.log("Received settings: " + json_data)
-		document.getElementById("about").innerHTML = "DroneBridge for ESP32 - v" + json_data["major_version"] +
-			"." + json_data["minor_version"] + " - esp-idf " + json_data["idf_version"]
+		document.getElementById("about").innerHTML = "DroneBridge for ESP32 v" + json_data["major_version"] +
+			"." + json_data["minor_version"] + "." + json_data["patch_version"] + " ("+json_data["maturity_version"]+")" +
+			" - esp-idf " + json_data["idf_version"] + " - " + get_esp_chip_model_str(json_data["esp_chip_model"])
 		document.getElementById("esp_mac").innerHTML = json_data["esp_mac"]
 		serial_via_JTAG = json_data["serial_via_JTAG"];
+		// set external antenna option visible based on info if RF switch is available on the board
+		if (parseInt(json_data["has_rf_switch"]) === 1) {
+			document.getElementById("ant_use_ext_div").style.display = "block";
+		} else {
+			document.getElementById("ant_use_ext_div").style.display = "none";
+		}
 	}).catch(error => {
 		conn_status = 0
 		error.message;
@@ -258,7 +318,12 @@ function get_settings() {
 			if (json_data.hasOwnProperty(key)) {
 				let elem = document.getElementById(key)
 				if (elem != null) {
-					elem.value = json_data[key] + ""
+					if (elem.type === "checkbox") {
+						// translate 1 & 0 to checked and not checked
+						elem.checked = json_data[key] === 1;
+					} else {
+						elem.value = json_data[key] + ""
+					}
 				}
 			}
 		}
@@ -320,7 +385,7 @@ async function clear_udp_clients() {
 	}
 }
 
-function show_toast(msg) {
+function show_toast(msg, background_color = "#0058a6") {
 	Toastify({
 		text: msg,
 		duration: 5000,
@@ -328,23 +393,41 @@ function show_toast(msg) {
 		close: true,
 		gravity: "top", // `top` or `bottom`
 		position: "center", // `left`, `center` or `right`
-		// style: {
-		//     background: "linear-gradient(to right, #00b09b, #96c93d)"
-		// },
-		backgroundColor: "linear-gradient(to right, #b6e026, #abdc28)",
+		style: {
+			background: background_color,
+			color: "#ff9734",
+			borderColor: "#ff9734",
+			borderStyle: "solid",
+			borderRadius: "2px",
+			borderWidth: "1px",
+		},
 		stopOnFocus: true, // Prevents dismissing of toast on hover
 	}).showToast();
 }
 
+function check_validity() {
+	let valid = true;
+	let wifi_pass = document.getElementById("wifi_pass")
+	if (!wifi_pass.checkValidity()) {
+		show_toast("Error: 8<(password length)<64");
+		valid = false;
+	}
+	return valid;
+}
+
 function save_settings() {
 	let form = document.getElementById("settings_form")
-	let json_data = toJSONString(form)
-	send_json("api/settings", json_data).then(send_response => {
-		console.log(send_response);
-		conn_status = 1
-		show_toast(send_response["msg"])
-		get_settings()  // update UI with new settings
-	}).catch(error => {
-		show_toast(error.message);
-	});
+	if (check_validity()) {
+		let json_data = toJSONString(form)
+		send_json("api/settings", json_data).then(send_response => {
+			console.log(send_response);
+			conn_status = 1
+			show_toast(send_response["msg"])
+			get_settings()  // update UI with new settings
+		}).catch(error => {
+			show_toast(error.message);
+		});
+	} else {
+		console.log("Form was not filled out correctly.")
+	}
 }

@@ -28,7 +28,7 @@
 
 #define TAG "DB_MAV_MSGS"
 
-uint16_t DB_MAV_PARAM_CNT = 12; // Number of MAVLink parameters returned by ESP32 in the PARAM message. Needed by GCS.
+uint16_t DB_MAV_PARAM_CNT = 15; // Number of MAVLink parameters returned by ESP32 in the PARAM message. Needed by GCS.
 
 /**
  * Based on the system architecture and configured wifi mode the ESP32 may have a different role and system id.
@@ -100,7 +100,7 @@ MAV_TYPE db_mav_get_parameter_value(float_int_union *float_int, char *param_id, 
         float_int->uint8 = DB_BUILD_VERSION;
         type = MAV_PARAM_TYPE_UINT8;
     } else if (strncmp(param_id, "SYS_ESP32_MODE", 16) == 0 || param_index == 1) {
-        float_int->uint8 = DB_WIFI_MODE;
+        float_int->uint8 = DB_RADIO_MODE;
         type = MAV_PARAM_TYPE_UINT8;
     } else if (strncmp(param_id, "SERIAL_PACK_SIZE", 16) == 0 || param_index == 2) {
         float_int->uint16 = DB_TRANS_BUF_SIZE;
@@ -132,6 +132,15 @@ MAV_TYPE db_mav_get_parameter_value(float_int_union *float_int, char *param_id, 
     } else if (strncmp(param_id, "SERIAL_T_OUT_MS", 16) == 0 || param_index == 11) {
         float_int->uint16 = DB_SERIAL_READ_TIMEOUT_MS;
         type = MAV_PARAM_TYPE_UINT16;
+    } else if (strncmp(param_id, "RADIO_DIS_ON_ARM", 16) == 0 || param_index == 12) {
+        float_int->uint8 = DB_DISABLE_RADIO_ARMED;
+        type = MAV_PARAM_TYPE_UINT8;
+    } else if (strncmp(param_id, "RADIO_EN_EXT_ANT", 16) == 0 || param_index == 13) {
+        float_int->uint8 = DB_EN_EXT_ANT;
+        type = MAV_PARAM_TYPE_UINT8;
+    } else if (strncmp(param_id, "WIFI_EN_GN", 16) == 0 || param_index == 14) {
+        float_int->uint8 = DB_WIFI_EN_GN;
+        type = MAV_PARAM_TYPE_UINT8;
     } else {
         type = 0;
     }
@@ -153,7 +162,7 @@ bool db_write_mavlink_parameter(fmav_param_set_t *param_set_payload) {
 
     if (strncmp(param_set_payload->param_id, "SYS_ESP32_MODE", 16) == 0) {
         if (float_int.uint8 < DB_WIFI_MODE_ESPNOW_END) {   // check E_DB_WIFI_MODE for allowed modes
-            DB_WIFI_MODE_DESIGNATED = float_int.uint8;  // do not directly change DB_WIFI_MODE since it is not safe and constantly processed by other tasks. Save settings and reboot will assign DB_WIFI_MODE_DESIGNATED to DB_WIFI_MODE
+            DB_RADIO_MODE_DESIGNATED = float_int.uint8;  // do not directly change DB_WIFI_MODE since it is not safe and constantly processed by other tasks. Save settings and reboot will assign DB_RADIO_MODE_DESIGNATED to DB_WIFI_MODE
             success = true;
         } else {
             ESP_LOGE(TAG, "Unknown mode %i, not saving as new setting", float_int.uint8);
@@ -176,32 +185,32 @@ bool db_write_mavlink_parameter(fmav_param_set_t *param_set_payload) {
         DB_UART_BAUD_RATE = float_int.int32;
         success = true;
     } else if (strncmp(param_set_payload->param_id, "SERIAL_TX_PIN", 16) == 0) {
-        if (float_int.uint8 < 64) {
+        if (float_int.uint8 <= SOC_GPIO_IN_RANGE_MAX) {
             DB_UART_PIN_TX = float_int.uint8;
             success = true;
         } else {
-            ESP_LOGW(TAG, "GPIO number must be <64");
+            ESP_LOGW(TAG, "GPIO number must be <=%i", SOC_GPIO_IN_RANGE_MAX);
         }
     } else if (strncmp(param_set_payload->param_id, "SERIAL_RX_PIN", 16) == 0) {
-        if (float_int.uint8 < 64) {
+        if (float_int.uint8 <= SOC_GPIO_IN_RANGE_MAX) {
             DB_UART_PIN_RX = float_int.uint8;
             success = true;
         } else {
-            ESP_LOGW(TAG, "GPIO number must be <64");
+            ESP_LOGW(TAG, "GPIO number must be <=%i", SOC_GPIO_IN_RANGE_MAX);
         }
     } else if (strncmp(param_set_payload->param_id, "SERIAL_RTS_PIN", 16) == 0) {
-        if (float_int.uint8 < 64) {
+        if (float_int.uint8 <= SOC_GPIO_IN_RANGE_MAX) {
             DB_UART_PIN_RTS = float_int.uint8;
             success = true;
         } else {
-            ESP_LOGW(TAG, "GPIO number must be <64");
+            ESP_LOGW(TAG, "GPIO number must be =<%i", SOC_GPIO_IN_RANGE_MAX);
         }
     } else if (strncmp(param_set_payload->param_id, "SERIAL_CTS_PIN", 16) == 0) {
-        if (float_int.uint8 < 64) {
+        if (float_int.uint8 <= SOC_GPIO_IN_RANGE_MAX) {
             DB_UART_PIN_CTS = float_int.uint8;
             success = true;
         } else {
-            ESP_LOGW(TAG, "GPIO number must be <64");
+            ESP_LOGW(TAG, "GPIO number must be <=%i", SOC_GPIO_IN_RANGE_MAX);
         }
     } else if (strncmp(param_set_payload->param_id, "SERIAL_TEL_PROTO", 16) == 0) {
         if (float_int.uint8 == DB_SERIAL_PROTOCOL_MAVLINK
@@ -222,6 +231,27 @@ bool db_write_mavlink_parameter(fmav_param_set_t *param_set_payload) {
     } else if (strncmp(param_set_payload->param_id, "SERIAL_RTS_THRES", 16) == 0) {
         DB_UART_RTS_THRESH = float_int.uint8;
         success = true;
+    } else if (strncmp(param_set_payload->param_id, "RADIO_DIS_ON_ARM", 16) == 0) {
+        if (float_int.uint8 == 1 || float_int.uint8 == 0) {
+            DB_DISABLE_RADIO_ARMED = float_int.uint8;
+            success = true;
+        } else {
+            ESP_LOGW(TAG, "RADIO_DIS_ON_ARM must be 1 or 0");
+        }
+    } else if (strncmp(param_set_payload->param_id, "RADIO_EN_EXT_ANT", 16) == 0) {
+        if (float_int.uint8 == 1 || float_int.uint8 == 0) {
+            DB_EN_EXT_ANT = float_int.uint8;
+            success = true;
+        } else {
+            ESP_LOGW(TAG, "RADIO_EN_EXT_ANT must be 1 or 0");
+        }
+    } else if (strncmp(param_set_payload->param_id, "WIFI_EN_GN", 16) == 0) {
+        if (float_int.uint8 == 1 || float_int.uint8 == 0) {
+            DB_WIFI_EN_GN = float_int.uint8;
+            success = true;
+        } else {
+            ESP_LOGW(TAG, "WIFI_EN_GN must be 1 or 0");
+        }
     } else {
         ESP_LOGE(TAG, "Unknown parameter value. Ignoring!");
     }
@@ -333,24 +363,34 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
                     ESP_LOGD(TAG, "Got heartbeat from GCS (sysID: %i)", new_msg->sysid);
                     DB_MAV_SYS_ID = new_msg->sysid;
                     // We must be in either one of these modes: AP LR or ESP-NOW GND
-                    if (DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_GND || DB_WIFI_MODE == DB_WIFI_MODE_AP_LR) {
+                    if (DB_RADIO_MODE == DB_WIFI_MODE_ESPNOW_GND || DB_RADIO_MODE == DB_WIFI_MODE_AP_LR) {
                         // Send heartbeat to GCS: Every ESP32 no matter its role or mode is emitting a heartbeat
                         uint16_t length = db_create_heartbeat(buff, fmav_status);
                         ESP_LOGD(TAG, "Sending back heartbeat via serial link to GCS");
+                        // In AP LR mode and in ESP-NOW GND mode the heartbeat has to be emitted via serial directly to the GCS
                         write_to_serial(buff, length);
                     } else {
                         ESP_LOGW(TAG, "We received a heartbeat from GCS while not being in DB_WIFI_MODE_ESPNOW_GND or "
                                       "DB_WIFI_MODE_AP_LR mode. Check your configuration! AIR-Side ESP32 seems to be "
                                       "connected to GCS via UART");
                     }
-                    // In AP LR mode and in ESP-NOW GND mode the heartbeat has to be emitted via UART directly to the GCS
                 } else if (payload.autopilot != MAV_AUTOPILOT_INVALID && new_msg->compid == MAV_COMP_ID_AUTOPILOT1) {
                     ESP_LOGD(TAG, "Got heartbeat from flight controller (sysID: %i)", new_msg->sysid);
                     // This means we are connected to the FC since we only parse mavlink on UART and thus only see the
                     // device we are connected to via UART
                     DB_MAV_SYS_ID = new_msg->sysid;
+                    // Check if FC is armed and the WiFi switch based on armed status is configured by the user
+                    if (DB_DISABLE_RADIO_ARMED &&
+                    (payload.base_mode & MAV_MODE_FLAG_SAFETY_ARMED ||
+                    (payload.system_status > MAV_STATE_STANDBY && payload.system_status != MAV_STATE_POWEROFF))) {
+                        // autopilot indicates it is armed
+                        db_set_wifi_status(false);
+                    } else {
+                        // autopilot indicates it is <<not>> armed
+                        db_set_wifi_status(true);
+                    }
                     // ESP32s that are connected to a flight controller via UART will send RADIO_STATUS messages to the GND
-                    if (DB_WIFI_MODE == DB_WIFI_MODE_STA || DB_WIFI_MODE == DB_WIFI_MODE_ESPNOW_AIR) {
+                    if (DB_RADIO_MODE == DB_WIFI_MODE_STA || (DB_RADIO_MODE == DB_WIFI_MODE_ESPNOW_AIR)) {
                         fmav_radio_status_t payload_r = {.fixed = 0, .txbuf=0,
                                 .noise = db_esp_signal_quality.gnd_noise_floor,
                                 .remnoise = db_esp_signal_quality.air_noise_floor,
@@ -361,10 +401,10 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
                                                                                  db_get_mav_comp_id(), &payload_r,
                                                                                  fmav_status);
                         db_send_to_all_clients(tcp_clients, udp_conns, buff, len);
-                    } else if (DB_WIFI_MODE == DB_WIFI_MODE_AP && wifi_sta_list.num > 0) {
-                        // we assume ESP32 is not used in DB_WIFI_MODE_AP on the ground but only on the drone side
-                        // ToDo: Only the RSSI of the first client is considered.
-                        //  Send each connected client its RSSI back. Easier for UDP since we have a nice list with mac addresses to use for mapping. Harder for TCP -> no macs
+                    } else if (DB_RADIO_MODE == DB_WIFI_MODE_AP && wifi_sta_list.num > 0) {
+                        // We assume ESP32 is not used in DB_WIFI_MODE_AP on the ground but only on the drone side -> We are in WiFi AP mode and connected to the drone
+                        // Send each connected client a radio status packet.
+                        // ToDo: Only the RSSI of the first client is considered. Easier for UDP since we have a nice list with mac addresses to use for mapping. Harder for TCP -> no MAC addresses available of connected clients
                         fmav_radio_status_t payload_r = {.fixed = 0, .noise = 0, .remnoise = 0, .remrssi=wifi_sta_list.sta[0].rssi, .rssi=-127, .rxerrors=0, .txbuf=0};
                         uint16_t len = fmav_msg_radio_status_encode_to_frame_buf(buff, db_get_mav_sys_id(),
                                                                                  db_get_mav_comp_id(), &payload_r,
@@ -390,7 +430,7 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
             uint16_t len = db_get_mavmsg_param(buff, fmav_status, 0, &float_int, MAV_PARAM_TYPE_UINT8, "SYS_SW_VERSION");
             db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
 
-            float_int.uint8 = DB_WIFI_MODE;
+            float_int.uint8 = DB_RADIO_MODE;
             len = db_get_mavmsg_param(buff, fmav_status, 1, &float_int, MAV_PARAM_TYPE_UINT8, "SYS_ESP32_MODE");
             db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
 
@@ -432,6 +472,18 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
 
             float_int.uint16 = DB_SERIAL_READ_TIMEOUT_MS;
             len = db_get_mavmsg_param(buff, fmav_status, 11, &float_int, MAV_PARAM_TYPE_UINT16, "SERIAL_T_OUT_MS");
+            db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
+
+            float_int.uint8 = DB_DISABLE_RADIO_ARMED;
+            len = db_get_mavmsg_param(buff, fmav_status, 12, &float_int, MAV_PARAM_TYPE_UINT8, "RADIO_DIS_ON_ARM");
+            db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
+
+            float_int.uint8 = DB_EN_EXT_ANT;
+            len = db_get_mavmsg_param(buff, fmav_status, 13, &float_int, MAV_PARAM_TYPE_UINT8, "RADIO_EN_EXT_ANT");
+            db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
+
+            float_int.uint8 = DB_WIFI_EN_GN;
+            len = db_get_mavmsg_param(buff, fmav_status, 14, &float_int, MAV_PARAM_TYPE_UINT8, "WIFI_EN_GN");
             db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
         }
             break;

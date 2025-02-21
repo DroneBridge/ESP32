@@ -49,6 +49,7 @@ build_and_copy sdkconfig_c3_noUARTConsole esp32c3_noUARTConsole
 
 # ESP32-C6
 build_and_copy sdkconfig_c6 esp32c6
+build_and_copy sdkconfig_c6_official esp32c6_official
 build_and_copy sdkconfig_c6_serial_via_JTAG esp32c6_USBSerial
 build_and_copy sdkconfig_c6_noUARTConsole esp32c6_noUARTConsole
 

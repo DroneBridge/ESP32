@@ -115,7 +115,7 @@ typedef struct {
     db_esp_now_packet_protected_data_t db_esp_now_packet_protected_data;    // shall be last in struct, so we can cut off when payload is smaller
 } __attribute__((__packed__)) db_esp_now_packet_t;  // total size must be <=250bytes (ESP-NOW requirement)
 
-void db_espnow_module();
+void db_start_espnow_module();
 
 _Noreturn void process_espnow_data();
 

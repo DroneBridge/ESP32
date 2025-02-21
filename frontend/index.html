@@ -58,17 +58,17 @@
             <h3>Wi-Fi</h3>
             <div class="row">
                 <div class="twelve columns">
-                    <label for="esp32_mode">ESP32 Mode (requires save & reboot)</label>
+                    <label for="esp32_mode">ESP32 Mode</label>
                     <select id="esp32_mode" name="esp32_mode" form="settings_form" onchange="change_ap_ip_visibility()">
-                        <option value="1">WiFi Access Point Mode</option>
-                        <option value="2">WiFi Client Mode</option>
-                        <option value="3">Wifi Access Point LR Mode</option>
+                        <option value="1">Wi-Fi Access Point Mode</option>
+                        <option value="2">Wi-Fi Client Mode</option>
+                        <option value="3">Wi-Fi Access Point LR Mode</option>
                         <option value="4">ESP-NOW LR Mode AIR</option>
                         <option value="5">ESP-NOW LR Mode GND</option>
                     </select>
-                    <div id="esp-lr-ap-disclaimer" style="color: #ff881a; margin-bottom: 0.8rem">LR Mode makes the
-                        device invisible for non-LR enabled devices!</br>You will not be able to change the config!</br>
-                        Data rate is reduced to ~0.25Mbps. Range may be increase by a factor of ~2.</br>Press boot
+                    <div class="note" id="esp-lr-ap-disclaimer"><h4>Attention:</h4>
+                        LR Mode makes the device invisible for non-LR enabled devices!</br>You will not be able to change the config!</br></br>
+                        The data rate is reduced to ~0.25Mbps. The range may be increase by a factor of ~2.</br>Press the boot
                         button (short press for AP-Mode with password "dronebridge" or long press for reset to defaults)
                         or erase the flash memory of the ESP32 and re-flash DroneBridge for ESP32 to get back into
                         normal Wi-Fi Mode!
@@ -78,38 +78,80 @@
             <div class="row">
                 <div class="six columns" id="wifi_ssid_div">
                     <label for="wifi_ssid">SSID</label>
-                    <input type="text" name="wifi_ssid" value="" id="wifi_ssid">
+                    <input type="text" name="wifi_ssid" value="" id="wifi_ssid" maxlength="31">
                 </div>
                 <div class="six columns">
                     <label for="wifi_pass">Password</label>
-                    <input type="text" name="wifi_pass" value="" id="wifi_pass">
+                    <input type="text" name="wifi_pass" value="" id="wifi_pass" minlength="8" maxlength="63" required>
                 </div>
             </div>
             <div class="row">
-                <div id="ap_channel_div" class="twelve columns">
+                <div id="ap_channel_div" class="six columns">
                     <label for="ap_channel">Channel</label>
-                    <input type="text" name="ap_channel" value="" id="ap_channel">
+                    <select id="ap_channel" name="ap_channel" form="settings_form">
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="7">7</option>
+                        <option value="8">8</option>
+                        <option value="9">9</option>
+                        <option value="10">10</option>
+                        <option value="11">11</option>
+                        <option value="12">12</option>
+                        <option value="13">13</option>
+                    </select>
+                </div>
+                <div class="six columns" id="ap_ip_div">
+                    <label for="ap_ip">Gateway IP address</label>
+                    <input type="text" name="ap_ip" value="" id="ap_ip">
                 </div>
             </div>
-            <h3>Serial</h3>
+            <div id="wifi_en_gn_div" class="row">
+                <div class="twelve columns">
+                    <div class="checkbox-wrapper-14">
+                        <input id="wifi_en_gn" name="wifi_en_gn" type="checkbox" class="switch">
+                        <label class="tooltip" for="wifi_en_gn"><span class="tooltiptext">Only enable this when you need b/g/n support. When off there is only 802.11 b support in WiFi client mode which provides sufficient bandwidth and is ideal for range.</span>802.11 b/g/n support</label>
+                    </div>
+                </div>
+            </div>
+            <div id="radio_dis_onarm_div" class="row">
+                <div class="twelve columns">
+                    <div class="checkbox-wrapper-14">
+                        <input id="radio_dis_onarm" name="radio_dis_onarm" type="checkbox" class="switch">
+                        <label for="radio_dis_onarm">Disable radio when autopilot is armed</label>
+                    </div>
+                </div>
+            </div>
+            <div id="ant_use_ext_div" class="row">
+                <div class="twelve columns">
+                    <div class="checkbox-wrapper-14">
+                        <input id="ant_use_ext" name="ant_use_ext" type="checkbox" class="switch">
+                        <label for="ant_use_ext">Use external antenna</label>
+                    </div>
+                </div>
+            </div>
+            <h3 style="margin-top: 2rem">Serial</h3>
             <div class="row" id="tx_rx_div">
                 <div class="six columns">
-                    <label for="tx_pin">UART TX Pin</label>
-                    <input type="text" name="tx_pin" value="" id="tx_pin">
+                    <label for="tx_pin">UART TX GPIO</label>
+                    <input type="number" name="tx_pin" value="" id="tx_pin">
                 </div>
                 <div class="six columns">
-                    <label for="rx_pin">UART RX Pin</label>
-                    <input type="text" name="rx_pin" value="" id="rx_pin">
+                    <label for="rx_pin">UART RX GPIO</label>
+                    <input type="number" name="rx_pin" value="" id="rx_pin">
                 </div>
             </div>
             <div class="row" id="rts_cts_div">
                 <div class="six columns">
-                    <label for="rts_pin">UART RTS Pin</label>
-                    <input type="text" name="rts_pin" value="" id="rts_pin">
+                    <label for="rts_pin">UART RTS GPIO</label>
+                    <input type="number" name="rts_pin" value="" id="rts_pin" onchange="flow_control_check()">
                 </div>
                 <div class="six columns">
-                    <label for="cts_pin">UART CTS Pin</label>
-                    <input type="text" name="cts_pin" value="" id="cts_pin">
+                    <label for="cts_pin">UART CTS GPIO</label>
+                    <input type="number" name="cts_pin" value="" id="cts_pin" onchange="flow_control_check()">
                 </div>
             </div>
             <div class="row" id="rts_thresh_div">
@@ -186,10 +228,7 @@
                 </div>
             </div>
             <div class="row">
-                <div class="six columns" id="ap_ip_div">
-                    <label for="ap_ip">Gateway IP address</label>
-                    <input type="text" name="ap_ip" value="" id="ap_ip">
-                </div>
+
             </div>
         </div>
     </form>
