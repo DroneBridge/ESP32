@@ -9,11 +9,11 @@ let esp_chip_model = 0;		// according to get_esp_chip_model_str()
 
 function change_radio_dis_arm_visibility() {
 	// we only support this feature when MAVLink or LTM are set AND when a standard Wi-Fi mode is enabled
-	let dis_radio_arm_div = document.getElementById("dis_radio_arm_div")
+	let radio_dis_onarm_div = document.getElementById("radio_dis_onarm_div")
 	if (document.getElementById("esp32_mode").value > "2" || document.getElementById("telem_proto").value === "5") {
-		dis_radio_arm_div.style.display = "none";
+		radio_dis_onarm_div.style.display = "none";
 	} else {
-		dis_radio_arm_div.style.display = "block";
+		radio_dis_onarm_div.style.display = "block";
 	}
 }
 
@@ -50,7 +50,6 @@ function change_msp_ltm_visibility(){
 	let msp_ltm_div = document.getElementById("msp_ltm_div");
 	let trans_pack_size_div = document.getElementById("trans_pack_size_div");
 	let telem_proto = document.getElementById("telem_proto");
-	let dis_radio_arm_div = document.getElementById("dis_radio_arm_div");
 	if (telem_proto.value === "1") {
 		msp_ltm_div.style.display = "block";
 		trans_pack_size_div.style.display = "none";
@@ -197,7 +196,8 @@ function get_system_info() {
 	get_json("api/system/info").then(json_data => {
 		console.log("Received settings: " + json_data)
 		document.getElementById("about").innerHTML = "DroneBridge for ESP32 v" + json_data["major_version"] +
-			"." + json_data["minor_version"] + " - esp-idf " + json_data["idf_version"] + " - " + get_esp_chip_model_str(json_data["esp_chip_model"])
+			"." + json_data["minor_version"] + "." + json_data["patch_version"] + " ("+json_data["maturity_version"]+")" +
+			" - esp-idf " + json_data["idf_version"] + " - " + get_esp_chip_model_str(json_data["esp_chip_model"])
 		document.getElementById("esp_mac").innerHTML = json_data["esp_mac"]
 		serial_via_JTAG = json_data["serial_via_JTAG"];
 		// set external antenna option visible based on info if RF switch is available on the board

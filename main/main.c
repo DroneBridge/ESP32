@@ -502,7 +502,7 @@ void db_set_wifi_status(uint8_t enable_wifi) {
 void db_write_settings_to_nvs() {
     ESP_LOGI(TAG,
              "Trying to save:\nWifi Mode: %i\nssid %s\nwifi_pass %s\nwifi_chan %i\nwifi_en_gn %i\nbaud %liu\ngpio_tx %i\ngpio_rx %i\ngpio_cts %i\ngpio_rts %i\nrts_thresh %i\nproto %i\n"
-             "trans_pack_size %i\nltm_per_packet %i\nap_ip %s\nip_sta %s\nip_sta_gw %s\nip_sta_netmsk %s\ndis_radio_arm %i",
+             "trans_pack_size %i\nltm_per_packet %i\nap_ip %s\nip_sta %s\nip_sta_gw %s\nip_sta_netmsk %s\nradio_dis_onarm %i",
              DB_RADIO_MODE_DESIGNATED, DB_WIFI_SSID, DB_WIFI_PWD, DB_WIFI_CHANNEL, DB_WIFI_EN_GN, DB_UART_BAUD_RATE,
              DB_UART_PIN_TX, DB_UART_PIN_RX, DB_UART_PIN_CTS, DB_UART_PIN_RTS, DB_UART_RTS_THRESH,
              DB_SERIAL_PROTOCOL, DB_TRANS_BUF_SIZE, DB_LTM_FRAME_NUM_BUFFER,
@@ -527,7 +527,7 @@ void db_write_settings_to_nvs() {
     ESP_ERROR_CHECK(nvs_set_u16(my_handle, "trans_pack_size", DB_TRANS_BUF_SIZE));
     ESP_ERROR_CHECK(nvs_set_u16(my_handle, "serial_timeout", DB_SERIAL_READ_TIMEOUT_MS));
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "ltm_per_packet", DB_LTM_FRAME_NUM_BUFFER));
-    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "dis_radio_arm", DB_DISABLE_RADIO_ARMED));
+    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "radio_dis_onarm", DB_DISABLE_RADIO_ARMED));
     ESP_ERROR_CHECK(nvs_set_str(my_handle, "ap_ip", DEFAULT_AP_IP));
     ESP_ERROR_CHECK(nvs_set_str(my_handle, "ip_sta", DB_STATIC_STA_IP));
     ESP_ERROR_CHECK(nvs_set_str(my_handle, "ip_sta_gw", DB_STATIC_STA_IP_GW));
@@ -625,7 +625,7 @@ void db_read_settings_nvs() {
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u16(my_handle, "trans_pack_size", &DB_TRANS_BUF_SIZE));
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u16(my_handle, "serial_timeout", &DB_SERIAL_READ_TIMEOUT_MS));
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "ltm_per_packet", &DB_LTM_FRAME_NUM_BUFFER));
-        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "dis_radio_arm", &DB_DISABLE_RADIO_ARMED));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "radio_dis_onarm", &DB_DISABLE_RADIO_ARMED));
         // get saved UDP client - this read might result in an error if no client was saved prev. by the user
         char udp_client_ip_str[INET_ADDRSTRLEN + 6];
         udp_client_ip_str[0] = '\0';
@@ -636,7 +636,7 @@ void db_read_settings_nvs() {
         // close NVM
         nvs_close(my_handle);
         ESP_LOGI(TAG,
-                 "\tWifi Mode: %i\n\twifi_chan %i\n\twifi_en_gn %i\n\tant_use_ext %i\n\tdis_radio_arm %i\n\tbaud %liu\n\tgpio_tx %i\n\tgpio_rx %i\n\tgpio_cts %i\n\t"
+                 "\tWifi Mode: %i\n\twifi_chan %i\n\twifi_en_gn %i\n\tant_use_ext %i\n\tradio_dis_onarm %i\n\tbaud %liu\n\tgpio_tx %i\n\tgpio_rx %i\n\tgpio_cts %i\n\t"
                  "gpio_rts %i\n\trts_thresh %i\n\tproto %i\n\ttrans_pack_size %i\n\tltm_per_packet %i\n\tserial_timeout %i",
                  DB_RADIO_MODE, DB_WIFI_CHANNEL, DB_WIFI_EN_GN, DB_EN_EXT_ANT, DB_DISABLE_RADIO_ARMED, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
                  DB_UART_PIN_CTS, DB_UART_PIN_RTS, DB_UART_RTS_THRESH, DB_SERIAL_PROTOCOL, DB_TRANS_BUF_SIZE,
@@ -736,7 +736,7 @@ void db_jtag_serial_info_print() {
     uint8_t buffer[512];
     int len = sprintf((char *) buffer,
                       "\tWifi Mode: %i\n\twifi_chan %i\n\twifi_en_gn %i\n\tant_use_ext %i\n\tbaud %liu\n\tgpio_tx %i\n\tgpio_rx %i\n\tgpio_cts %i\n\t"
-                      "gpio_rts %i\n\trts_thresh %i\n\tproto %i\n\ttrans_pack_size %i\n\tltm_per_packet %i\n\tserial_timeout %i\n\tdis_radio_arm %i\n",
+                      "gpio_rts %i\n\trts_thresh %i\n\tproto %i\n\ttrans_pack_size %i\n\tltm_per_packet %i\n\tserial_timeout %i\n\tradio_dis_onarm %i\n",
                       DB_RADIO_MODE, DB_WIFI_CHANNEL, DB_WIFI_EN_GN, DB_EN_EXT_ANT, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
                       DB_UART_PIN_CTS, DB_UART_PIN_RTS, DB_UART_RTS_THRESH, DB_SERIAL_PROTOCOL, DB_TRANS_BUF_SIZE,
                       DB_LTM_FRAME_NUM_BUFFER, DB_SERIAL_READ_TIMEOUT_MS, DB_DISABLE_RADIO_ARMED);

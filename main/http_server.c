@@ -250,11 +250,11 @@ static esp_err_t settings_post_handler(httpd_req_t *req) {
         DB_SERIAL_PROTOCOL = DB_SERIAL_PROTOCOL_TRANSPARENT;
     }
 
-    json = cJSON_GetObjectItem(root, "dis_wifi_arm");
+    json = cJSON_GetObjectItem(root, "radio_dis_onarm");
     if (json && (json->valueint == 1 || json->valueint == 0)) {
         DB_DISABLE_RADIO_ARMED = json->valueint;
     } else if (json) {
-        ESP_LOGW(REST_TAG, "dis_wifi_arm is not 1 (turn WiFi off on arm) or 0 (keep WiFi on)");
+        ESP_LOGW(REST_TAG, "radio_dis_onarm is not 1 (turn WiFi off on arm) or 0 (keep WiFi on)");
         DB_DISABLE_RADIO_ARMED = false;
     }
 
@@ -484,6 +484,8 @@ static esp_err_t system_info_get_handler(httpd_req_t *req) {
     cJSON_AddNumberToObject(root, "db_build_version", DB_BUILD_VERSION);
     cJSON_AddNumberToObject(root, "major_version", DB_MAJOR_VERSION);
     cJSON_AddNumberToObject(root, "minor_version", DB_MINOR_VERSION);
+    cJSON_AddNumberToObject(root, "patch_version", DB_PATCH_VERSION);
+    cJSON_AddStringToObject(root, "maturity_version", DB_MATURITY_VERSION);
     cJSON_AddNumberToObject(root, "esp_chip_model", chip_info.model);
     cJSON_AddNumberToObject(root, "has_rf_switch", DB_HAS_RF_SWITCH);
     char mac_str[18];
@@ -604,7 +606,7 @@ static esp_err_t settings_get_handler(httpd_req_t *req) {
     cJSON_AddNumberToObject(root, "rts_thresh", DB_UART_RTS_THRESH);
     cJSON_AddNumberToObject(root, "baud", DB_UART_BAUD_RATE);
     cJSON_AddNumberToObject(root, "telem_proto", DB_SERIAL_PROTOCOL);
-    cJSON_AddNumberToObject(root, "dis_wifi_arm", DB_DISABLE_RADIO_ARMED);
+    cJSON_AddNumberToObject(root, "radio_dis_onarm", DB_DISABLE_RADIO_ARMED);
     cJSON_AddNumberToObject(root, "ltm_pp", DB_LTM_FRAME_NUM_BUFFER);
     cJSON_AddStringToObject(root, "ap_ip", DEFAULT_AP_IP);
     cJSON_AddStringToObject(root, "static_client_ip", DB_STATIC_STA_IP);

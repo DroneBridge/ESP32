@@ -31,10 +31,12 @@
     "serial_timeout": 50
   },
   "info": {
-    "idf_version": "v5.1.2",
-    "db_build_version": 14,
+    "idf_version": "v5.10.5",
+    "db_build_version": 18,
     "major_version": 2,
     "minor_version": 1,
+    "patch_version": 0,
+    "maturity_version": "stable",
     "esp_chip_model": 5,
     "esp_mac": "EC:DA:3B:BC:XX:XX",
     "serial_via_JTAG": 0,
