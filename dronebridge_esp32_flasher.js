@@ -92,15 +92,37 @@ let t2stable_esps2_noUARTConsole = new DBTarget("ESP32-S2", "ESP32-S2 (noUARTCon
 let t2stable_esps3 = new DBTarget("ESP32-S3", "ESP32-S3", "esp32s3/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
 let t2stable_esps3_usbserial = new DBTarget("ESP32-S3", "ESP32-S3 (USBSerial)", "esp32s3_USBSerial/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
 let t2stable_esps3_noUARTConsole = new DBTarget("ESP32-S3", "ESP32-S3 (noUARTConsole)", "esp32s3_noUARTConsole/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
-let release_20_stable = new DBRelease("v2.0 (stable)", "./db_releases/2_0/",
+let release_20_stable = new DBRelease("v2.0.0 (stable)", "./db_releases/2_0/",
     [t2stable_esp32,
         t2stable_espc3, t2stable_espc3_official, t2stable_espc3_noUARTConsole, t2stable_espc3_usbserial,
         t2stable_espc6, t2stable_espc6_usbserial, t2stable_espc6_noUARTConsole,
         t2stable_esps2, t2stable_esps2_noUARTConsole,
         t2stable_esps3, t2stable_esps3_usbserial, t2stable_esps3_noUARTConsole]);
 
+// v2.1 RC1 release
+let t2_1RC1_esp32 = new DBTarget("ESP32", "ESP32", "esp32/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x1000, 0x8000, 0x10000, 0x190000], "DIO", "40MHz");
+let t2_1RC1_espc3 = new DBTarget("ESP32-C3", "ESP32-C3", "esp32c3/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let t2_1RC1_espc3_official = new DBTarget("ESP32-C3", "ESP32-C3 Official HW", "esp32c3_official/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz", "4MB");
+let t2_1RC1_espc3_usbserial = new DBTarget("ESP32-C3", "ESP32-C3 (USBSerial)", "esp32c3_USBSerial/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let t2_1RC1_espc3_noUARTConsole = new DBTarget("ESP32-C3", "ESP32-C3 (noUARTConsole)", "esp32c3_noUARTConsole/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let t2_1RC1_espc6 = new DBTarget("ESP32-C6", "ESP32-C6", "esp32c6/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let t2_1RC1_espc6_official = new DBTarget("ESP32-C6", "ESP32-C6 Official HW", "esp32c6_official/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz", "4MB");
+let t2_1RC1_espc6_usbserial = new DBTarget("ESP32-C6", "ESP32-C6 (USBSerial)", "esp32c6_USBSerial/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let t2_1RC1_espc6_noUARTConsole = new DBTarget("ESP32-C6", "ESP32-C6 (noUARTConsole)", "esp32c6_noUARTConsole/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let t2_1RC1_esps2 = new DBTarget("ESP32-S2", "ESP32-S2", "esp32s2/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x1000, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let t2_1RC1_esps2_noUARTConsole = new DBTarget("ESP32-S2", "ESP32-S2 (noUARTConsole)", "esp32s2_noUARTConsole/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x1000, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let t2_1RC1_esps3 = new DBTarget("ESP32-S3", "ESP32-S3", "esp32s3/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let t2_1RC1_esps3_usbserial = new DBTarget("ESP32-S3", "ESP32-S3 (USBSerial)", "esp32s3_USBSerial/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let t2_1RC1_esps3_noUARTConsole = new DBTarget("ESP32-S3", "ESP32-S3 (noUARTConsole)", "esp32s3_noUARTConsole/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
+let release_210_RC1 = new DBRelease("v2.1.0 RC1 (pre-release)", "./db_releases/2_1_0RC1/",
+    [t2_1RC1_esp32,
+        t2_1RC1_espc3, t2_1RC1_espc3_official, t2_1RC1_espc3_usbserial, t2_1RC1_espc3_noUARTConsole,
+        t2_1RC1_espc6, t2_1RC1_espc6_official, t2_1RC1_espc6_usbserial, t2_1RC1_espc6_noUARTConsole,
+        t2_1RC1_esps2, t2_1RC1_esps2_noUARTConsole,
+        t2_1RC1_esps3, t2_1RC1_esps3_usbserial, t2_1RC1_esps3_noUARTConsole]);
+
 // overall array containing all releases with flashing instructions
-let db_releases = [release_20_stable, release_20RC4, release_20RC3, release_20RC2, release_15];
+let db_releases = [release_210_RC1, release_20_stable, release_15];
 
 
 let device = null;
