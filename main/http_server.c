@@ -182,6 +182,13 @@ static esp_err_t settings_post_handler(httpd_req_t *req) {
         ESP_LOGE(REST_TAG, "No a valid wifi channel (1-13). Not changing!");
     }
 
+    json = cJSON_GetObjectItem(root, "wifi_en_gn");
+    if (json && (json->valueint == 1 || json->valueint == 0)) {
+        DB_WIFI_EN_GN = json->valueint;
+    } else if (json) {
+        ESP_LOGE(REST_TAG, "wifi_en_gn is not 1 (802.11bgn) nor 0 (802.11b) for WiFi client mode");
+    }
+
     json = cJSON_GetObjectItem(root, "ant_use_ext");
     if (json && (json->valueint == 1 || json->valueint == 0)) {
         DB_EN_EXT_ANT = json->valueint;
@@ -243,11 +250,11 @@ static esp_err_t settings_post_handler(httpd_req_t *req) {
         DB_SERIAL_PROTOCOL = DB_SERIAL_PROTOCOL_TRANSPARENT;
     }
 
-    json = cJSON_GetObjectItem(root, "dis_wifi_arm");
+    json = cJSON_GetObjectItem(root, "radio_dis_onarm");
     if (json && (json->valueint == 1 || json->valueint == 0)) {
         DB_DISABLE_RADIO_ARMED = json->valueint;
     } else if (json) {
-        ESP_LOGW(REST_TAG, "dis_wifi_arm is not 1 (turn WiFi off on arm) or 0 (keep WiFi on)");
+        ESP_LOGW(REST_TAG, "radio_dis_onarm is not 1 (turn WiFi off on arm) or 0 (keep WiFi on)");
         DB_DISABLE_RADIO_ARMED = false;
     }
 
@@ -477,6 +484,8 @@ static esp_err_t system_info_get_handler(httpd_req_t *req) {
     cJSON_AddNumberToObject(root, "db_build_version", DB_BUILD_VERSION);
     cJSON_AddNumberToObject(root, "major_version", DB_MAJOR_VERSION);
     cJSON_AddNumberToObject(root, "minor_version", DB_MINOR_VERSION);
+    cJSON_AddNumberToObject(root, "patch_version", DB_PATCH_VERSION);
+    cJSON_AddStringToObject(root, "maturity_version", DB_MATURITY_VERSION);
     cJSON_AddNumberToObject(root, "esp_chip_model", chip_info.model);
     cJSON_AddNumberToObject(root, "has_rf_switch", DB_HAS_RF_SWITCH);
     char mac_str[18];
@@ -586,6 +595,7 @@ static esp_err_t settings_get_handler(httpd_req_t *req) {
     cJSON_AddStringToObject(root, "wifi_ssid", (char *) DB_WIFI_SSID);
     cJSON_AddStringToObject(root, "wifi_pass", (char *) DB_WIFI_PWD);
     cJSON_AddNumberToObject(root, "ap_channel", DB_WIFI_CHANNEL);
+    cJSON_AddNumberToObject(root, "wifi_en_gn", DB_WIFI_EN_GN);
     cJSON_AddNumberToObject(root, "ant_use_ext", DB_EN_EXT_ANT);
     cJSON_AddNumberToObject(root, "trans_pack_size", DB_TRANS_BUF_SIZE);
     cJSON_AddNumberToObject(root, "serial_timeout", DB_SERIAL_READ_TIMEOUT_MS);
@@ -596,7 +606,7 @@ static esp_err_t settings_get_handler(httpd_req_t *req) {
     cJSON_AddNumberToObject(root, "rts_thresh", DB_UART_RTS_THRESH);
     cJSON_AddNumberToObject(root, "baud", DB_UART_BAUD_RATE);
     cJSON_AddNumberToObject(root, "telem_proto", DB_SERIAL_PROTOCOL);
-    cJSON_AddNumberToObject(root, "dis_wifi_arm", DB_DISABLE_RADIO_ARMED);
+    cJSON_AddNumberToObject(root, "radio_dis_onarm", DB_DISABLE_RADIO_ARMED);
     cJSON_AddNumberToObject(root, "ltm_pp", DB_LTM_FRAME_NUM_BUFFER);
     cJSON_AddStringToObject(root, "ap_ip", DEFAULT_AP_IP);
     cJSON_AddStringToObject(root, "static_client_ip", DB_STATIC_STA_IP);
