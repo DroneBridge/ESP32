@@ -48,6 +48,20 @@ uint8_t db_get_mav_sys_id() {
 }
 
 /**
+ * Converts the measured (negative dBm) signal strength to a format the MAVLink RADIO STATUS packet accepts and the GCS likes.
+ * If QGroundControl is desired output format it will not convert but send the value as int8. For Mission Planner it converts int8 to uint8. The value represents the absolute(dBm): -54 dBm -> 54
+ * @param signal_strength Signal strength in dBm as reported by the ESP32
+ * @return Signal strength formatted for QGroundControl (0 to -127) or Mission Planner (0 to 100)
+ */
+int8_t db_format_rssi(int8_t signal_strength, int8_t noise_floor) {
+    if (DB_RSSI_HECTO) {
+        return 100-(abs(signal_strength)/abs(noise_floor)*100);
+    } else {
+        return signal_strength;
+    }
+}
+
+/**
  * Creates and writes Mavlink heartbeat message to supplied buffer
  * @param buff Buffer to write heartbeat to (>280 bytes)
  * @return Length of the message in the buffer
@@ -380,7 +394,7 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
                         db_set_wifi_status(true);
                     }
                     // ESP32s that are connected to a flight controller via UART will send RADIO_STATUS messages to the GND
-                    if (DB_RADIO_MODE == DB_WIFI_MODE_STA || (DB_RADIO_MODE == DB_WIFI_MODE_ESPNOW_AIR)) {
+                    if (DB_RADIO_MODE == DB_WIFI_MODE_STA || DB_RADIO_MODE == DB_WIFI_MODE_ESPNOW_AIR) {
                         fmav_radio_status_t payload_r = {.fixed = 0, .txbuf=0,
                                 .noise = db_esp_signal_quality.gnd_noise_floor,
                                 .remnoise = db_esp_signal_quality.air_noise_floor,
@@ -395,7 +409,7 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
                         // We assume ESP32 is not used in DB_WIFI_MODE_AP on the ground but only on the drone side -> We are in WiFi AP mode and connected to the drone
                         // Send each connected client a radio status packet.
                         // ToDo: Only the RSSI of the first client is considered. Easier for UDP since we have a nice list with mac addresses to use for mapping. Harder for TCP -> no MAC addresses available of connected clients
-                        fmav_radio_status_t payload_r = {.fixed = 0, .noise = 0, .remnoise = 0, .remrssi=wifi_sta_list.sta[0].rssi, .rssi=-127, .rxerrors=0, .txbuf=0};
+                        fmav_radio_status_t payload_r = {.fixed = UINT8_MAX, .noise = UINT8_MAX, .remnoise = UINT8_MAX, .remrssi=wifi_sta_list.sta[0].rssi, .rssi=UINT8_MAX, .rxerrors=0, .txbuf=0};
                         uint16_t len = fmav_msg_radio_status_encode_to_frame_buf(buff, db_get_mav_sys_id(),
                                                                                  db_get_mav_comp_id(), &payload_r,
                                                                                  fmav_status);

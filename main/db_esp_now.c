@@ -421,7 +421,7 @@ static void db_espnow_receive_callback(const esp_now_recv_info_t *recv_info, con
         return;
     } else {
         // we are GND and packet is for us from AIR
-#if defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C2) || defined(CONFIG_IDF_TARGET_ESP32S2)
+#if defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C2) || defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32C6)
         db_esp_now_clients_list->gnd_noise_floor = (int8_t ) recv_info->rx_ctrl->noise_floor;
         // rest RSSI will be processed in process_espnow_data()
 #endif
@@ -433,7 +433,7 @@ static void db_espnow_receive_callback(const esp_now_recv_info_t *recv_info, con
     } else {
         // we are AIR a packet is for us from GND - we only expect one GND station to be talking to us
         db_esp_signal_quality.air_rssi = recv_info->rx_ctrl->rssi;
-#if defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C2) || defined(CONFIG_IDF_TARGET_ESP32S2)
+#if defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C2) || defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32C6)
         db_esp_signal_quality.air_noise_floor = recv_info->rx_ctrl->noise_floor;
 #endif
     }

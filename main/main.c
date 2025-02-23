@@ -114,7 +114,7 @@ uint8_t DB_LTM_FRAME_NUM_BUFFER = 2;
 uint8_t DB_EN_EXT_ANT = false;
 
 uint8_t DB_WIFI_IS_OFF = false;  // keep track if we switched Wi-Fi off already
-db_esp_signal_quality_t db_esp_signal_quality = {.air_rssi = -127, .air_noise_floor = -1, .gnd_rssi= -127, .gnd_noise_floor = -1};
+db_esp_signal_quality_t db_esp_signal_quality = {.air_rssi = UINT8_MAX, .air_noise_floor = UINT8_MAX, .gnd_rssi= UINT8_MAX, .gnd_noise_floor = UINT8_MAX};
 wifi_sta_list_t wifi_sta_list = {.num = 0};
 uint8_t LOCAL_MAC_ADDRESS[6];
 
