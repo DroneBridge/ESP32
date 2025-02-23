@@ -288,7 +288,7 @@ function get_stats() {
 		if ('esp_rssi' in json_data) {
 			let rssi = parseInt(json_data["esp_rssi"])
 			if (!isNaN(rssi) && rssi < 0) {
-				document.getElementById("current_client_ip").innerHTML = "IP Address: " + json_data["current_client_ip"] + "<br />RSSI: " + rssi + "dBm"
+				document.getElementById("current_client_ip").innerHTML = "IP Address: " + json_data["current_client_ip"] + "<br />Signal Strength: " + rssi + "dBm"
 			} else if (!isNaN(rssi)) {
 				document.getElementById("current_client_ip").innerHTML = "IP Address: " + json_data["current_client_ip"]
 			}

@@ -18,10 +18,14 @@
  */
 
 #include "http_server.h"
+
+#include <db_parameters.h>
 #include <string.h>
 #include <fcntl.h>
 #include <lwip/sockets.h>
 #include <esp_chip_info.h>
+#include <utils/wpa_debug.h>
+
 #include "esp_http_server.h"
 #include "esp_system.h"
 #include "esp_log.h"
@@ -160,7 +164,7 @@ static esp_err_t settings_post_handler(httpd_req_t *req) {
     cJSON *root = cJSON_Parse(buf);
 
     cJSON *json = cJSON_GetObjectItem(root, "esp32_mode");
-    if (json) DB_RADIO_MODE_DESIGNATED = json->valueint;    // do not directly change DB_WIFI_MODE since it is not safe and constantly processed by other tasks. Save settings and reboot will assign DB_RADIO_MODE_DESIGNATED to DB_WIFI_MODE
+    if (json) DB_RADIO_MODE_DESIGNATED = json->valueint;    // do not directly change DB_WIFI_MODE since it is not safe and constantly processed by other tasks. Save settings and reboot will assign DB_PARAM_RADIO_MODE_DESIGNATED to DB_WIFI_MODE
 
     json = cJSON_GetObjectItem(root, "wifi_ssid");
     if (json && strlen(json->valuestring) < 32 && strlen(json->valuestring) > 0)
@@ -430,24 +434,24 @@ static esp_err_t settings_static_ip_post_handler(httpd_req_t *req) {
     esp_err_t err = ESP_OK;
     cJSON *json = cJSON_GetObjectItem(root, "client_ip");
     if (json) {
-        strncpy(DB_STATIC_STA_IP, json->valuestring, sizeof(DB_STATIC_STA_IP));
-        DB_STATIC_STA_IP[IP4ADDR_STRLEN_MAX-1] = '\0';    // to remove warning and to be sure
+        strncpy(DB_PARAM_STA_IP, json->valuestring, sizeof(DB_PARAM_STA_IP));
+        DB_PARAM_STA_IP[IP4ADDR_STRLEN_MAX-1] = '\0';    // to remove warning and to be sure
     } else {
         err = ESP_FAIL;
     }
 
     json = cJSON_GetObjectItem(root, "netmask");
     if (json) {
-        strncpy(DB_STATIC_STA_IP_NETMASK, json->valuestring, sizeof(DB_STATIC_STA_IP_NETMASK));
-        DB_STATIC_STA_IP_NETMASK[IP4ADDR_STRLEN_MAX-1] = '\0';    // to remove warning and to be sure
+        strncpy(DB_PARAM_STA_IP_NETMASK, json->valuestring, sizeof(DB_PARAM_STA_IP_NETMASK));
+        DB_PARAM_STA_IP_NETMASK[IP4ADDR_STRLEN_MAX-1] = '\0';    // to remove warning and to be sure
     } else {
         err = ESP_FAIL;
     }
 
     json = cJSON_GetObjectItem(root, "gw_ip");
     if (json) {
-        strncpy(DB_STATIC_STA_IP_GW, json->valuestring, sizeof(DB_STATIC_STA_IP_GW));
-        DB_STATIC_STA_IP_GW[IP4ADDR_STRLEN_MAX-1] = '\0';    // to remove warning and to be sure
+        strncpy(DB_PARAM_STA_GW, json->valuestring, sizeof(DB_PARAM_STA_GW));
+        DB_PARAM_STA_GW[IP4ADDR_STRLEN_MAX-1] = '\0';    // to remove warning and to be sure
     } else {
         err = ESP_FAIL;
     }
@@ -527,10 +531,10 @@ static esp_err_t system_stats_get_handler(httpd_req_t *req) {
     }
     cJSON_AddItemToObject(root, "udp_clients", udp_clients);
     // add RSSI and IP info
-    if (DB_RADIO_MODE == DB_WIFI_MODE_STA) {
+    if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_STA) {
         cJSON_AddStringToObject(root, "current_client_ip", CURRENT_CLIENT_IP);
         cJSON_AddNumberToObject(root, "esp_rssi", db_esp_signal_quality.air_rssi);
-    } else if (DB_RADIO_MODE == DB_WIFI_MODE_AP || DB_RADIO_MODE == DB_WIFI_MODE_AP_LR) {
+    } else if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_AP || DB_PARAM_RADIO_MODE == DB_WIFI_MODE_AP_LR) {
         cJSON *sta_array = cJSON_AddArrayToObject(root, "connected_sta");
         for (int i = 0; i < wifi_sta_list.num; i++) {
             cJSON *connected_stations_status = cJSON_CreateObject();
@@ -591,27 +595,26 @@ static esp_err_t system_clients_get_handler(httpd_req_t *req) {
 static esp_err_t settings_get_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "application/json");
     cJSON *root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "esp32_mode", DB_RADIO_MODE);
-    cJSON_AddStringToObject(root, "wifi_ssid", (char *) DB_WIFI_SSID);
-    cJSON_AddStringToObject(root, "wifi_pass", (char *) DB_WIFI_PWD);
-    cJSON_AddNumberToObject(root, "ap_channel", DB_WIFI_CHANNEL);
-    cJSON_AddNumberToObject(root, "wifi_en_gn", DB_WIFI_EN_GN);
-    cJSON_AddNumberToObject(root, "ant_use_ext", DB_EN_EXT_ANT);
-    cJSON_AddNumberToObject(root, "trans_pack_size", DB_TRANS_BUF_SIZE);
-    cJSON_AddNumberToObject(root, "serial_timeout", DB_SERIAL_READ_TIMEOUT_MS);
-    cJSON_AddNumberToObject(root, "tx_pin", DB_UART_PIN_TX);
-    cJSON_AddNumberToObject(root, "rx_pin", DB_UART_PIN_RX);
-    cJSON_AddNumberToObject(root, "cts_pin", DB_UART_PIN_CTS);
-    cJSON_AddNumberToObject(root, "rts_pin", DB_UART_PIN_RTS);
-    cJSON_AddNumberToObject(root, "rts_thresh", DB_UART_RTS_THRESH);
-    cJSON_AddNumberToObject(root, "baud", DB_UART_BAUD_RATE);
-    cJSON_AddNumberToObject(root, "telem_proto", DB_SERIAL_PROTOCOL);
-    cJSON_AddNumberToObject(root, "radio_dis_onarm", DB_DISABLE_RADIO_ARMED);
-    cJSON_AddNumberToObject(root, "ltm_pp", DB_LTM_FRAME_NUM_BUFFER);
-    cJSON_AddStringToObject(root, "ap_ip", DEFAULT_AP_IP);
-    cJSON_AddStringToObject(root, "static_client_ip", DB_STATIC_STA_IP);
-    cJSON_AddStringToObject(root, "static_netmask", DB_STATIC_STA_IP_NETMASK);
-    cJSON_AddStringToObject(root, "static_gw_ip", DB_STATIC_STA_IP_GW);
+
+    for (int i = 0; i < sizeof(db_params) / sizeof(db_params[0]); i++) {
+        switch (db_params[i]->type) {
+            case STRING:
+                cJSON_AddStringToObject(root, db_params[i]->db_name,  db_params[i]->value.db_param_str.value);
+                break;
+            case UINT8:
+                cJSON_AddNumberToObject(root, db_params[i]->db_name, db_params[i]->value.db_param_u8.value);
+                break;
+            case UINT16:
+                cJSON_AddNumberToObject(root, db_params[i]->db_name, db_params[i]->value.db_param_u16.value);
+                break;
+            case INT32:
+                cJSON_AddNumberToObject(root, db_params[i]->db_name, db_params[i]->value.db_param_i32.value);
+                break;
+            default:
+                ESP_LOGE(REST_TAG, "settings_get_handler() -> db_parameter.type unknown!");
+            break;
+        }
+    }
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
     free((void *) sys_info);

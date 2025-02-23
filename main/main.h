@@ -27,21 +27,6 @@
 #define DB_HAS_RF_SWITCH 0
 #endif
 
-enum E_DB_WIFI_MODE {
-    DB_WIFI_MODE_AP = 1,            // Wi-Fi access point mode with 802.11b mode enabled
-    DB_WIFI_MODE_STA = 2,           // Wi-Fi client mode with 802.11b and LR mode enabled
-    DB_WIFI_MODE_AP_LR = 3,         // ESP32 WiFi LR Mode 802.11b
-    DB_WIFI_MODE_ESPNOW_AIR = 4,    // ESP-NOW Mode for broadcasting device
-    DB_WIFI_MODE_ESPNOW_GND = 5,    // ESP-NOW Mode for GND station
-    DB_WIFI_MODE_ESPNOW_END = 6,    // End of enum
-};
-
-enum E_DB_SERIAL_PROTOCOL {
-    DB_SERIAL_PROTOCOL_MSPLTM = 1,
-    DB_SERIAL_PROTOCOL_MAVLINK = 4,
-    DB_SERIAL_PROTOCOL_TRANSPARENT = 5
-};
-
 void db_jtag_serial_info_print();
 void db_write_settings_to_nvs();
 void save_udp_client_to_nvm(struct db_udp_client_t *new_db_udp_client, bool clear_client);
