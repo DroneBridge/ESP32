@@ -41,9 +41,9 @@ def add_custom_udp():
 def add_static_ip():
     url = "http://dronebridge.local/api/settings/static-ip"
     data = {
-        "client_ip": "192.168.10.88",
-        "netmask": "255.255.255.0",
-        "gw_ip": "192.198.10.1"
+        "ip_sta": "192.168.10.88",  # static ip
+        "ip_sta_netmsk": "255.255.255.0",   # netmask
+        "ip_sta_gw": "192.198.10.1" # gateway ip
     }
     # Send the POST request
     response = requests.post(url, json=data)
@@ -59,9 +59,9 @@ def add_static_ip():
 def reset_static_ip():
     url = "http://dronebridge.local/api/settings/static-ip"
     data = {
-        "client_ip": "",
-        "netmask": "",
-        "gw_ip": ""
+        "ip_sta": "",
+        "ip_sta_netmsk": "",
+        "ip_sta_gw": ""
     }
     # Send the POST request
     response = requests.post(url, json=data)

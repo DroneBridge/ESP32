@@ -20,7 +20,10 @@
 #include "db_parameters.h"
 
 #include <esp_log.h>
+#include <esp_netif_ip_addr.h>
+#include <esp_wifi_types_generic.h>
 #include <string.h>
+#include <lwip/sockets.h>
 
 #define TAG "DB_PARAM"
 
@@ -57,6 +60,8 @@ db_parameter_t db_param_ssid = {
         .db_param_str = {
             .value = "DroneBridge for ESP32",
             .default_value = "DroneBridge for ESP32",
+            .min_len = 1,
+            .max_len = MAX_SSID_LEN,
         }
     }
 };
@@ -77,6 +82,8 @@ db_parameter_t db_param_pass = {
         .db_param_str = {
             .value = "dronebridge",
             .default_value = "dronebridge",
+            .min_len = 7,
+            .max_len = 64
         }
     }
 };
@@ -96,6 +103,8 @@ db_parameter_t db_param_wifi_ap_ip = {
         .db_param_str = {
             .value = "192.168.2.1",
             .default_value = "192.168.2.1",
+            .min_len = 8,
+            .max_len = IP4ADDR_STRLEN_MAX
         }
     }
 };
@@ -115,6 +124,8 @@ db_parameter_t db_param_wifi_sta_ip = {
         .db_param_str = {
             .value = "",
             .default_value = "",
+            .min_len = 0,   // can be empty
+            .max_len = IP4ADDR_STRLEN_MAX
         }
     }
 };
@@ -134,6 +145,8 @@ db_parameter_t db_param_wifi_sta_gw = {
         .db_param_str = {
             .value = "",
             .default_value = "",
+            .min_len = 0,
+            .max_len = IP4ADDR_STRLEN_MAX
         }
     }
 };
@@ -153,6 +166,8 @@ db_parameter_t db_param_wifi_sta_netmask = {
         .db_param_str = {
             .value = "",
             .default_value = "",
+            .min_len = 0,
+            .max_len = IP4ADDR_STRLEN_MAX
         }
     }
 };
@@ -172,6 +187,8 @@ db_parameter_t db_param_udp_client_ip = {
         .db_param_str = {
             .value = '\0',
             .default_value = '\0',
+            .min_len = 0,
+            .max_len = IP4ADDR_STRLEN_MAX
         }
     }
 };
@@ -390,6 +407,9 @@ db_parameter_t db_param_gpio_cts = {
     }
 };
 
+/**
+ * I really don't know. Maybe some sort of timeout. Just leave it at the defaults.
+ */
 db_parameter_t db_param_gpio_rts_thresh = {
     .db_name = "rts_thresh",
     .type = UINT8,
@@ -572,7 +592,8 @@ db_parameter_t *db_params[] = {
 void db_param_set_to_default(db_parameter_t *db_parameter) {
     switch (db_parameter->type) {
         case STRING:
-            strncpy(db_parameter->value.db_param_str.value, db_parameter->value.db_param_str.default_value, DB_PARAM_VALUE_MAXLEN);
+            strncpy(db_parameter->value.db_param_str.value, db_parameter->value.db_param_str.default_value,
+                    DB_PARAM_VALUE_MAXLEN);
             break;
         case UINT8:
             db_parameter->value.db_param_u8.value = db_parameter->value.db_param_u8.default_value;
@@ -603,25 +624,29 @@ void db_param_reset_all() {
  * @param str_buffer Buffer to write the parameter string - must be long enough ~512 bytes
  */
 int db_param_print_values_to_buffer(uint8_t *str_buffer) {
-    int str_len = 0;    // overall length of the string in the str_buffer
+    int str_len = 0; // overall length of the string in the str_buffer
     for (int i = 0; i < sizeof(db_params) / sizeof(db_params[0]); i++) {
         uint8_t param_str_buf[128]; // buffer for the string of a single value
         switch (db_params[i]->type) {
             case STRING:
-                str_len += sprintf((char *) param_str_buf, "\t%s: %s\n", (char *) db_params[i]->db_name, (char *) db_params[i]->value.db_param_str.value);
-            break;
+                str_len += sprintf((char *) param_str_buf, "\t%s: %s\n", (char *) db_params[i]->db_name,
+                                   (char *) db_params[i]->value.db_param_str.value);
+                break;
             case UINT8:
-                str_len += sprintf((char *) param_str_buf, "\t%s: %i\n", (char *) db_params[i]->db_name, db_params[i]->value.db_param_u8.value);
-            break;
+                str_len += sprintf((char *) param_str_buf, "\t%s: %i\n", (char *) db_params[i]->db_name,
+                                   db_params[i]->value.db_param_u8.value);
+                break;
             case UINT16:
-                str_len += sprintf((char *) param_str_buf, "\t%s: %i\n", (char *) db_params[i]->db_name, db_params[i]->value.db_param_u16.value);
-            break;
+                str_len += sprintf((char *) param_str_buf, "\t%s: %i\n", (char *) db_params[i]->db_name,
+                                   db_params[i]->value.db_param_u16.value);
+                break;
             case INT32:
-                str_len += sprintf((char *) param_str_buf, "\t%s: %i\n", (char *) db_params[i]->db_name, db_params[i]->value.db_param_i32.value);
-            break;
+                str_len += sprintf((char *) param_str_buf, "\t%s: %i\n", (char *) db_params[i]->db_name,
+                                   db_params[i]->value.db_param_i32.value);
+                break;
             default:
                 ESP_LOGE(TAG, "db_param_print_values_to_buffer() -> db_parameter.type unknown!");
-            break;
+                break;
         }
         strcat((char *) str_buffer, param_str_buf); // add the string of the individual printed param to the big buffer
     }
@@ -655,24 +680,27 @@ void db_read_str_nvs(nvs_handle_t my_handle, char *key, char *dst) {
  * Parameters must be part of db_params array
  * @param nvs_handle Opened Namespace of the NVM partition. This is the handle.
  */
-void db_param_read_all_params_to_nvs(const nvs_handle_t *nvs_handle) {
+void db_param_read_all_params_nvs(const nvs_handle_t *nvs_handle) {
     for (int i = 0; i < sizeof(db_params) / sizeof(db_params[0]); i++) {
         switch (db_params[i]->type) {
             case STRING:
                 db_read_str_nvs(*nvs_handle, db_params[i]->db_name, db_params[i]->value.db_param_str.value);
-            break;
+                break;
             case UINT8:
-                ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(*nvs_handle, db_params[i]->db_name, &db_params[i]->value.db_param_u8.value));
-            break;
+                ESP_ERROR_CHECK_WITHOUT_ABORT(
+                    nvs_get_u8(*nvs_handle, db_params[i]->db_name, &db_params[i]->value.db_param_u8.value));
+                break;
             case UINT16:
-                ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u16(*nvs_handle, db_params[i]->db_name, &db_params[i]->value.db_param_u16.value));
-            break;
+                ESP_ERROR_CHECK_WITHOUT_ABORT(
+                    nvs_get_u16(*nvs_handle, db_params[i]->db_name, &db_params[i]->value.db_param_u16.value));
+                break;
             case INT32:
-                ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_i32(*nvs_handle, db_params[i]->db_name, &db_params[i]->value.db_param_i32.value));
-            break;
+                ESP_ERROR_CHECK_WITHOUT_ABORT(
+                    nvs_get_i32(*nvs_handle, db_params[i]->db_name, &db_params[i]->value.db_param_i32.value));
+                break;
             default:
                 ESP_LOGE(TAG, "db_param_read_all_params_to_nvs() -> db_parameter.type unknown!");
-            break;
+                break;
         }
     }
 }
@@ -683,29 +711,143 @@ void db_param_read_all_params_to_nvs(const nvs_handle_t *nvs_handle) {
  * Parameters must be part of db_params array
  * @param nvs_handle Opened Namespace of the NVM partition. This is the handle.
  */
-void db_param_write_all_params_to_nvs(const nvs_handle_t *nvs_handle) {
+void db_param_write_all_params_nvs(const nvs_handle_t *nvs_handle) {
     for (int i = 0; i < sizeof(db_params) / sizeof(db_params[0]); i++) {
         switch (db_params[i]->type) {
             case STRING:
-                ESP_ERROR_CHECK(nvs_set_str(*nvs_handle, db_params[i]->db_name, db_params[i]->value.db_param_str.value));
-            break;
+                ESP_ERROR_CHECK(nvs_set_str(*nvs_handle, db_params[i]->db_name, db_params[i]->value.db_param_str.value))
+                ;
+                break;
             case UINT8:
                 if (strcmp(db_params[i]->db_name, db_param_radio_mode.db_name) == 0) {
                     // This is different. User writes the desired mode into DB_RADIO_MODE_DESIGNATED and does not overwrite the value
                     ESP_ERROR_CHECK(nvs_set_u8(*nvs_handle, db_params[i]->db_name, DB_RADIO_MODE_DESIGNATED));
                 } else {
-                    ESP_ERROR_CHECK(nvs_set_u8(*nvs_handle, db_params[i]->db_name, db_params[i]->value.db_param_u8.value));
+                    ESP_ERROR_CHECK(
+                        nvs_set_u8(*nvs_handle, db_params[i]->db_name, db_params[i]->value.db_param_u8.value));
                 }
-            break;
+                break;
             case UINT16:
                 ESP_ERROR_CHECK(nvs_set_u16(*nvs_handle, db_params[i]->db_name, db_params[i]->value.db_param_u16.value));
-            break;
+                break;
             case INT32:
                 ESP_ERROR_CHECK(nvs_set_i32(*nvs_handle, db_params[i]->db_name, db_params[i]->value.db_param_i32.value));
-            break;
+                break;
             default:
                 ESP_LOGE(TAG, "db_param_write_all_params_to_nvs() -> db_parameter.type unknown!");
+                break;
+        }
+    }
+}
+
+/**
+ * Parses the provided json for all known parameters. Applies all recognized parameter values to local storage.
+ * Checks if parameter values are within the valid range. Otherwise, reject by not applying the new value.
+ * Does not save them to NVM!
+ * @param root_obj JSON that contains a single layer with the parameters to change.
+ */
+void db_param_read_all_params_json(const cJSON *root_obj) {
+    for (int i = 0; i < sizeof(db_params) / sizeof(db_params[0]); i++) {
+        cJSON *jobject = cJSON_GetObjectItem(root_obj, db_params[i]->db_name);
+        switch (db_params[i]->type) {
+            case STRING:
+                if (jobject && strlen(jobject->valuestring) <= db_params[i]->value.db_param_str.max_len && strlen(
+                        jobject->valuestring) > 0) {
+                    strncpy(db_params[i]->value.db_param_str.value, jobject->valuestring, DB_PARAM_VALUE_MAXLEN);
+                } else if (jobject) {
+                    ESP_LOGE(TAG, "db_param_read_all_params_json(): Invalid string length (1-%i) for param %s",
+                             db_params[i]->value.db_param_str.max_len, (char *) db_params[i]->db_name);
+                } else {
+                    // do nothing - param was not found in the json
+                }
+                break;
+            case UINT8:
+                if (jobject &&
+                    jobject->valueint <= db_params[i]->value.db_param_u8.max &&
+                    jobject->valueint >= db_params[i]->value.db_param_u8.min) {
+                    if (strcmp(db_params[i]->db_name, db_param_radio_mode.db_name) == 0) {
+                        // This is different. User writes the desired mode into DB_RADIO_MODE_DESIGNATED and does not overwrite the value
+                        DB_RADIO_MODE_DESIGNATED = jobject->valueint;
+                    } else {
+                        db_params[i]->value.db_param_u8.value = jobject->valueint; // accept value and assign
+                    }
+                } else if (jobject) {
+                    ESP_LOGE(
+                        TAG, "db_param_read_all_params_json(): Value %i is out of valid range (%i-%i) for param %s",
+                        jobject->valueint, db_params[i]->value.db_param_u8.max, db_params[i]->value.db_param_u8.min,
+                        (char *) db_params[i]->db_name);
+                } else {
+                    // do nothing - param was not found in the json
+                }
+                break;
+            case UINT16:
+                if (jobject &&
+                    jobject->valueint <= db_params[i]->value.db_param_u16.max &&
+                    jobject->valueint >= db_params[i]->value.db_param_u16.min) {
+                    db_params[i]->value.db_param_u16.value = jobject->valueint; // accept value and assign
+                } else if (jobject) {
+                    ESP_LOGE(
+                        TAG, "db_param_read_all_params_json(): Value %i is out of valid range (%i-%i) for param %s",
+                        jobject->valueint, db_params[i]->value.db_param_u16.max, db_params[i]->value.db_param_u16.min,
+                        (char *) db_params[i]->db_name);
+                } else {
+                    // do nothing - param was not found in the json
+                }
+                break;
+            case INT32:
+                if (jobject &&
+                    jobject->valueint <= db_params[i]->value.db_param_i32.max &&
+                    jobject->valueint >= db_params[i]->value.db_param_i32.min) {
+                    db_params[i]->value.db_param_i32.value = jobject->valueint; // accept value and assign
+                    } else if (jobject) {
+                        ESP_LOGE(
+                            TAG, "db_param_read_all_params_json(): Value %i is out of valid range (%i-%i) for param %s",
+                            jobject->valueint, db_params[i]->value.db_param_i32.max, db_params[i]->value.db_param_i32.min,
+                            (char *) db_params[i]->db_name);
+                    } else {
+                        // do nothing - param was not found in the json
+                    }
+                break;
+            default:
+                ESP_LOGE(TAG, "db_param_write_all_params_to_nvs() -> db_parameter.type unknown!");
+                break;
+        }
+    }
+}
+
+/**
+ * Writes all known parameters to a supplied cJSON.
+ * @param root_obj A cJSON object that will be filled with all known parameters
+ */
+void db_param_write_all_params_json(cJSON *root_obj) {
+    for (int i = 0; i < sizeof(db_params) / sizeof(db_params[0]); i++) {
+        switch (db_params[i]->type) {
+            case STRING:
+                cJSON_AddStringToObject(root_obj, db_params[i]->db_name,  db_params[i]->value.db_param_str.value);
+            break;
+            case UINT8:
+                cJSON_AddNumberToObject(root_obj, db_params[i]->db_name, db_params[i]->value.db_param_u8.value);
+            break;
+            case UINT16:
+                cJSON_AddNumberToObject(root_obj, db_params[i]->db_name, db_params[i]->value.db_param_u16.value);
+            break;
+            case INT32:
+                cJSON_AddNumberToObject(root_obj, db_params[i]->db_name, db_params[i]->value.db_param_i32.value);
+            break;
+            default:
+                ESP_LOGE(TAG, "db_param_write_all_params_json() -> db_parameter.type unknown!");
             break;
         }
     }
+}
+
+/**
+ * Checks if the supplied IPv4 string is representing a valid IPv4 address.
+ * @param ipaddress IPv4 string
+ * @return true if valid IPv4 string was supplied
+ */
+bool is_valid_ip4(const char *ipaddress) {
+    struct sockaddr_in sa;
+    const int result = inet_pton(AF_INET, ipaddress, &(sa.sin_addr));
+    return result != 0;
 }

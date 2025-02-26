@@ -35,13 +35,13 @@
 #include "main.h"
 #include "db_serial.h"
 
-static const char *REST_TAG = "DB_HTTP_REST";
+#define TAG "DB_HTTP_REST"
 #define REST_CHECK(a, str, goto_tag, ...)                                              \
     do                                                                                 \
     {                                                                                  \
         if (!(a))                                                                      \
         {                                                                              \
-            ESP_LOGE(REST_TAG, "%s(%d): " str, __FUNCTION__, __LINE__, ##__VA_ARGS__); \
+            ESP_LOGE(TAG, "%s(%d): " str, __FUNCTION__, __LINE__, ##__VA_ARGS__); \
             goto goto_tag;                                                             \
         }                                                                              \
     } while (0)
@@ -55,12 +55,6 @@ typedef struct rest_server_context {
 } rest_server_context_t;
 
 #define CHECK_FILE_EXTENSION(filename, ext) (strcasecmp(&filename[strlen(filename) - strlen(ext)], ext) == 0)
-
-bool is_valid_ip4(char *ipAddress) {
-    struct sockaddr_in sa;
-    int result = inet_pton(AF_INET, ipAddress, &(sa.sin_addr));
-    return result != 0;
-}
 
 /**
  * Set HTTP response content type according to file extension
@@ -98,7 +92,7 @@ static esp_err_t rest_common_get_handler(httpd_req_t *req) {
     }
     int fd = open(filepath, O_RDONLY, 0);
     if (fd == -1) {
-        ESP_LOGE(REST_TAG, "Failed to open file : %s", filepath);
+        ESP_LOGE(TAG, "Failed to open file : %s", filepath);
         /* Respond with 500 Internal Server Error */
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to read existing file");
         return ESP_FAIL;
@@ -112,12 +106,12 @@ static esp_err_t rest_common_get_handler(httpd_req_t *req) {
         /* Read file in chunks into the scratch buffer */
         read_bytes = read(fd, chunk, SCRATCH_BUFSIZE);
         if (read_bytes == -1) {
-            ESP_LOGE(REST_TAG, "Failed to read file : %s", filepath);
+            ESP_LOGE(TAG, "Failed to read file : %s", filepath);
         } else if (read_bytes > 0) {
             /* Send the buffer contents as HTTP response chunk */
             if (httpd_resp_send_chunk(req, chunk, read_bytes) != ESP_OK) {
                 close(fd);
-                ESP_LOGE(REST_TAG, "File sending failed!");
+                ESP_LOGE(TAG, "File sending failed!");
                 /* Abort sending file */
                 httpd_resp_sendstr_chunk(req, NULL);
                 /* Respond with 500 Internal Server Error */
@@ -128,7 +122,7 @@ static esp_err_t rest_common_get_handler(httpd_req_t *req) {
     } while (read_bytes > 0);
     /* Close file after sending complete */
     close(fd);
-    ESP_LOGI(REST_TAG, "File sending complete");
+    ESP_LOGI(TAG, "File sending complete");
     /* Respond with an empty chunk to signal HTTP response completion */
     httpd_resp_send_chunk(req, NULL, 0);
     return ESP_OK;
@@ -163,116 +157,10 @@ static esp_err_t settings_post_handler(httpd_req_t *req) {
 
     cJSON *root = cJSON_Parse(buf);
 
-    cJSON *json = cJSON_GetObjectItem(root, "esp32_mode");
-    if (json) DB_RADIO_MODE_DESIGNATED = json->valueint;    // do not directly change DB_WIFI_MODE since it is not safe and constantly processed by other tasks. Save settings and reboot will assign DB_PARAM_RADIO_MODE_DESIGNATED to DB_WIFI_MODE
-
-    json = cJSON_GetObjectItem(root, "wifi_ssid");
-    if (json && strlen(json->valuestring) < 32 && strlen(json->valuestring) > 0)
-        strncpy((char *) DB_WIFI_SSID, json->valuestring, sizeof(DB_WIFI_SSID) - 1);
-    else if (json)
-        ESP_LOGE(REST_TAG, "Invalid SSID length (1-31)");
-
-    json = cJSON_GetObjectItem(root, "wifi_pass");
-    if (json && strlen(json->valuestring) < 64 && strlen(json->valuestring) > 7)
-        strncpy((char *) DB_WIFI_PWD, json->valuestring, sizeof(DB_WIFI_PWD) - 1);
-    else if (json)
-        ESP_LOGE(REST_TAG, "Invalid password length (8-63)");
-
-
-    json = cJSON_GetObjectItem(root, "ap_channel");
-    if (json && json->valueint > 0 && json->valueint < 14) {
-        DB_WIFI_CHANNEL = json->valueint;
-    } else if (json) {
-        ESP_LOGE(REST_TAG, "No a valid wifi channel (1-13). Not changing!");
-    }
-
-    json = cJSON_GetObjectItem(root, "wifi_en_gn");
-    if (json && (json->valueint == 1 || json->valueint == 0)) {
-        DB_WIFI_EN_GN = json->valueint;
-    } else if (json) {
-        ESP_LOGE(REST_TAG, "wifi_en_gn is not 1 (802.11bgn) nor 0 (802.11b) for WiFi client mode");
-    }
-
-    json = cJSON_GetObjectItem(root, "ant_use_ext");
-    if (json && (json->valueint == 1 || json->valueint == 0)) {
-        DB_EN_EXT_ANT = json->valueint;
-    } else if (json) {
-        ESP_LOGW(REST_TAG, "ant_use_ext is not 1 (external antenna) nor 0 (on-board antenna)");
-        DB_EN_EXT_ANT = false;
-    }
-
-    json = cJSON_GetObjectItem(root, "trans_pack_size");
-    if (json && json->valueint > 0 && json->valueint < 1024) {
-        DB_TRANS_BUF_SIZE = json->valueint;
-    } else {
-        ESP_LOGE(REST_TAG, "Settings change: trans_pack_size is out of range (1-1024): %i", json->valueint);
-    }
-
-    json = cJSON_GetObjectItem(root, "serial_timeout");
-    if (json && json->valueint > 0) {
-        DB_SERIAL_READ_TIMEOUT_MS = json->valueint;
-    } else {
-        ESP_LOGE(REST_TAG,"Serial read timeout must be >0 - ignoring");
-    }
-
-    json = cJSON_GetObjectItem(root, "tx_pin");
-    if (json && json->valueint <= SOC_GPIO_IN_RANGE_MAX) {
-        DB_UART_PIN_TX = json->valueint;
-    } else {
-        ESP_LOGW(REST_TAG, "GPIO pin must be in range of %i", SOC_GPIO_IN_RANGE_MAX);
-    }
-    json = cJSON_GetObjectItem(root, "rx_pin");
-    if (json && json->valueint <= SOC_GPIO_IN_RANGE_MAX) {
-        DB_UART_PIN_RX = json->valueint;
-    } else {
-        ESP_LOGW(REST_TAG, "GPIO pin must be in range of %i", SOC_GPIO_IN_RANGE_MAX);
-    }
-    json = cJSON_GetObjectItem(root, "rts_pin");
-    if (json && json->valueint <= SOC_GPIO_IN_RANGE_MAX) {
-        DB_UART_PIN_RTS = json->valueint;
-    } else {
-        ESP_LOGW(REST_TAG, "GPIO pin must be in range of %i", SOC_GPIO_IN_RANGE_MAX);
-    }
-    json = cJSON_GetObjectItem(root, "cts_pin");
-    if (json && json->valueint <= SOC_GPIO_IN_RANGE_MAX) {
-        DB_UART_PIN_CTS = json->valueint;
-    } else {
-        ESP_LOGW(REST_TAG, "GPIO pin must be in range of %i", SOC_GPIO_IN_RANGE_MAX);
-    }
-
-    json = cJSON_GetObjectItem(root, "rts_thresh");
-    if (json) DB_UART_RTS_THRESH = json->valueint;
-
-    json = cJSON_GetObjectItem(root, "baud");
-    if (json) DB_UART_BAUD_RATE = json->valueint;
-
-    json = cJSON_GetObjectItem(root, "telem_proto");
-    if (json && (json->valueint == 1 || json->valueint == 4 || json->valueint == 5)) {
-        DB_SERIAL_PROTOCOL = json->valueint;
-    } else if (json) {
-        ESP_LOGW(REST_TAG, "telem_proto is not 1 (LTM/MSP) or 4 (MAVLink) or 5 (Transparent). Changing to transparent");
-        DB_SERIAL_PROTOCOL = DB_SERIAL_PROTOCOL_TRANSPARENT;
-    }
-
-    json = cJSON_GetObjectItem(root, "radio_dis_onarm");
-    if (json && (json->valueint == 1 || json->valueint == 0)) {
-        DB_DISABLE_RADIO_ARMED = json->valueint;
-    } else if (json) {
-        ESP_LOGW(REST_TAG, "radio_dis_onarm is not 1 (turn WiFi off on arm) or 0 (keep WiFi on)");
-        DB_DISABLE_RADIO_ARMED = false;
-    }
-
-    json = cJSON_GetObjectItem(root, "ltm_pp");
-    if (json) DB_LTM_FRAME_NUM_BUFFER = json->valueint;
-
-    json = cJSON_GetObjectItem(root, "ap_ip");
-    if (json && is_valid_ip4(json->valuestring)) {
-        strncpy(DEFAULT_AP_IP, json->valuestring, sizeof(DEFAULT_AP_IP) - 1);
-    } else if (json) {
-        ESP_LOGE(REST_TAG, "New IP \"%s\" is not a valid IP address! Not changing!", json->valuestring);
-    }
+    db_param_read_all_params_json(root);
     db_write_settings_to_nvs();
-    ESP_LOGI(REST_TAG, "Settings changed!");
+    ESP_LOGI(TAG, "Settings changed!");
+    
     cJSON_Delete(root);
     httpd_resp_sendstr(req, "{\n"
                             "    \"status\": \"success\",\n"
@@ -328,10 +216,10 @@ static esp_err_t settings_clients_udp_post(httpd_req_t *req) {
     int new_udp_port = 0;
     char new_ip[IP4ADDR_STRLEN_MAX];
     uint8_t save_to_nvm = false;
-    cJSON *json = cJSON_GetObjectItem(root, "ip");
+    cJSON *json = cJSON_GetObjectItem(root, db_param_udp_client_ip.db_name);
     if (json) strncpy(new_ip, json->valuestring, sizeof(new_ip));
     new_ip[IP4ADDR_STRLEN_MAX-1] = '\0';    // to remove warning and to be sure
-    json = cJSON_GetObjectItem(root, "port");
+    json = cJSON_GetObjectItem(root, db_param_udp_client_port.db_name);
     if (json) new_udp_port = json->valueint;
     json = cJSON_GetObjectItem(root, "save");
     if (json && cJSON_IsBool(json)) {
@@ -385,7 +273,7 @@ static esp_err_t settings_clients_clear_udp_get(httpd_req_t *req) {
         memset(&udp_conn_list->db_udp_clients[i], 0, sizeof(struct db_udp_client_t));
     }
     udp_conn_list->size = 0;
-    ESP_LOGI(REST_TAG, "Removed all UDP clients from list!");
+    ESP_LOGI(TAG, "Removed all UDP clients from list!");
     // Clear saved client as well. Pass any client since it will be ignored as long as clear_client is set to true.
     save_udp_client_to_nvm(&udp_conn_list->db_udp_clients[0], true);
     return ESP_OK;
@@ -407,7 +295,7 @@ static esp_err_t settings_clients_clear_udp_get(httpd_req_t *req) {
  *   "gw_ip": ""
  * }
  * @param req
- * @return
+ * @return ESP_OK on success & ESP_FAIL on failure
  */
 static esp_err_t settings_static_ip_post_handler(httpd_req_t *req) {
     int total_len = req->content_len;
@@ -432,7 +320,7 @@ static esp_err_t settings_static_ip_post_handler(httpd_req_t *req) {
     cJSON *root = cJSON_Parse(buf);
 
     esp_err_t err = ESP_OK;
-    cJSON *json = cJSON_GetObjectItem(root, "client_ip");
+    cJSON *json = cJSON_GetObjectItem(root, db_param_wifi_sta_ip.db_name);
     if (json) {
         strncpy(DB_PARAM_STA_IP, json->valuestring, sizeof(DB_PARAM_STA_IP));
         DB_PARAM_STA_IP[IP4ADDR_STRLEN_MAX-1] = '\0';    // to remove warning and to be sure
@@ -440,7 +328,7 @@ static esp_err_t settings_static_ip_post_handler(httpd_req_t *req) {
         err = ESP_FAIL;
     }
 
-    json = cJSON_GetObjectItem(root, "netmask");
+    json = cJSON_GetObjectItem(root, db_param_wifi_sta_netmask.db_name);
     if (json) {
         strncpy(DB_PARAM_STA_IP_NETMASK, json->valuestring, sizeof(DB_PARAM_STA_IP_NETMASK));
         DB_PARAM_STA_IP_NETMASK[IP4ADDR_STRLEN_MAX-1] = '\0';    // to remove warning and to be sure
@@ -448,7 +336,7 @@ static esp_err_t settings_static_ip_post_handler(httpd_req_t *req) {
         err = ESP_FAIL;
     }
 
-    json = cJSON_GetObjectItem(root, "gw_ip");
+    json = cJSON_GetObjectItem(root, db_param_wifi_sta_gw.db_name);
     if (json) {
         strncpy(DB_PARAM_STA_GW, json->valuestring, sizeof(DB_PARAM_STA_GW));
         DB_PARAM_STA_GW[IP4ADDR_STRLEN_MAX-1] = '\0';    // to remove warning and to be sure
@@ -595,26 +483,7 @@ static esp_err_t system_clients_get_handler(httpd_req_t *req) {
 static esp_err_t settings_get_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "application/json");
     cJSON *root = cJSON_CreateObject();
-
-    for (int i = 0; i < sizeof(db_params) / sizeof(db_params[0]); i++) {
-        switch (db_params[i]->type) {
-            case STRING:
-                cJSON_AddStringToObject(root, db_params[i]->db_name,  db_params[i]->value.db_param_str.value);
-                break;
-            case UINT8:
-                cJSON_AddNumberToObject(root, db_params[i]->db_name, db_params[i]->value.db_param_u8.value);
-                break;
-            case UINT16:
-                cJSON_AddNumberToObject(root, db_params[i]->db_name, db_params[i]->value.db_param_u16.value);
-                break;
-            case INT32:
-                cJSON_AddNumberToObject(root, db_params[i]->db_name, db_params[i]->value.db_param_i32.value);
-                break;
-            default:
-                ESP_LOGE(REST_TAG, "settings_get_handler() -> db_parameter.type unknown!");
-            break;
-        }
-    }
+    db_param_write_all_params_json(root);
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
     free((void *) sys_info);
@@ -633,7 +502,7 @@ esp_err_t start_rest_server(const char *base_path) {
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.max_uri_handlers = 9;
 
-    ESP_LOGI(REST_TAG, "Starting HTTP Server");
+    ESP_LOGI(TAG, "Starting HTTP Server");
     REST_CHECK(httpd_start(&server, &config) == ESP_OK, "Start server failed", err_start);
 
     /* URI handler for fetching system info */

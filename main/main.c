@@ -96,8 +96,8 @@ static esp_err_t db_set_dns_server(esp_netif_t *netif, uint32_t addr, esp_netif_
 static void set_client_static_ip() {
     if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_STA && strlen(DB_PARAM_STA_IP) > 0 && strlen(DB_PARAM_STA_GW) > 0 &&
         strlen(DB_PARAM_STA_IP_NETMASK) > 0) {
-        ESP_LOGI(TAG, "Assigning static IP to ESP32: ESP32-IP: %s Gateway: %s Netmask: %s", DB_PARAM_STA_IP,
-                 DB_PARAM_STA_GW, DB_PARAM_STA_IP_NETMASK);
+        ESP_LOGI(TAG, "Assigning static IP to ESP32: ESP32-IP: %s Gateway: %s Netmask: %s", (char *) DB_PARAM_STA_IP,
+                 (char *) DB_PARAM_STA_GW, (char *) DB_PARAM_STA_IP_NETMASK);
 
         if (esp_netif_dhcpc_stop(esp_default_netif) != ESP_OK) {
             ESP_LOGE(TAG, "Failed to stop dhcp client in order to set static IP");
@@ -111,8 +111,8 @@ static void set_client_static_ip() {
         if (esp_netif_set_ip_info(esp_default_netif, &ip) != ESP_OK) {
             ESP_LOGE(TAG, "Failed to set static ip info");
         }
-        ESP_LOGD(TAG, "Success to set static ip: %s, netmask: %s, gw: %s", DB_PARAM_STA_IP, DB_PARAM_STA_IP_NETMASK,
-                 DB_PARAM_STA_GW);
+        ESP_LOGD(TAG, "Success to set static ip: %s, netmask: %s, gw: %s", (char *) DB_PARAM_STA_IP, (char *) DB_PARAM_STA_IP_NETMASK,
+                 (char *) DB_PARAM_STA_GW);
         ESP_ERROR_CHECK(db_set_dns_server(esp_default_netif, ipaddr_addr(DB_PARAM_STA_GW), ESP_NETIF_DNS_MAIN));
         ESP_ERROR_CHECK(db_set_dns_server(esp_default_netif, ipaddr_addr("0.0.0.0"), ESP_NETIF_DNS_BACKUP));
     } else {
@@ -456,7 +456,7 @@ void db_write_settings_to_nvs() {
     ESP_LOGI(TAG, "Saving to NVS %s", NVS_NAMESPACE);
     nvs_handle_t my_handle;
     ESP_ERROR_CHECK(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &my_handle));
-    db_param_write_all_params_to_nvs(&my_handle);
+    db_param_write_all_params_nvs(&my_handle);
     ESP_ERROR_CHECK(nvs_commit(my_handle));
     nvs_close(my_handle);
 }
@@ -506,7 +506,7 @@ void db_read_settings_nvs() {
         db_write_settings_to_nvs();
     } else {
         ESP_LOGI(TAG, "Reading settings from NVS");
-        db_param_read_all_params_to_nvs(&my_handle);
+        db_param_read_all_params_nvs(&my_handle);
         // get saved UDP client - this read might result in an error if no client was saved prev. by the user
 
         // char udp_client_ip_str[INET_ADDRSTRLEN + 6];

@@ -20,6 +20,7 @@
 #ifndef DB_PARAMETERS_H
 #define DB_PARAMETERS_H
 
+#include <cJSON.h>
 #include <nvs.h>
 #include <stdint.h>
 #include <driver/gpio.h>
@@ -70,9 +71,9 @@ uint16_t DB_MAV_PARAM_CNT = 17; // Number of MAVLink parameters returned by ESP3
 #define DB_PARAM_PASS (char *) db_param_pass.value.db_param_str.value
 #define DB_PARAM_CHANNEL db_param_channel.value.db_param_u8.value
 #define DB_PARAM_RADIO_MODE db_param_radio_mode.value.db_param_u8.value
-#define DB_PARAM_STA_IP (char *) db_param_wifi_sta_ip.value.db_param_str.value
-#define DB_PARAM_STA_GW (char *) db_param_wifi_sta_gw.value.db_param_str.value
-#define DB_PARAM_STA_IP_NETMASK (char *) db_param_wifi_sta_netmask.value.db_param_str.value
+#define DB_PARAM_STA_IP db_param_wifi_sta_ip.value.db_param_str.value
+#define DB_PARAM_STA_GW db_param_wifi_sta_gw.value.db_param_str.value
+#define DB_PARAM_STA_IP_NETMASK db_param_wifi_sta_netmask.value.db_param_str.value
 #define DB_PARAM_AP_IP (char *) db_param_wifi_ap_ip.value.db_param_str.value
 #define DB_PARAM_WIFI_EN_GN db_param_wifi_en_gn.value.db_param_u8.value
 #define DB_PARAM_DIS_RADIO_ON_ARM db_param_dis_radio_armed.value.db_param_u8.value
@@ -103,6 +104,8 @@ enum E_DB_SERIAL_PROTOCOL {
 typedef struct db_parameter_str_s {
     uint8_t value[DB_PARAM_VALUE_MAXLEN];
     uint8_t default_value[DB_PARAM_VALUE_MAXLEN];
+    uint8_t min_len;    // valid if >= min_len
+    uint8_t max_len;    // valid if <= max_len
 } db_param_str_t;
 
 typedef struct db_parameter_u8_s {
@@ -134,7 +137,7 @@ enum db_param_type_t {
 };
 
 typedef struct db_parameter_s {
-    uint8_t db_name[DB_PARAM_NAME_MAXLEN];  // must match web interface input name
+    uint8_t db_name[DB_PARAM_NAME_MAXLEN];  // equals the NVS key, JSON object name and web interface input ID
     enum db_param_type_t type;
     struct {    // no string support for mavlink
       uint8_t param_name[16];
@@ -180,7 +183,9 @@ extern db_parameter_t db_param_udp_client_port;
 void db_param_set_to_default(db_parameter_t *db_parameter);
 void db_param_reset_all();
 int db_param_print_values_to_buffer(uint8_t *str_buffer);
-void db_param_read_all_params_to_nvs(const nvs_handle_t *nvs_handle);
-void db_param_write_all_params_to_nvs(const nvs_handle_t *nvs_handle);
+void db_param_read_all_params_nvs(const nvs_handle_t *nvs_handle);
+void db_param_write_all_params_nvs(const nvs_handle_t *nvs_handle);
+void db_param_read_all_params_json(const cJSON *root_obj);
+void db_param_write_all_params_json(cJSON *root_obj);
 
 #endif //DB_PARAMETERS_H

@@ -347,8 +347,8 @@ function add_new_udp_client() {
 
 	if (ip != null && port != null && ippattern.test(ip)) {
 		let myjson = {
-			ip: ip,
-			port: port,
+			udp_client_ip: ip,
+			udp_client_port: port,
 			save: save_to_nvm
 		};
 		send_json("api/settings/clients/udp", JSON.stringify(myjson)).then(send_response => {
