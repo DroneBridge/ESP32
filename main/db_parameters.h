@@ -187,5 +187,39 @@ void db_param_read_all_params_nvs(const nvs_handle_t *nvs_handle);
 void db_param_write_all_params_nvs(const nvs_handle_t *nvs_handle);
 void db_param_read_all_params_json(const cJSON *root_obj);
 void db_param_write_all_params_json(cJSON *root_obj);
+bool db_param_is_valid_assign_str(const char *new_string_value, db_parameter_t *target_param);
+bool db_param_is_valid_assign_u8(const uint8_t new_u8_value, db_parameter_t *target_param);
+bool db_param_is_valid_assign_u16(const uint16_t new_u16_value, db_parameter_t *target_param);
+bool db_param_is_valid_assign_i32(const int32_t new_i32_value, db_parameter_t *target_param);
+
+/**
+ * Array containing all references to the DB parameters
+ */
+db_parameter_t *db_params[] = {
+    &db_param_ssid,
+    &db_param_pass,
+    &db_param_wifi_ap_ip,
+    &db_param_wifi_sta_ip,
+    &db_param_wifi_sta_gw,
+    &db_param_wifi_sta_netmask,
+    &db_param_udp_client_ip,
+    &db_param_radio_mode,
+    &db_param_sw_version,
+    &db_param_channel,
+    &db_param_wifi_en_gn,
+    &db_param_wifi_ant_ext,
+    &db_param_baud,
+    &db_param_gpio_tx,
+    &db_param_gpio_rx,
+    &db_param_gpio_rts,
+    &db_param_gpio_cts,
+    &db_param_gpio_rts_thresh,
+    &db_param_proto,
+    &db_param_serial_pack_size,
+    &db_param_serial_read_timeout,
+    &db_param_ltm_per_packet,
+    &db_param_dis_radio_armed,
+    &db_param_udp_client_port
+};
 
 #endif //DB_PARAMETERS_H

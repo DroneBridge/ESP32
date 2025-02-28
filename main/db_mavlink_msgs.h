@@ -34,8 +34,8 @@ uint8_t db_get_mav_comp_id();
 uint8_t db_get_mav_sys_id();
 uint16_t db_create_heartbeat(uint8_t *buff, fmav_status_t *fmav_status);
 uint16_t db_get_mavmsg_param(uint8_t *buff, fmav_status_t *fmav_status, uint16_t param_index, float_int_union *value, uint8_t type, char *param_id);
-MAV_TYPE db_mav_get_parameter_value(float_int_union *float_int, char *param_id, int16_t param_index);
-bool db_write_mavlink_parameter(fmav_param_set_t *param_set_payload);
+MAV_PARAM_TYPE db_mav_get_parameter_value(float_int_union *float_int, const char *param_id, const int16_t param_index);
+bool db_write_mavlink_parameter(const fmav_param_set_t *param_set_payload);
 void db_process_mavlink_command(fmav_command_long_t *the_command,
                                 fmav_message_t *the_msg,
                                 fmav_status_t *status,

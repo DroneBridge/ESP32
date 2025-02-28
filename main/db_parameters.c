@@ -19,6 +19,7 @@
 
 #include "db_parameters.h"
 
+#include <db_serial.h>
 #include <esp_log.h>
 #include <esp_netif_ip_addr.h>
 #include <esp_wifi_types_generic.h>
@@ -30,7 +31,7 @@
 /**
  * Steps to add new parameters.
  * 1. Add new parameter as db_parameter_t below
- * 2. Add new parameter to db_params array below
+ * 2. Add new parameter to db_params array
  * 3. Increase DB_MAV_PARAM_CNT if parameter is available via MAVLink (non-string parameter)
  * 4. Make parameter available globally by adding extern definition into db_parameters.h
  * 5. Create an optional macro in db_parameters.h to make the parameter value easy accessible
@@ -556,36 +557,6 @@ db_parameter_t db_param_udp_client_port = {
 };
 
 /**
- * Array containing all references to the DB parameters
- */
-db_parameter_t *db_params[] = {
-    &db_param_ssid,
-    &db_param_pass,
-    &db_param_wifi_ap_ip,
-    &db_param_wifi_sta_ip,
-    &db_param_wifi_sta_gw,
-    &db_param_wifi_sta_netmask,
-    &db_param_udp_client_ip,
-    &db_param_radio_mode,
-    &db_param_sw_version,
-    &db_param_channel,
-    &db_param_wifi_en_gn,
-    &db_param_wifi_ant_ext,
-    &db_param_baud,
-    &db_param_gpio_tx,
-    &db_param_gpio_rx,
-    &db_param_gpio_rts,
-    &db_param_gpio_cts,
-    &db_param_gpio_rts_thresh,
-    &db_param_proto,
-    &db_param_serial_pack_size,
-    &db_param_serial_read_timeout,
-    &db_param_ltm_per_packet,
-    &db_param_dis_radio_armed,
-    &db_param_udp_client_port
-};
-
-/**
  * Sets the value of the supplied the parameter to its default value
  * @param db_parameter The parameter to reset to default
  */
@@ -751,62 +722,32 @@ void db_param_read_all_params_json(const cJSON *root_obj) {
         cJSON *jobject = cJSON_GetObjectItem(root_obj, db_params[i]->db_name);
         switch (db_params[i]->type) {
             case STRING:
-                if (jobject && strlen(jobject->valuestring) <= db_params[i]->value.db_param_str.max_len && strlen(
-                        jobject->valuestring) > 0) {
-                    strncpy(db_params[i]->value.db_param_str.value, jobject->valuestring, DB_PARAM_VALUE_MAXLEN);
-                } else if (jobject) {
-                    ESP_LOGE(TAG, "db_param_read_all_params_json(): Invalid string length (1-%i) for param %s",
-                             db_params[i]->value.db_param_str.max_len, (char *) db_params[i]->db_name);
+                if (jobject) {
+                    db_param_is_valid_assign_str(jobject->valuestring, db_params[i]);
                 } else {
                     // do nothing - param was not found in the json
                 }
                 break;
             case UINT8:
-                if (jobject &&
-                    jobject->valueint <= db_params[i]->value.db_param_u8.max &&
-                    jobject->valueint >= db_params[i]->value.db_param_u8.min) {
-                    if (strcmp(db_params[i]->db_name, db_param_radio_mode.db_name) == 0) {
-                        // This is different. User writes the desired mode into DB_RADIO_MODE_DESIGNATED and does not overwrite the value
-                        DB_RADIO_MODE_DESIGNATED = jobject->valueint;
-                    } else {
-                        db_params[i]->value.db_param_u8.value = jobject->valueint; // accept value and assign
-                    }
-                } else if (jobject) {
-                    ESP_LOGE(
-                        TAG, "db_param_read_all_params_json(): Value %i is out of valid range (%i-%i) for param %s",
-                        jobject->valueint, db_params[i]->value.db_param_u8.max, db_params[i]->value.db_param_u8.min,
-                        (char *) db_params[i]->db_name);
+                if (jobject) {
+                    db_param_is_valid_assign_u8(jobject->valueint, db_params[i]);
                 } else {
                     // do nothing - param was not found in the json
                 }
                 break;
             case UINT16:
-                if (jobject &&
-                    jobject->valueint <= db_params[i]->value.db_param_u16.max &&
-                    jobject->valueint >= db_params[i]->value.db_param_u16.min) {
-                    db_params[i]->value.db_param_u16.value = jobject->valueint; // accept value and assign
-                } else if (jobject) {
-                    ESP_LOGE(
-                        TAG, "db_param_read_all_params_json(): Value %i is out of valid range (%i-%i) for param %s",
-                        jobject->valueint, db_params[i]->value.db_param_u16.max, db_params[i]->value.db_param_u16.min,
-                        (char *) db_params[i]->db_name);
+                if (jobject) {
+                    db_param_is_valid_assign_u16(jobject->valueint, db_params[i]);
                 } else {
                     // do nothing - param was not found in the json
                 }
                 break;
             case INT32:
-                if (jobject &&
-                    jobject->valueint <= db_params[i]->value.db_param_i32.max &&
-                    jobject->valueint >= db_params[i]->value.db_param_i32.min) {
-                    db_params[i]->value.db_param_i32.value = jobject->valueint; // accept value and assign
-                    } else if (jobject) {
-                        ESP_LOGE(
-                            TAG, "db_param_read_all_params_json(): Value %i is out of valid range (%i-%i) for param %s",
-                            jobject->valueint, db_params[i]->value.db_param_i32.max, db_params[i]->value.db_param_i32.min,
-                            (char *) db_params[i]->db_name);
-                    } else {
-                        // do nothing - param was not found in the json
-                    }
+                if (jobject) {
+                    db_param_is_valid_assign_i32(jobject->valueint, db_params[i]);
+                } else {
+                    // do nothing - param was not found in the json
+                }
                 break;
             default:
                 ESP_LOGE(TAG, "db_param_write_all_params_to_nvs() -> db_parameter.type unknown!");
@@ -839,6 +780,91 @@ void db_param_write_all_params_json(cJSON *root_obj) {
             break;
         }
     }
+}
+
+/**
+ * Checks if string is valid for assignment to the target_param.
+ * If valid assigns the new value to the parameter
+ * @param new_string_value The new string to be checked and assigned
+ * @param target_param The internal db parameter to be assigned with the new value
+ * @return true when valid and assigned - else false
+ */
+bool db_param_is_valid_assign_str(const char *new_string_value, db_parameter_t *target_param) {
+    // ToDo: Add IPv4 check for strings via custom validation function in db_parameter_t
+    if (strlen(new_string_value) <= target_param->value.db_param_str.max_len && strlen(new_string_value) > 0) {
+        strncpy(target_param->value.db_param_str.value, new_string_value, DB_PARAM_VALUE_MAXLEN);
+        return true;
+    }
+    // new value is not valid
+    ESP_LOGE(TAG, "db_param_is_valid_assign_str(): Invalid string length (1-%i) for param %s",
+             target_param->value.db_param_str.max_len, (char *) target_param->db_name);
+    return false;
+}
+
+/**
+ * Checks if u8 is valid for assignment to the target_param.
+ * If valid assigns the new value to the parameter
+ * @param new_u8_value The new u8 to be checked and assigned
+ * @param target_param The internal db parameter to be assigned with the new value
+ * @return true when valid and assigned - else false
+ */
+bool db_param_is_valid_assign_u8(const uint8_t new_u8_value, db_parameter_t *target_param) {
+    if (new_u8_value <= target_param->value.db_param_u8.max && new_u8_value >= target_param->value.db_param_u8.min) {
+        if (strcmp(target_param->db_name, db_param_radio_mode.db_name) == 0) {
+            // Special case check: Do not directly change DB_WIFI_MODE since it is not safe and constantly
+            // processed by other tasks. Save settings and reboot will assign DB_RADIO_MODE_DESIGNATED to DB_WIFI_MODE
+            DB_RADIO_MODE_DESIGNATED = new_u8_value;
+        } else {
+            target_param->value.db_param_u8.value = new_u8_value; // accept value and assign
+        }
+        return true;
+    }
+    // new value is not valid
+    ESP_LOGE(
+        TAG, "db_param_is_valid_assign_u8(): Value %i is out of valid range (%i-%i) for param %s",
+        new_u8_value, target_param->value.db_param_u8.max, target_param->value.db_param_u8.min,
+        (char *) target_param->db_name);
+    return false;
+}
+
+/**
+ * Checks if u16 is valid for assignment to the target_param.
+ * If valid assigns the new value to the parameter
+ * @param new_u16_value The new u16 to be checked and assigned
+ * @param target_param The internal db parameter to be assigned with the new value
+ * @return true when valid and assigned - else false
+ */
+bool db_param_is_valid_assign_u16(const uint16_t new_u16_value, db_parameter_t *target_param) {
+    if (new_u16_value <= target_param->value.db_param_u16.max && new_u16_value >= target_param->value.db_param_u16.min) {
+            target_param->value.db_param_u16.value = new_u16_value; // accept value and assign
+        return true;
+    }
+    // new value is not valid
+    ESP_LOGE(
+        TAG, "db_param_is_valid_assign_u16(): Value %i is out of valid range (%i-%i) for param %s",
+        new_u16_value, target_param->value.db_param_u16.max, target_param->value.db_param_u16.min,
+        (char *) target_param->db_name);
+    return false;
+}
+
+/**
+ * Checks if i32 is valid for assignment to the target_param.
+ * If valid assigns the new value to the parameter
+ * @param new_i32_value The new i32 to be checked and assigned
+ * @param target_param The internal db parameter to be assigned with the new value
+ * @return true when valid and assigned - else false
+ */
+bool db_param_is_valid_assign_i32(const int32_t new_i32_value, db_parameter_t *target_param) {
+    if (new_i32_value <= target_param->value.db_param_i32.max && new_i32_value >= target_param->value.db_param_i32.min) {
+        target_param->value.db_param_i32.value = new_i32_value; // accept value and assign
+        return true;
+    }
+    // new value is not valid
+    ESP_LOGE(
+        TAG, "db_param_is_valid_assign_i32(): Value %i is out of valid range (%i-%i) for param %s",
+        new_i32_value, target_param->value.db_param_i32.max, target_param->value.db_param_i32.min,
+        (char *) target_param->db_name);
+    return false;
 }
 
 /**
