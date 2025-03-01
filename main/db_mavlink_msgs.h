@@ -21,14 +21,8 @@
 #define DB_ESP32_DB_MAVLINK_MSGS_H
 
 #include <stdint.h>
-#include "fastmavlink/c_library/common/common.h"
 #include "db_serial.h"
-
-//typedef struct  {
-//    char mavlink_parameter_name[16];
-//    void* parameter_internal_variable;
-//    MAV_PARAM_TYPE mavlink_parameter_data_type;
-//} db_internal_parameters_t;
+#include "common/common.h"
 
 uint8_t db_get_mav_comp_id();
 uint8_t db_get_mav_sys_id();

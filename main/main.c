@@ -37,9 +37,7 @@
 #include "esp_spiffs.h"
 #include "http_server.h"
 #include "main.h"
-
-#include <db_parameters.h>
-
+#include "db_parameters.h"
 #include "mdns.h"
 #include "db_esp_now.h"
 #include "iot_button.h"
@@ -65,6 +63,7 @@
 
 static const char *TAG = "DB_ESP32";
 
+char CURRENT_CLIENT_IP[IP4ADDR_STRLEN_MAX] = "192.168.2.1";
 uint8_t DB_WIFI_IS_OFF = false;  // keep track if we switched Wi-Fi off already
 db_esp_signal_quality_t db_esp_signal_quality = {.air_rssi = UINT8_MAX, .air_noise_floor = UINT8_MAX, .gnd_rssi= UINT8_MAX, .gnd_noise_floor = UINT8_MAX};
 wifi_sta_list_t wifi_sta_list = {.num = 0};
@@ -94,8 +93,8 @@ static esp_err_t db_set_dns_server(esp_netif_t *netif, uint32_t addr, esp_netif_
  * Stops client DHCP server
  */
 static void set_client_static_ip() {
-    if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_STA && strlen(DB_PARAM_STA_IP) > 0 && strlen(DB_PARAM_STA_GW) > 0 &&
-        strlen(DB_PARAM_STA_IP_NETMASK) > 0) {
+    if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_STA && strlen((char *) DB_PARAM_STA_IP) > 0 && strlen((char *) DB_PARAM_STA_GW) > 0 &&
+        strlen((char *) DB_PARAM_STA_IP_NETMASK) > 0) {
         ESP_LOGI(TAG, "Assigning static IP to ESP32: ESP32-IP: %s Gateway: %s Netmask: %s", (char *) DB_PARAM_STA_IP,
                  (char *) DB_PARAM_STA_GW, (char *) DB_PARAM_STA_IP_NETMASK);
 
@@ -105,15 +104,15 @@ static void set_client_static_ip() {
         }
         esp_netif_ip_info_t ip;
         memset(&ip, 0, sizeof(esp_netif_ip_info_t));
-        ip.ip.addr = ipaddr_addr(DB_PARAM_STA_IP);
-        ip.netmask.addr = ipaddr_addr(DB_PARAM_STA_IP_NETMASK);
-        ip.gw.addr = ipaddr_addr(DB_PARAM_STA_GW);
+        ip.ip.addr = ipaddr_addr((char *) DB_PARAM_STA_IP);
+        ip.netmask.addr = ipaddr_addr((char *) DB_PARAM_STA_IP_NETMASK);
+        ip.gw.addr = ipaddr_addr((char *) DB_PARAM_STA_GW);
         if (esp_netif_set_ip_info(esp_default_netif, &ip) != ESP_OK) {
             ESP_LOGE(TAG, "Failed to set static ip info");
         }
         ESP_LOGD(TAG, "Success to set static ip: %s, netmask: %s, gw: %s", (char *) DB_PARAM_STA_IP, (char *) DB_PARAM_STA_IP_NETMASK,
                  (char *) DB_PARAM_STA_GW);
-        ESP_ERROR_CHECK(db_set_dns_server(esp_default_netif, ipaddr_addr(DB_PARAM_STA_GW), ESP_NETIF_DNS_MAIN));
+        ESP_ERROR_CHECK(db_set_dns_server(esp_default_netif, ipaddr_addr((char *) DB_PARAM_STA_GW), ESP_NETIF_DNS_MAIN));
         ESP_ERROR_CHECK(db_set_dns_server(esp_default_netif, ipaddr_addr("0.0.0.0"), ESP_NETIF_DNS_BACKUP));
     } else {
         //no static IP specified let the DHCP assign us one
@@ -285,8 +284,11 @@ void db_init_wifi_apmode(int wifi_mode) {
                     .max_connection = 10
             },
     };
-    strncpy((char *) wifi_config.ap.ssid, (char *) DB_PARAM_WIFI_SSID, 32);
-    strncpy((char *) wifi_config.ap.password, (char *) DB_PARAM_PASS, 64);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-truncation"
+    strncpy((char *) wifi_config.ap.ssid, DB_PARAM_WIFI_SSID, 32);
+    strncpy((char *) wifi_config.ap.password, DB_PARAM_PASS, 64);
+#pragma GCC diagnostic pop
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
     if (wifi_mode == DB_WIFI_MODE_AP_LR) {
@@ -313,7 +315,10 @@ void db_init_wifi_apmode(int wifi_mode) {
     ESP_ERROR_CHECK(esp_netif_dhcps_start(esp_default_netif));
 
     ESP_ERROR_CHECK(esp_netif_set_hostname(esp_default_netif, "DBESP32"));
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-truncation"
     strncpy(CURRENT_CLIENT_IP, DB_PARAM_AP_IP, sizeof(CURRENT_CLIENT_IP));
+#pragma GCC diagnostic pop
     ESP_ERROR_CHECK(esp_read_mac(LOCAL_MAC_ADDRESS, ESP_MAC_WIFI_SOFTAP));
 }
 
@@ -350,8 +355,11 @@ int db_init_wifi_clientmode() {
                     .threshold.authmode = WIFI_AUTH_WEP
             },
     };
-    strncpy((char *) wifi_config.sta.ssid, (char *) DB_PARAM_WIFI_SSID, 32);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-truncation"
+    strncpy((char *) wifi_config.sta.ssid, (char *) DB_PARAM_WIFI_SSID, sizeof(wifi_config.sta.ssid));
     strncpy((char *) wifi_config.sta.password, (char *) DB_PARAM_PASS, 64);
+#pragma GCC diagnostic pop
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     if (DB_PARAM_WIFI_EN_GN) {
@@ -528,7 +536,7 @@ void db_read_settings_nvs() {
         ESP_LOGI(TAG, "%s", (char *) param_str_buffer);
 
         // Check if we have a saved UDP client from the last session. Add it to the known udp clients if there is one.
-        if (strlen(db_param_udp_client_ip.value.db_param_str.value) > 0 &&
+        if (strlen((char *) db_param_udp_client_ip.value.db_param_str.value) > 0 &&
             db_param_udp_client_port.value.db_param_u8.value != 0) {
             // there was a saved UDP client in the NVM from last session - add it to the udp clients list
             ESP_LOGI(TAG, "Adding %s:%i to known UDP clients.",
@@ -536,7 +544,7 @@ void db_read_settings_nvs() {
             struct sockaddr_in new_sockaddr;
             memset(&new_sockaddr, 0, sizeof(new_sockaddr));
             new_sockaddr.sin_family = AF_INET;
-            inet_pton(AF_INET, db_param_udp_client_ip.value.db_param_str.value, &new_sockaddr.sin_addr);
+            inet_pton(AF_INET, (char *) db_param_udp_client_ip.value.db_param_str.value, &new_sockaddr.sin_addr);
             new_sockaddr.sin_port = htons(db_param_udp_client_port.value.db_param_u8.value);
             struct db_udp_client_t new_udp_client = {
                     .udp_client = new_sockaddr,

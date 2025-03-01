@@ -24,8 +24,6 @@
 #include <fcntl.h>
 #include <lwip/sockets.h>
 #include <esp_chip_info.h>
-#include <utils/wpa_debug.h>
-
 #include "esp_http_server.h"
 #include "esp_system.h"
 #include "esp_log.h"
@@ -216,10 +214,10 @@ static esp_err_t settings_clients_udp_post(httpd_req_t *req) {
     int new_udp_port = 0;
     char new_ip[IP4ADDR_STRLEN_MAX];
     uint8_t save_to_nvm = false;
-    cJSON *json = cJSON_GetObjectItem(root, db_param_udp_client_ip.db_name);
+    cJSON *json = cJSON_GetObjectItem(root, (char *) db_param_udp_client_ip.db_name);
     if (json) strncpy(new_ip, json->valuestring, sizeof(new_ip));
     new_ip[IP4ADDR_STRLEN_MAX-1] = '\0';    // to remove warning and to be sure
-    json = cJSON_GetObjectItem(root, db_param_udp_client_port.db_name);
+    json = cJSON_GetObjectItem(root, (char *) db_param_udp_client_port.db_name);
     if (json) new_udp_port = json->valueint;
     json = cJSON_GetObjectItem(root, "save");
     if (json && cJSON_IsBool(json)) {
@@ -320,25 +318,25 @@ static esp_err_t settings_static_ip_post_handler(httpd_req_t *req) {
     cJSON *root = cJSON_Parse(buf);
 
     esp_err_t err = ESP_OK;
-    cJSON *json = cJSON_GetObjectItem(root, db_param_wifi_sta_ip.db_name);
+    cJSON *json = cJSON_GetObjectItem(root, (char *) db_param_wifi_sta_ip.db_name);
     if (json) {
-        strncpy(DB_PARAM_STA_IP, json->valuestring, sizeof(DB_PARAM_STA_IP));
+        strncpy((char *) DB_PARAM_STA_IP, json->valuestring, sizeof(DB_PARAM_STA_IP));
         DB_PARAM_STA_IP[IP4ADDR_STRLEN_MAX-1] = '\0';    // to remove warning and to be sure
     } else {
         err = ESP_FAIL;
     }
 
-    json = cJSON_GetObjectItem(root, db_param_wifi_sta_netmask.db_name);
+    json = cJSON_GetObjectItem(root, (char *) db_param_wifi_sta_netmask.db_name);
     if (json) {
-        strncpy(DB_PARAM_STA_IP_NETMASK, json->valuestring, sizeof(DB_PARAM_STA_IP_NETMASK));
+        strncpy((char *) DB_PARAM_STA_IP_NETMASK, json->valuestring, sizeof(DB_PARAM_STA_IP_NETMASK));
         DB_PARAM_STA_IP_NETMASK[IP4ADDR_STRLEN_MAX-1] = '\0';    // to remove warning and to be sure
     } else {
         err = ESP_FAIL;
     }
 
-    json = cJSON_GetObjectItem(root, db_param_wifi_sta_gw.db_name);
+    json = cJSON_GetObjectItem(root, (char *) db_param_wifi_sta_gw.db_name);
     if (json) {
-        strncpy(DB_PARAM_STA_GW, json->valuestring, sizeof(DB_PARAM_STA_GW));
+        strncpy((char *) DB_PARAM_STA_GW, json->valuestring, sizeof(DB_PARAM_STA_GW));
         DB_PARAM_STA_GW[IP4ADDR_STRLEN_MAX-1] = '\0';    // to remove warning and to be sure
     } else {
         err = ESP_FAIL;

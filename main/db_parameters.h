@@ -20,11 +20,12 @@
 #ifndef DB_PARAMETERS_H
 #define DB_PARAMETERS_H
 
+#include <string.h>
 #include <cJSON.h>
 #include <nvs.h>
 #include <stdint.h>
 #include <driver/gpio.h>
-#include "fastmavlink/c_library/common/common.h"
+#include "common/common.h"
 
 #define DB_BUILD_VERSION 15
 #define DB_MAJOR_VERSION 2
@@ -32,11 +33,12 @@
 #define DB_PATCH_VERSION 0
 #define DB_MATURITY_VERSION "RC1"
 
-#define DB_PARAM_NAME_MAXLEN     16
-#define DB_PARAM_VALUE_MAXLEN    64
-#define MAX_LTM_FRAMES_IN_BUFFER 5
+#define DB_PARAM_TOTAL_NUM          24  // total number of db parameters
+#define DB_PARAM_NAME_MAXLEN        16
+#define DB_PARAM_VALUE_MAXLEN       64
+#define MAX_LTM_FRAMES_IN_BUFFER    5
 
-uint16_t DB_MAV_PARAM_CNT = 17; // Number of MAVLink parameters returned by ESP32 in the PARAM message. Needed by GCS.
+#define DB_MAV_PARAM_CNT            17 // Number of MAVLink parameters returned by ESP32 in the PARAM message. Needed by GCS.
 
 #ifdef CONFIG_DB_OFFICIAL_BOARD_1_X
 #define DB_DEFAULT_UART_TX_PIN GPIO_NUM_5
@@ -101,6 +103,7 @@ enum E_DB_SERIAL_PROTOCOL {
     DB_SERIAL_PROTOCOL_TRANSPARENT = 5
 };
 
+// ToDo: This is not ideal since all parameters are not allocated with 64 bytes. Dynamic allocation is more complex
 typedef struct db_parameter_str_s {
     uint8_t value[DB_PARAM_VALUE_MAXLEN];
     uint8_t default_value[DB_PARAM_VALUE_MAXLEN];
@@ -110,21 +113,21 @@ typedef struct db_parameter_str_s {
 
 typedef struct db_parameter_u8_s {
     uint8_t value;
-    uint8_t default_value;
+    const uint8_t default_value;
     uint8_t min;
     uint8_t max;
 } db_param_u8_t;
 
 typedef struct db_parameter_u16_s {
     uint16_t value;
-    uint16_t default_value;
+    const uint16_t default_value;
     uint16_t min;
     uint16_t max;
 } db_param_u16_t;
 
 typedef struct db_parameter_i32_s {
     int32_t value;
-    int32_t default_value;
+    const int32_t default_value;
     int32_t min;
     int32_t max;
 } db_param_i32_t;
@@ -153,7 +156,7 @@ typedef struct db_parameter_s {
 } db_parameter_t;
 
 extern uint8_t DB_RADIO_MODE_DESIGNATED;
-extern db_parameter_t *db_params[];
+extern db_parameter_t *db_params[DB_PARAM_TOTAL_NUM];
 
 extern db_parameter_t db_param_ssid;
 extern db_parameter_t db_param_pass;
@@ -180,6 +183,8 @@ extern db_parameter_t db_param_ltm_per_packet;
 extern db_parameter_t db_param_dis_radio_armed;
 extern db_parameter_t db_param_udp_client_port;
 
+//db_parameter_t db_param_init_str_param(uint8_t *db_name, uint8_t *mav_param_name, uint8_t *default_value,
+//                                       uint8_t max_val_len, uint8_t min_val_len);
 void db_param_set_to_default(db_parameter_t *db_parameter);
 void db_param_reset_all();
 int db_param_print_values_to_buffer(uint8_t *str_buffer);
@@ -188,38 +193,8 @@ void db_param_write_all_params_nvs(const nvs_handle_t *nvs_handle);
 void db_param_read_all_params_json(const cJSON *root_obj);
 void db_param_write_all_params_json(cJSON *root_obj);
 bool db_param_is_valid_assign_str(const char *new_string_value, db_parameter_t *target_param);
-bool db_param_is_valid_assign_u8(const uint8_t new_u8_value, db_parameter_t *target_param);
-bool db_param_is_valid_assign_u16(const uint16_t new_u16_value, db_parameter_t *target_param);
-bool db_param_is_valid_assign_i32(const int32_t new_i32_value, db_parameter_t *target_param);
-
-/**
- * Array containing all references to the DB parameters
- */
-db_parameter_t *db_params[] = {
-    &db_param_ssid,
-    &db_param_pass,
-    &db_param_wifi_ap_ip,
-    &db_param_wifi_sta_ip,
-    &db_param_wifi_sta_gw,
-    &db_param_wifi_sta_netmask,
-    &db_param_udp_client_ip,
-    &db_param_radio_mode,
-    &db_param_sw_version,
-    &db_param_channel,
-    &db_param_wifi_en_gn,
-    &db_param_wifi_ant_ext,
-    &db_param_baud,
-    &db_param_gpio_tx,
-    &db_param_gpio_rx,
-    &db_param_gpio_rts,
-    &db_param_gpio_cts,
-    &db_param_gpio_rts_thresh,
-    &db_param_proto,
-    &db_param_serial_pack_size,
-    &db_param_serial_read_timeout,
-    &db_param_ltm_per_packet,
-    &db_param_dis_radio_armed,
-    &db_param_udp_client_port
-};
+bool db_param_is_valid_assign_u8(uint8_t new_u8_value, db_parameter_t *target_param);
+bool db_param_is_valid_assign_u16(uint16_t new_u16_value, db_parameter_t *target_param);
+bool db_param_is_valid_assign_i32(int32_t new_i32_value, db_parameter_t *target_param);
 
 #endif //DB_PARAMETERS_H

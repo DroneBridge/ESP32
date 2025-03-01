@@ -19,9 +19,7 @@
 
 #include "db_parameters.h"
 
-#include <db_serial.h>
 #include <esp_log.h>
-#include <esp_netif_ip_addr.h>
 #include <esp_wifi_types_generic.h>
 #include <string.h>
 #include <lwip/sockets.h>
@@ -32,9 +30,10 @@
  * Steps to add new parameters.
  * 1. Add new parameter as db_parameter_t below
  * 2. Add new parameter to db_params array
- * 3. Increase DB_MAV_PARAM_CNT if parameter is available via MAVLink (non-string parameter)
- * 4. Make parameter available globally by adding extern definition into db_parameters.h
- * 5. Create an optional macro in db_parameters.h to make the parameter value easy accessible
+ * 3. Increase DB_PARAM_TOTAL_NUM
+ * 4. Increase DB_MAV_PARAM_CNT if parameter is available via MAVLink (non-string parameter)
+ * 5. Make parameter available globally by adding extern definition into db_parameters.h
+ * 6. Create an optional macro in db_parameters.h to make the parameter value easy accessible
  */
 
 /**
@@ -50,21 +49,21 @@ uint8_t DB_RADIO_MODE_DESIGNATED = DB_WIFI_MODE_AP; // initially assign the same
  * Wi-Fi AP SSID name OR Wi-Fi AP SSID name to connect to in Wi-Fi client mode
  */
 db_parameter_t db_param_ssid = {
-    .db_name = "ssid",
-    .type = STRING,
-    .mav_t = {
-        .param_name = "SYS_SSID",
-        .param_index = -1,
-        .param_type = MAV_PARAM_TYPE_ENUM_END, // no string support so far
-    },
-    .value = {
-        .db_param_str = {
-            .value = "DroneBridge for ESP32",
-            .default_value = "DroneBridge for ESP32",
-            .min_len = 1,
-            .max_len = MAX_SSID_LEN,
+        .db_name = "ssid",
+        .type = STRING,
+        .mav_t = {
+                .param_name = "SYS_SSID",
+                .param_index = -1,
+                .param_type = MAV_PARAM_TYPE_ENUM_END, // no string support so far
+        },
+        .value = {
+                .db_param_str = {
+                        .value = "DroneBridge for ESP32",
+                        .default_value = "DroneBridge for ESP32",
+                        .min_len = 1,
+                        .max_len = MAX_SSID_LEN,
+                }
         }
-    }
 };
 
 /**
@@ -186,8 +185,8 @@ db_parameter_t db_param_udp_client_ip = {
     },
     .value = {
         .db_param_str = {
-            .value = '\0',
-            .default_value = '\0',
+            .value = "\0",
+            .default_value = "\0",
             .min_len = 0,
             .max_len = IP4ADDR_STRLEN_MAX
         }
@@ -315,7 +314,7 @@ db_parameter_t db_param_baud = {
         .param_type = MAV_PARAM_TYPE_INT32,
     },
     .value = {
-        .db_param_u8 = {
+        .db_param_i32 = {
             .value = DB_DEFAULT_UART_BAUD_RATE,
             .default_value = DB_DEFAULT_UART_BAUD_RATE,
             .min = 1200,
@@ -557,13 +556,78 @@ db_parameter_t db_param_udp_client_port = {
 };
 
 /**
+ * Array containing all references to the DB parameters
+ */
+db_parameter_t *db_params[] = {
+        &db_param_ssid,
+        &db_param_pass,
+        &db_param_wifi_ap_ip,
+        &db_param_wifi_sta_ip,
+        &db_param_wifi_sta_gw,
+        &db_param_wifi_sta_netmask,
+        &db_param_udp_client_ip,
+        &db_param_radio_mode,
+        &db_param_sw_version,
+        &db_param_channel,
+        &db_param_wifi_en_gn,
+        &db_param_wifi_ant_ext,
+        &db_param_baud,
+        &db_param_gpio_tx,
+        &db_param_gpio_rx,
+        &db_param_gpio_rts,
+        &db_param_gpio_cts,
+        &db_param_gpio_rts_thresh,
+        &db_param_proto,
+        &db_param_serial_pack_size,
+        &db_param_serial_read_timeout,
+        &db_param_ltm_per_packet,
+        &db_param_dis_radio_armed,
+        &db_param_udp_client_port
+};
+
+//db_parameter_t db_param_init_str_param(uint8_t *db_name, uint8_t *mav_param_name, uint8_t *default_value,
+//                                       uint8_t max_val_len, uint8_t min_val_len) {
+//    db_parameter_t db_str_param = {
+//            .db_name = "",
+//            .type = STRING,
+//            .mav_t = {
+//                    .param_name = "",
+//                    .param_index = -1,
+//                    .param_type = MAV_PARAM_TYPE_ENUM_END, // no string support so far
+//            },
+//            .value = {
+//                    .db_param_str = {
+//                            .min_len = min_val_len,
+//                            .max_len = max_val_len,
+//                    }
+//            }
+//    };
+//    strncpy((char *) db_str_param.db_name, (char *) db_name, DB_PARAM_NAME_MAXLEN);
+//    strncpy((char *) db_str_param.mav_t.param_name, (char *) mav_param_name, 16);
+//    db_str_param.value.db_param_str.default_value = (uint8_t *) strdup((char *) default_value);
+//    db_str_param.value.db_param_str.value = malloc(max_val_len);
+//    if (db_str_param.value.db_param_str.value == NULL) {
+//        ESP_LOGE(TAG, "Error allocating space for string parameter %s", db_name);
+//    } else {
+//        // all good
+//    }
+//    return db_str_param;
+//}
+//
+//void db_param_init_parameters() {
+//    // Wi-Fi AP SSID name OR Wi-Fi AP SSID name to connect to in Wi-Fi client mode
+//    db_param_init_str_param("ssid", "SYS_SSID", "DroneBridge for ESP32", MAX_SSID_LEN, 1);
+//
+//}
+
+/**
  * Sets the value of the supplied the parameter to its default value
  * @param db_parameter The parameter to reset to default
  */
 void db_param_set_to_default(db_parameter_t *db_parameter) {
     switch (db_parameter->type) {
         case STRING:
-            strncpy(db_parameter->value.db_param_str.value, db_parameter->value.db_param_str.default_value,
+            strncpy((char *) db_parameter->value.db_param_str.value, (char *) db_parameter->value.db_param_str.default_value,
                     DB_PARAM_VALUE_MAXLEN);
             break;
         case UINT8:
@@ -612,14 +676,14 @@ int db_param_print_values_to_buffer(uint8_t *str_buffer) {
                                    db_params[i]->value.db_param_u16.value);
                 break;
             case INT32:
-                str_len += sprintf((char *) param_str_buf, "\t%s: %i\n", (char *) db_params[i]->db_name,
+                str_len += sprintf((char *) param_str_buf, "\t%s: %li\n", (char *) db_params[i]->db_name,
                                    db_params[i]->value.db_param_i32.value);
                 break;
             default:
                 ESP_LOGE(TAG, "db_param_print_values_to_buffer() -> db_parameter.type unknown!");
                 break;
         }
-        strcat((char *) str_buffer, param_str_buf); // add the string of the individual printed param to the big buffer
+        strcat((char *) str_buffer, (char *) param_str_buf); // add the string of the individual printed param to the big buffer
     }
     return str_len;
 }
@@ -655,19 +719,19 @@ void db_param_read_all_params_nvs(const nvs_handle_t *nvs_handle) {
     for (int i = 0; i < sizeof(db_params) / sizeof(db_params[0]); i++) {
         switch (db_params[i]->type) {
             case STRING:
-                db_read_str_nvs(*nvs_handle, db_params[i]->db_name, db_params[i]->value.db_param_str.value);
+                db_read_str_nvs(*nvs_handle, (char *) db_params[i]->db_name, (char *) db_params[i]->value.db_param_str.value);
                 break;
             case UINT8:
                 ESP_ERROR_CHECK_WITHOUT_ABORT(
-                    nvs_get_u8(*nvs_handle, db_params[i]->db_name, &db_params[i]->value.db_param_u8.value));
+                    nvs_get_u8(*nvs_handle, (char *) db_params[i]->db_name, &db_params[i]->value.db_param_u8.value));
                 break;
             case UINT16:
                 ESP_ERROR_CHECK_WITHOUT_ABORT(
-                    nvs_get_u16(*nvs_handle, db_params[i]->db_name, &db_params[i]->value.db_param_u16.value));
+                    nvs_get_u16(*nvs_handle, (char *) db_params[i]->db_name, &db_params[i]->value.db_param_u16.value));
                 break;
             case INT32:
                 ESP_ERROR_CHECK_WITHOUT_ABORT(
-                    nvs_get_i32(*nvs_handle, db_params[i]->db_name, &db_params[i]->value.db_param_i32.value));
+                    nvs_get_i32(*nvs_handle, (char *) db_params[i]->db_name, &db_params[i]->value.db_param_i32.value));
                 break;
             default:
                 ESP_LOGE(TAG, "db_param_read_all_params_to_nvs() -> db_parameter.type unknown!");
@@ -686,23 +750,23 @@ void db_param_write_all_params_nvs(const nvs_handle_t *nvs_handle) {
     for (int i = 0; i < sizeof(db_params) / sizeof(db_params[0]); i++) {
         switch (db_params[i]->type) {
             case STRING:
-                ESP_ERROR_CHECK(nvs_set_str(*nvs_handle, db_params[i]->db_name, db_params[i]->value.db_param_str.value))
-                ;
+                ESP_ERROR_CHECK(nvs_set_str(*nvs_handle, (char *) db_params[i]->db_name,
+                                            (char *) db_params[i]->value.db_param_str.value));
                 break;
             case UINT8:
-                if (strcmp(db_params[i]->db_name, db_param_radio_mode.db_name) == 0) {
+                if (strcmp((char *) db_params[i]->db_name, (char *) db_param_radio_mode.db_name) == 0) {
                     // This is different. User writes the desired mode into DB_RADIO_MODE_DESIGNATED and does not overwrite the value
-                    ESP_ERROR_CHECK(nvs_set_u8(*nvs_handle, db_params[i]->db_name, DB_RADIO_MODE_DESIGNATED));
+                    ESP_ERROR_CHECK(nvs_set_u8(*nvs_handle, (char *) db_params[i]->db_name, DB_RADIO_MODE_DESIGNATED));
                 } else {
                     ESP_ERROR_CHECK(
-                        nvs_set_u8(*nvs_handle, db_params[i]->db_name, db_params[i]->value.db_param_u8.value));
+                        nvs_set_u8(*nvs_handle, (char *) db_params[i]->db_name, db_params[i]->value.db_param_u8.value));
                 }
                 break;
             case UINT16:
-                ESP_ERROR_CHECK(nvs_set_u16(*nvs_handle, db_params[i]->db_name, db_params[i]->value.db_param_u16.value));
+                ESP_ERROR_CHECK(nvs_set_u16(*nvs_handle, (char *) db_params[i]->db_name, db_params[i]->value.db_param_u16.value));
                 break;
             case INT32:
-                ESP_ERROR_CHECK(nvs_set_i32(*nvs_handle, db_params[i]->db_name, db_params[i]->value.db_param_i32.value));
+                ESP_ERROR_CHECK(nvs_set_i32(*nvs_handle, (char *) db_params[i]->db_name, db_params[i]->value.db_param_i32.value));
                 break;
             default:
                 ESP_LOGE(TAG, "db_param_write_all_params_to_nvs() -> db_parameter.type unknown!");
@@ -719,7 +783,7 @@ void db_param_write_all_params_nvs(const nvs_handle_t *nvs_handle) {
  */
 void db_param_read_all_params_json(const cJSON *root_obj) {
     for (int i = 0; i < sizeof(db_params) / sizeof(db_params[0]); i++) {
-        cJSON *jobject = cJSON_GetObjectItem(root_obj, db_params[i]->db_name);
+        cJSON *jobject = cJSON_GetObjectItem(root_obj, (char *) db_params[i]->db_name);
         switch (db_params[i]->type) {
             case STRING:
                 if (jobject) {
@@ -764,16 +828,16 @@ void db_param_write_all_params_json(cJSON *root_obj) {
     for (int i = 0; i < sizeof(db_params) / sizeof(db_params[0]); i++) {
         switch (db_params[i]->type) {
             case STRING:
-                cJSON_AddStringToObject(root_obj, db_params[i]->db_name,  db_params[i]->value.db_param_str.value);
+                cJSON_AddStringToObject(root_obj, (char *) db_params[i]->db_name,  (char *) db_params[i]->value.db_param_str.value);
             break;
             case UINT8:
-                cJSON_AddNumberToObject(root_obj, db_params[i]->db_name, db_params[i]->value.db_param_u8.value);
+                cJSON_AddNumberToObject(root_obj, (char *) db_params[i]->db_name, db_params[i]->value.db_param_u8.value);
             break;
             case UINT16:
-                cJSON_AddNumberToObject(root_obj, db_params[i]->db_name, db_params[i]->value.db_param_u16.value);
+                cJSON_AddNumberToObject(root_obj, (char *) db_params[i]->db_name, db_params[i]->value.db_param_u16.value);
             break;
             case INT32:
-                cJSON_AddNumberToObject(root_obj, db_params[i]->db_name, db_params[i]->value.db_param_i32.value);
+                cJSON_AddNumberToObject(root_obj, (char *) db_params[i]->db_name, db_params[i]->value.db_param_i32.value);
             break;
             default:
                 ESP_LOGE(TAG, "db_param_write_all_params_json() -> db_parameter.type unknown!");
@@ -792,7 +856,7 @@ void db_param_write_all_params_json(cJSON *root_obj) {
 bool db_param_is_valid_assign_str(const char *new_string_value, db_parameter_t *target_param) {
     // ToDo: Add IPv4 check for strings via custom validation function in db_parameter_t
     if (strlen(new_string_value) <= target_param->value.db_param_str.max_len && strlen(new_string_value) > 0) {
-        strncpy(target_param->value.db_param_str.value, new_string_value, DB_PARAM_VALUE_MAXLEN);
+        strncpy((char *) target_param->value.db_param_str.value, new_string_value, DB_PARAM_VALUE_MAXLEN);
         return true;
     }
     // new value is not valid
@@ -810,7 +874,7 @@ bool db_param_is_valid_assign_str(const char *new_string_value, db_parameter_t *
  */
 bool db_param_is_valid_assign_u8(const uint8_t new_u8_value, db_parameter_t *target_param) {
     if (new_u8_value <= target_param->value.db_param_u8.max && new_u8_value >= target_param->value.db_param_u8.min) {
-        if (strcmp(target_param->db_name, db_param_radio_mode.db_name) == 0) {
+        if (strcmp((char *) target_param->db_name, (char *) db_param_radio_mode.db_name) == 0) {
             // Special case check: Do not directly change DB_WIFI_MODE since it is not safe and constantly
             // processed by other tasks. Save settings and reboot will assign DB_RADIO_MODE_DESIGNATED to DB_WIFI_MODE
             DB_RADIO_MODE_DESIGNATED = new_u8_value;
@@ -861,7 +925,7 @@ bool db_param_is_valid_assign_i32(const int32_t new_i32_value, db_parameter_t *t
     }
     // new value is not valid
     ESP_LOGE(
-        TAG, "db_param_is_valid_assign_i32(): Value %i is out of valid range (%i-%i) for param %s",
+        TAG, "db_param_is_valid_assign_i32(): Value %li is out of valid range (%li-%li) for param %s",
         new_i32_value, target_param->value.db_param_i32.max, target_param->value.db_param_i32.min,
         (char *) target_param->db_name);
     return false;
