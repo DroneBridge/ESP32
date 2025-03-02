@@ -77,8 +77,8 @@
             </div>
             <div class="row">
                 <div class="six columns" id="wifi_ssid_div">
-                    <label for="wifi_ssid">SSID</label>
-                    <input type="text" name="wifi_ssid" value="" id="wifi_ssid" maxlength="31">
+                    <label for="ssid">SSID</label>
+                    <input type="text" name="ssid" value="" id="ssid" maxlength="31">
                 </div>
                 <div class="six columns">
                     <label for="wifi_pass">Password</label>
@@ -87,8 +87,8 @@
             </div>
             <div class="row">
                 <div id="ap_channel_div" class="six columns">
-                    <label for="ap_channel">Channel</label>
-                    <select id="ap_channel" name="ap_channel" form="settings_form">
+                    <label for="wifi_chan">Channel</label>
+                    <select id="wifi_chan" name="wifi_chan" form="settings_form">
                         <option value="1">1</option>
                         <option value="2">2</option>
                         <option value="3">3</option>
@@ -136,22 +136,22 @@
             <h3 style="margin-top: 2rem">Serial</h3>
             <div class="row" id="tx_rx_div">
                 <div class="six columns">
-                    <label for="tx_pin">UART TX GPIO</label>
-                    <input type="number" name="tx_pin" value="" id="tx_pin">
+                    <label for="gpio_tx">UART TX GPIO</label>
+                    <input type="number" name="gpio_tx" value="" id="gpio_tx">
                 </div>
                 <div class="six columns">
-                    <label for="rx_pin">UART RX GPIO</label>
-                    <input type="number" name="rx_pin" value="" id="rx_pin">
+                    <label for="gpio_rx">UART RX GPIO</label>
+                    <input type="number" name="gpio_rx" value="" id="gpio_rx">
                 </div>
             </div>
             <div class="row" id="rts_cts_div">
                 <div class="six columns">
-                    <label for="rts_pin">UART RTS GPIO</label>
-                    <input type="number" name="rts_pin" value="" id="rts_pin" onchange="flow_control_check()">
+                    <label for="gpio_rts">UART RTS GPIO</label>
+                    <input type="number" name="gpio_rts" value="" id="gpio_rts" onchange="flow_control_check()">
                 </div>
                 <div class="six columns">
-                    <label for="cts_pin">UART CTS GPIO</label>
-                    <input type="number" name="cts_pin" value="" id="cts_pin" onchange="flow_control_check()">
+                    <label for="gpio_cts">UART CTS GPIO</label>
+                    <input type="number" name="gpio_cts" value="" id="gpio_cts" onchange="flow_control_check()">
                 </div>
             </div>
             <div class="row" id="rts_thresh_div">
@@ -162,8 +162,8 @@
             </div>
             <div class="row">
                 <div class="six columns">
-                    <label for="telem_proto">UART serial protocol</label>
-                    <select id="telem_proto" name="telem_proto" form="settings_form"
+                    <label for="proto">UART serial protocol</label>
+                    <select id="proto" name="proto" form="settings_form"
                             onchange="change_msp_ltm_visibility()">
                         <option value="1">MSP/LTM</option>
                         <option value="4">MAVLink</option>
@@ -226,8 +226,13 @@
                     <input type="number" id="serial_timeout" name="serial_timeout" min="1" max="65535" value="50">
                 </div>
             </div>
-            <div class="row">
-
+            <div id="rep_rssi_dbm_div" class="row">
+                <div class="twelve columns">
+                    <div class="checkbox-wrapper-14">
+                        <input id="rep_rssi_dbm" name="rep_rssi_dbm" type="checkbox" class="switch">
+                        <label for="rep_rssi_dbm">Report Rssi in [dBm] instead of 0-100</label>
+                    </div>
+                </div>
             </div>
         </div>
     </form>

@@ -25,6 +25,12 @@
 #include "globals.h"
 #include "main.h"
 
+#ifndef MIN
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
+#endif
+#ifndef MAX
+#define MAX(a,b) ((a) > (b) ? (a) : (b))
+#endif
 
 #define FASTMAVLINK_ROUTER_LINKS_MAX  3
 #define FASTMAVLINK_ROUTER_COMPONENTS_MAX  5
@@ -56,11 +62,12 @@ uint8_t db_get_mav_sys_id() {
  * @return Signal strength formatted for QGroundControl (0 to -127 [dBm]) or Mission Planner (0 to 100)
  */
 int8_t db_format_rssi(int8_t signal_strength, int8_t noise_floor) {
-    if (1) { // DB_RSSI_HECTO
-        return MIN(100, 2 * (MIN(-50, signal_strength) + 100));    // dBm from [-50 to -100] scaled to 100 to 0
-    } else {
-        // [dBm]
+    if (db_param_rssi_dbm.value.db_param_u8.value) {
+        // report in [dBm]
         return signal_strength;
+    } else {
+        // dBm from [-50 to -100] scaled to 100 to 0
+        return MIN(100, 2 * (MIN(-50, signal_strength) + 100));
     }
 }
 
@@ -91,7 +98,7 @@ uint16_t db_get_mavmsg_param(uint8_t *buff, fmav_status_t *fmav_status, uint16_t
     fmav_param_value_t fmav_param_value = {
             .param_value = value->f,
             .param_type = type,
-            .param_count = DB_MAV_PARAM_CNT,
+            .param_count = DB_PARAM_MAV_CNT,
             .param_index = param_index};
     if (strlen(param_id)>15) {  // max size of param_id is 16 bytes
         memcpy(fmav_param_value.param_id, param_id, 16);
@@ -354,6 +361,7 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
                 switch (db_params[i]->type) {
                     case STRING:
                         // ignoring strings. Not supported with this request
+                        continue;
                     break;
                     case UINT8:
                         float_int.uint8 = db_params[i]->value.db_param_u8.value;

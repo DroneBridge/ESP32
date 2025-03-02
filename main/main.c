@@ -515,25 +515,12 @@ void db_read_settings_nvs() {
     } else {
         ESP_LOGI(TAG, "Reading settings from NVS");
         db_param_read_all_params_nvs(&my_handle);
-        // get saved UDP client - this read might result in an error if no client was saved prev. by the user
-
-        // char udp_client_ip_str[INET_ADDRSTRLEN + 6];
-        // udp_client_ip_str[0] = '\0';
-        // db_read_str_nvs(my_handle, "udp_client_ip", udp_client_ip_str);
-        // uint16_t udp_client_port = 0;
-        // if (strlen(udp_client_ip_str) > 0) {
-        //     ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u16(my_handle, "udp_client_port", &udp_client_port));
-        // } else {
-        //     // no point in getting the port since ip was not there
-        // }
-
-        // close NVM
         nvs_close(my_handle);
 
         // print parameters to console for logging
         uint8_t param_str_buffer[512];
         db_param_print_values_to_buffer(param_str_buffer);
-        ESP_LOGI(TAG, "%s", (char *) param_str_buffer);
+        ESP_LOGI(TAG, "\n%s", (char *) param_str_buffer);
 
         // Check if we have a saved UDP client from the last session. Add it to the known udp clients if there is one.
         if (strlen((char *) db_param_udp_client_ip.value.db_param_str.value) > 0 &&
@@ -630,8 +617,8 @@ void db_configure_antenna() {
     gpio_set_level(GPIO_NUM_3, 0); // set to low to enable RF switching
     #endif
     gpio_set_direction(CONFIG_DB_RF_SWITCH_GPIO, GPIO_MODE_OUTPUT);
-    gpio_set_level(CONFIG_DB_RF_SWITCH_GPIO, DB_EN_EXT_ANT);   // set level to enable external/internal antenna
-    ESP_LOGI(TAG, "External antenna usage: %i", DB_EN_EXT_ANT);
+    gpio_set_level(CONFIG_DB_RF_SWITCH_GPIO, DB_PARAM_EN_EXT_ANT);   // set level to enable external/internal antenna
+    ESP_LOGI(TAG, "External antenna usage: %i", DB_PARAM_EN_EXT_ANT);
 #endif
 }
 

@@ -27,18 +27,19 @@
 #include <driver/gpio.h>
 #include "common/common.h"
 
-#define DB_BUILD_VERSION 15
+#define DB_BUILD_VERSION 16
 #define DB_MAJOR_VERSION 2
 #define DB_MINOR_VERSION 1
 #define DB_PATCH_VERSION 0
-#define DB_MATURITY_VERSION "RC1"
+#define DB_MATURITY_VERSION "RC2"
 
-#define DB_PARAM_TOTAL_NUM          24  // total number of db parameters
+#define DB_PARAM_TOTAL_NUM          26  // total number of db parameters
+#define DB_PARAM_MAV_CNT            19 // Number of MAVLink parameters returned by ESP32 in the PARAM message. Needed by GCS.
+
 #define DB_PARAM_NAME_MAXLEN        16
 #define DB_PARAM_VALUE_MAXLEN       64
 #define MAX_LTM_FRAMES_IN_BUFFER    5
 
-#define DB_MAV_PARAM_CNT            17 // Number of MAVLink parameters returned by ESP32 in the PARAM message. Needed by GCS.
 
 #ifdef CONFIG_DB_OFFICIAL_BOARD_1_X
 #define DB_DEFAULT_UART_TX_PIN GPIO_NUM_5
@@ -87,6 +88,7 @@
 #define DB_PARAM_GPIO_RTS db_param_gpio_rts.value.db_param_u8.value
 #define DB_PARAM_GPIO_CTS db_param_gpio_cts.value.db_param_u8.value
 #define DB_PARAM_SERIAL_RTS_THRESH db_param_gpio_rts_thresh.value.db_param_u8.value
+#define DB_PARAM_EN_EXT_ANT db_param_en_ext_ant.value.db_param_u8.value
 
 enum E_DB_WIFI_MODE {
     DB_WIFI_MODE_AP = 1,            // Wi-Fi access point mode with 802.11b mode enabled
@@ -182,6 +184,8 @@ extern db_parameter_t db_param_serial_read_timeout;
 extern db_parameter_t db_param_ltm_per_packet;
 extern db_parameter_t db_param_dis_radio_armed;
 extern db_parameter_t db_param_udp_client_port;
+extern db_parameter_t db_param_en_ext_ant;
+extern db_parameter_t db_param_rssi_dbm;
 
 //db_parameter_t db_param_init_str_param(uint8_t *db_name, uint8_t *mav_param_name, uint8_t *default_value,
 //                                       uint8_t max_val_len, uint8_t min_val_len);
@@ -196,5 +200,6 @@ bool db_param_is_valid_assign_str(const char *new_string_value, db_parameter_t *
 bool db_param_is_valid_assign_u8(uint8_t new_u8_value, db_parameter_t *target_param);
 bool db_param_is_valid_assign_u16(uint16_t new_u16_value, db_parameter_t *target_param);
 bool db_param_is_valid_assign_i32(int32_t new_i32_value, db_parameter_t *target_param);
+bool is_valid_ip4(const char *ipaddress);
 
 #endif //DB_PARAMETERS_H

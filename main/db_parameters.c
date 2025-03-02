@@ -71,126 +71,126 @@ db_parameter_t db_param_ssid = {
  * Password for Wi-Fi connections.
  */
 db_parameter_t db_param_pass = {
-    .db_name = "wifi_pass",
-    .type = STRING,
-    .mav_t = {
-        .param_name = "SYS_PASS",
-        .param_index = -1,
-        .param_type = MAV_PARAM_TYPE_ENUM_END, // no string support so far
-    },
-    .value = {
-        .db_param_str = {
-            .value = "dronebridge",
-            .default_value = "dronebridge",
-            .min_len = 7,
-            .max_len = 64
+        .db_name = "wifi_pass",
+        .type = STRING,
+        .mav_t = {
+                .param_name = "SYS_PASS",
+                .param_index = -1,
+                .param_type = MAV_PARAM_TYPE_ENUM_END, // no string support so far
+        },
+        .value = {
+                .db_param_str = {
+                        .value = "dronebridge",
+                        .default_value = "dronebridge",
+                        .min_len = 7,
+                        .max_len = 64
+                }
         }
-    }
 };
 
 /**
  * IPv4 of the Wi-Fi access point when in Wi-Fi AP mode
  */
 db_parameter_t db_param_wifi_ap_ip = {
-    .db_name = "ap_ip",
-    .type = STRING,
-    .mav_t = {
-        .param_name = "WIFI_AP_IP",
-        .param_index = -1,
-        .param_type = MAV_PARAM_TYPE_ENUM_END, // no string support so far
-    },
-    .value = {
-        .db_param_str = {
-            .value = "192.168.2.1",
-            .default_value = "192.168.2.1",
-            .min_len = 8,
-            .max_len = IP4ADDR_STRLEN_MAX
+        .db_name = "ap_ip",
+        .type = STRING,
+        .mav_t = {
+                .param_name = "WIFI_AP_IP",
+                .param_index = -1,
+                .param_type = MAV_PARAM_TYPE_ENUM_END, // no string support so far
+        },
+        .value = {
+                .db_param_str = {
+                        .value = "192.168.2.1",
+                        .default_value = "192.168.2.1",
+                        .min_len = 8,
+                        .max_len = IP4ADDR_STRLEN_MAX
+                }
         }
-    }
 };
 
 /**
  * User can specify static IP when in Wi-Fi client mode. If this is empty use auto IP.
  */
 db_parameter_t db_param_wifi_sta_ip = {
-    .db_name = "ip_sta",
-    .type = STRING,
-    .mav_t = {
-        .param_name = "WIFI_STA_IP",
-        .param_index = -1,
-        .param_type = MAV_PARAM_TYPE_ENUM_END, // no string support so far
-    },
-    .value = {
-        .db_param_str = {
-            .value = "",
-            .default_value = "",
-            .min_len = 0,   // can be empty
-            .max_len = IP4ADDR_STRLEN_MAX
+        .db_name = "ip_sta",
+        .type = STRING,
+        .mav_t = {
+                .param_name = "WIFI_STA_IP",
+                .param_index = -1,
+                .param_type = MAV_PARAM_TYPE_ENUM_END, // no string support so far
+        },
+        .value = {
+                .db_param_str = {
+                        .value = "",
+                        .default_value = "",
+                        .min_len = 0,   // can be empty
+                        .max_len = IP4ADDR_STRLEN_MAX
+                }
         }
-    }
 };
 
 /**
  * If db_param_wifi_sta_ip is set then this must be set to the GW IP
  */
 db_parameter_t db_param_wifi_sta_gw = {
-    .db_name = "ip_sta_gw",
-    .type = STRING,
-    .mav_t = {
-        .param_name = "WIFI_STA_GW",
-        .param_index = -1,
-        .param_type = MAV_PARAM_TYPE_ENUM_END, // no string support so far
-    },
-    .value = {
-        .db_param_str = {
-            .value = "",
-            .default_value = "",
-            .min_len = 0,
-            .max_len = IP4ADDR_STRLEN_MAX
+        .db_name = "ip_sta_gw",
+        .type = STRING,
+        .mav_t = {
+                .param_name = "WIFI_STA_GW",
+                .param_index = -1,
+                .param_type = MAV_PARAM_TYPE_ENUM_END, // no string support so far
+        },
+        .value = {
+                .db_param_str = {
+                        .value = "",
+                        .default_value = "",
+                        .min_len = 0,
+                        .max_len = IP4ADDR_STRLEN_MAX
+                }
         }
-    }
 };
 
 /**
  * If db_param_wifi_sta_ip is set: Netmask when settings static IP in Wi-Fi client mode
  */
 db_parameter_t db_param_wifi_sta_netmask = {
-    .db_name = "ip_sta_netmsk",
-    .type = STRING,
-    .mav_t = {
-        .param_name = "WIFI_STA_NETM",
-        .param_index = -1,
-        .param_type = MAV_PARAM_TYPE_ENUM_END, // no string support so far
-    },
-    .value = {
-        .db_param_str = {
-            .value = "",
-            .default_value = "",
-            .min_len = 0,
-            .max_len = IP4ADDR_STRLEN_MAX
+        .db_name = "ip_sta_netmsk",
+        .type = STRING,
+        .mav_t = {
+                .param_name = "WIFI_STA_NETM",
+                .param_index = -1,
+                .param_type = MAV_PARAM_TYPE_ENUM_END, // no string support so far
+        },
+        .value = {
+                .db_param_str = {
+                        .value = "",
+                        .default_value = "",
+                        .min_len = 0,
+                        .max_len = IP4ADDR_STRLEN_MAX
+                }
         }
-    }
 };
 
 /**
  * Users can add custom UDP client targets. This is the IP of the first target added. Only the first one is saved to NVM.
  */
 db_parameter_t db_param_udp_client_ip = {
-    .db_name = "udp_client_ip",
-    .type = STRING,
-    .mav_t = {
-        .param_name = "WIFI_UDP_IP",
-        .param_index = -1,
-        .param_type = MAV_PARAM_TYPE_ENUM_END, // no string support so far
-    },
-    .value = {
-        .db_param_str = {
-            .value = "\0",
-            .default_value = "\0",
-            .min_len = 0,
-            .max_len = IP4ADDR_STRLEN_MAX
+        .db_name = "udp_client_ip",
+        .type = STRING,
+        .mav_t = {
+                .param_name = "WIFI_UDP_IP",
+                .param_index = -1,
+                .param_type = MAV_PARAM_TYPE_ENUM_END, // no string support so far
+        },
+        .value = {
+                .db_param_str = {
+                        .value = "\0",
+                        .default_value = "\0",
+                        .min_len = 0,
+                        .max_len = IP4ADDR_STRLEN_MAX
+                }
         }
-    }
 };
 
 /* ---------- From here with increasing param_index all parameters that are also available via MAVLink ---------- */
@@ -199,21 +199,21 @@ db_parameter_t db_param_udp_client_ip = {
  * For reporting build version via MAVLink. Does not change.
  */
 db_parameter_t db_param_sw_version = {
-    .db_name = "sw_version",
-    .type = UINT8,
-    .mav_t = {
-        .param_name = "SYS_SW_VERSION",
-        .param_index = 0,
-        .param_type = MAV_PARAM_TYPE_UINT8,
-    },
-    .value = {
-        .db_param_u8 = {
-            .value = DB_BUILD_VERSION,
-            .default_value = DB_BUILD_VERSION,
-            .min = DB_BUILD_VERSION,
-            .max = DB_BUILD_VERSION,
+        .db_name = "sw_version",
+        .type = UINT8,
+        .mav_t = {
+                .param_name = "SYS_SW_VERSION",
+                .param_index = 0,
+                .param_type = MAV_PARAM_TYPE_UINT8,
+        },
+        .value = {
+                .db_param_u8 = {
+                        .value = DB_BUILD_VERSION,
+                        .default_value = DB_BUILD_VERSION,
+                        .min = DB_BUILD_VERSION,
+                        .max = DB_BUILD_VERSION,
+                }
         }
-    }
 };
 
 /**
@@ -221,42 +221,42 @@ db_parameter_t db_param_sw_version = {
  * Assign it during startup when received from storage. Can therefore only be changed via reboot and DB_WIFI_MODE_DESIGNATED
  */
 db_parameter_t db_param_radio_mode = {
-    .db_name = "esp32_mode",
-    .type = UINT8,
-    .mav_t = {
-        .param_name = "SYS_ESP32_MODE",
-        .param_index = 1,
-        .param_type = MAV_PARAM_TYPE_UINT8,
-    },
-    .value = {
-        .db_param_u8 = {
-            .value = DB_WIFI_MODE_AP,
-            .default_value = DB_WIFI_MODE_AP,
-            .min = DB_WIFI_MODE_AP,
-            .max = DB_WIFI_MODE_END,
+        .db_name = "esp32_mode",
+        .type = UINT8,
+        .mav_t = {
+                .param_name = "SYS_ESP32_MODE",
+                .param_index = 1,
+                .param_type = MAV_PARAM_TYPE_UINT8,
+        },
+        .value = {
+                .db_param_u8 = {
+                        .value = DB_WIFI_MODE_AP,
+                        .default_value = DB_WIFI_MODE_AP,
+                        .min = DB_WIFI_MODE_AP,
+                        .max = DB_WIFI_MODE_END,
+                }
         }
-    }
 };
 
 /**
  * Radio channel in WiFi AP and ESP-NOW mode
  */
 db_parameter_t db_param_channel = {
-    .db_name = "wifi_chan",
-    .type = UINT8,
-    .mav_t = {
-        .param_name = "WIFI_AP_CHANNEL",
-        .param_index = 2,
-        .param_type = MAV_PARAM_TYPE_UINT8,
-    },
-    .value = {
-        .db_param_u8 = {
-            .value = 6,
-            .default_value = 6,
-            .min = 1,
-            .max = 13,
+        .db_name = "wifi_chan",
+        .type = UINT8,
+        .mav_t = {
+                .param_name = "WIFI_AP_CHANNEL",
+                .param_index = 2,
+                .param_type = MAV_PARAM_TYPE_UINT8,
+        },
+        .value = {
+                .db_param_u8 = {
+                        .value = 6,
+                        .default_value = 6,
+                        .min = 1,
+                        .max = 13,
+                }
         }
-    }
 };
 
 /**
@@ -264,210 +264,210 @@ db_parameter_t db_param_channel = {
  *  disabled: only 802.11b support for client mode - set to true: 802.11bgn mode support
  */
 db_parameter_t db_param_wifi_en_gn = {
-    .db_name = "wifi_en_gn",
-    .type = UINT8,
-    .mav_t = {
-        .param_name = "WIFI_EN_GN",
-        .param_index = 3,
-        .param_type = MAV_PARAM_TYPE_UINT8,
-    },
-    .value = {
-        .db_param_u8 = {
-            .value = false,
-            .default_value = false,
-            .min = false,
-            .max = true,
+        .db_name = "wifi_en_gn",
+        .type = UINT8,
+        .mav_t = {
+                .param_name = "WIFI_EN_GN",
+                .param_index = 3,
+                .param_type = MAV_PARAM_TYPE_UINT8,
+        },
+        .value = {
+                .db_param_u8 = {
+                        .value = false,
+                        .default_value = false,
+                        .min = false,
+                        .max = true,
+                }
         }
-    }
 };
 
 /**
  * Set to 1 to use external antenna. Set to 0 to enable onboard antenna - board must have antenna switch
  */
 db_parameter_t db_param_wifi_ant_ext = {
-    .db_name = "ant_use_ext",
-    .type = UINT8,
-    .mav_t = {
-        .param_name = "RADIO_EN_EXT_ANT",
-        .param_index = 4,
-        .param_type = MAV_PARAM_TYPE_UINT8,
-    },
-    .value = {
-        .db_param_u8 = {
-            .value = false,
-            .default_value = false,
-            .min = false,
-            .max = true,
+        .db_name = "ant_use_ext",
+        .type = UINT8,
+        .mav_t = {
+                .param_name = "RADIO_EN_EXT_ANT",
+                .param_index = 4,
+                .param_type = MAV_PARAM_TYPE_UINT8,
+        },
+        .value = {
+                .db_param_u8 = {
+                        .value = false,
+                        .default_value = false,
+                        .min = false,
+                        .max = true,
+                }
         }
-    }
 };
 
 /**
  * UART baud rate
  */
 db_parameter_t db_param_baud = {
-    .db_name = "baud",
-    .type = INT32,
-    .mav_t = {
-        .param_name = "RADIO_EN_EXT_ANT",
-        .param_index = 5,
-        .param_type = MAV_PARAM_TYPE_INT32,
-    },
-    .value = {
-        .db_param_i32 = {
-            .value = DB_DEFAULT_UART_BAUD_RATE,
-            .default_value = DB_DEFAULT_UART_BAUD_RATE,
-            .min = 1200,
-            .max = 5000000,
+        .db_name = "baud",
+        .type = INT32,
+        .mav_t = {
+                .param_name = "RADIO_EN_EXT_ANT",
+                .param_index = 5,
+                .param_type = MAV_PARAM_TYPE_INT32,
+        },
+        .value = {
+                .db_param_i32 = {
+                        .value = DB_DEFAULT_UART_BAUD_RATE,
+                        .default_value = DB_DEFAULT_UART_BAUD_RATE,
+                        .min = 1200,
+                        .max = 5000000,
+                }
         }
-    }
 };
 
 /**
  * TX GPIO number of the UART
  */
 db_parameter_t db_param_gpio_tx = {
-    .db_name = "gpio_tx",
-    .type = UINT8,
-    .mav_t = {
-        .param_name = "SERIAL_TX_PIN",
-        .param_index = 6,
-        .param_type = MAV_PARAM_TYPE_UINT8,
-    },
-    .value = {
-        .db_param_u8 = {
-            .value = DB_DEFAULT_UART_TX_PIN,
-            .default_value = DB_DEFAULT_UART_TX_PIN,
-            .min = 0,
-            .max = SOC_GPIO_IN_RANGE_MAX,
+        .db_name = "gpio_tx",
+        .type = UINT8,
+        .mav_t = {
+                .param_name = "SERIAL_TX_PIN",
+                .param_index = 6,
+                .param_type = MAV_PARAM_TYPE_UINT8,
+        },
+        .value = {
+                .db_param_u8 = {
+                        .value = DB_DEFAULT_UART_TX_PIN,
+                        .default_value = DB_DEFAULT_UART_TX_PIN,
+                        .min = 0,
+                        .max = SOC_GPIO_IN_RANGE_MAX,
+                }
         }
-    }
 };
 
 /**
  * RX GPIO number of the UART
  */
 db_parameter_t db_param_gpio_rx = {
-    .db_name = "gpio_rx",
-    .type = UINT8,
-    .mav_t = {
-        .param_name = "SERIAL_RX_PIN",
-        .param_index = 7,
-        .param_type = MAV_PARAM_TYPE_UINT8,
-    },
-    .value = {
-        .db_param_u8 = {
-            .value = DB_DEFAULT_UART_RX_PIN,
-            .default_value = DB_DEFAULT_UART_RX_PIN,
-            .min = 0,
-            .max = SOC_GPIO_IN_RANGE_MAX,
+        .db_name = "gpio_rx",
+        .type = UINT8,
+        .mav_t = {
+                .param_name = "SERIAL_RX_PIN",
+                .param_index = 7,
+                .param_type = MAV_PARAM_TYPE_UINT8,
+        },
+        .value = {
+                .db_param_u8 = {
+                        .value = DB_DEFAULT_UART_RX_PIN,
+                        .default_value = DB_DEFAULT_UART_RX_PIN,
+                        .min = 0,
+                        .max = SOC_GPIO_IN_RANGE_MAX,
+                }
         }
-    }
 };
 
 /**
  * RTS GPIO number of the UART. Set to same value as CTS GPIO to disable flow control.
  */
 db_parameter_t db_param_gpio_rts = {
-    .db_name = "gpio_rts",
-    .type = UINT8,
-    .mav_t = {
-        .param_name = "SERIAL_RTS_PIN",
-        .param_index = 8,
-        .param_type = MAV_PARAM_TYPE_UINT8,
-    },
-    .value = {
-        .db_param_u8 = {
-            .value = DB_DEFAULT_UART_RTS_PIN,
-            .default_value = DB_DEFAULT_UART_RTS_PIN,
-            .min = 0,
-            .max = SOC_GPIO_IN_RANGE_MAX,
+        .db_name = "gpio_rts",
+        .type = UINT8,
+        .mav_t = {
+                .param_name = "SERIAL_RTS_PIN",
+                .param_index = 8,
+                .param_type = MAV_PARAM_TYPE_UINT8,
+        },
+        .value = {
+                .db_param_u8 = {
+                        .value = DB_DEFAULT_UART_RTS_PIN,
+                        .default_value = DB_DEFAULT_UART_RTS_PIN,
+                        .min = 0,
+                        .max = SOC_GPIO_IN_RANGE_MAX,
+                }
         }
-    }
 };
 
 /**
  * CTS GPIO number of the UART. Set to same value as RTS GPIO to disable flow control.
  */
 db_parameter_t db_param_gpio_cts = {
-    .db_name = "gpio_cts",
-    .type = UINT8,
-    .mav_t = {
-        .param_name = "SERIAL_CTS_PIN",
-        .param_index = 9,
-        .param_type = MAV_PARAM_TYPE_UINT8,
-    },
-    .value = {
-        .db_param_u8 = {
-            .value = DB_DEFAULT_UART_CTS_PIN,
-            .default_value = DB_DEFAULT_UART_CTS_PIN,
-            .min = 0,
-            .max = SOC_GPIO_IN_RANGE_MAX,
+        .db_name = "gpio_cts",
+        .type = UINT8,
+        .mav_t = {
+                .param_name = "SERIAL_CTS_PIN",
+                .param_index = 9,
+                .param_type = MAV_PARAM_TYPE_UINT8,
+        },
+        .value = {
+                .db_param_u8 = {
+                        .value = DB_DEFAULT_UART_CTS_PIN,
+                        .default_value = DB_DEFAULT_UART_CTS_PIN,
+                        .min = 0,
+                        .max = SOC_GPIO_IN_RANGE_MAX,
+                }
         }
-    }
 };
 
 /**
  * I really don't know. Maybe some sort of timeout. Just leave it at the defaults.
  */
 db_parameter_t db_param_gpio_rts_thresh = {
-    .db_name = "rts_thresh",
-    .type = UINT8,
-    .mav_t = {
-        .param_name = "SERIAL_RTS_THRES",
-        .param_index = 10,
-        .param_type = MAV_PARAM_TYPE_UINT8,
-    },
-    .value = {
-        .db_param_u8 = {
-            .value = 64,
-            .default_value = 64,
-            .min = 0,
-            .max = 128,
+        .db_name = "rts_thresh",
+        .type = UINT8,
+        .mav_t = {
+                .param_name = "SERIAL_RTS_THRES",
+                .param_index = 10,
+                .param_type = MAV_PARAM_TYPE_UINT8,
+        },
+        .value = {
+                .db_param_u8 = {
+                        .value = 64,
+                        .default_value = 64,
+                        .min = 0,
+                        .max = 128,
+                }
         }
-    }
 };
 
 /**
  * Sets the parser for the serial port
  */
 db_parameter_t db_param_proto = {
-    .db_name = "proto",
-    .type = UINT8,
-    .mav_t = {
-        .param_name = "SERIAL_TEL_PROTO",
-        .param_index = 11,
-        .param_type = MAV_PARAM_TYPE_UINT8,
-    },
-    .value = {
-        .db_param_u8 = {
-            .value = DB_SERIAL_PROTOCOL_MAVLINK,
-            .default_value = DB_SERIAL_PROTOCOL_MAVLINK,
-            .min = DB_SERIAL_PROTOCOL_MSPLTM,
-            .max = DB_SERIAL_PROTOCOL_TRANSPARENT,
+        .db_name = "proto",
+        .type = UINT8,
+        .mav_t = {
+                .param_name = "SERIAL_TEL_PROTO",
+                .param_index = 11,
+                .param_type = MAV_PARAM_TYPE_UINT8,
+        },
+        .value = {
+                .db_param_u8 = {
+                        .value = DB_SERIAL_PROTOCOL_MAVLINK,
+                        .default_value = DB_SERIAL_PROTOCOL_MAVLINK,
+                        .min = DB_SERIAL_PROTOCOL_MSPLTM,
+                        .max = DB_SERIAL_PROTOCOL_TRANSPARENT,
+                }
         }
-    }
 };
 
 /**
  * Maximum packet size via ESP-NOW or WiFi in transparent or mavlink mode. Caped to 250 bytes-HEADER in ESP-NOW mode.
  */
 db_parameter_t db_param_serial_pack_size = {
-    .db_name = "trans_pack_size",
-    .type = UINT16,
-    .mav_t = {
-        .param_name = "SERIAL_PACK_SIZE",
-        .param_index = 12,
-        .param_type = MAV_PARAM_TYPE_UINT16,
-    },
-    .value = {
-        .db_param_u16 = {
-            .value = 128,
-            .default_value = 128,
-            .min = 16,
-            .max = 1023,
+        .db_name = "trans_pack_size",
+        .type = UINT16,
+        .mav_t = {
+                .param_name = "SERIAL_PACK_SIZE",
+                .param_index = 12,
+                .param_type = MAV_PARAM_TYPE_UINT16,
+        },
+        .value = {
+                .db_param_u16 = {
+                        .value = 128,
+                        .default_value = 128,
+                        .min = 16,
+                        .max = 1023,
+                }
         }
-    }
 };
 
 /**
@@ -475,84 +475,128 @@ db_parameter_t db_param_serial_pack_size = {
  * the max. packet size was not reached.
  */
 db_parameter_t db_param_serial_read_timeout = {
-    .db_name = "serial_timeout",
-    .type = UINT16,
-    .mav_t = {
-        .param_name = "SERIAL_T_OUT_MS",
-        .param_index = 13,
-        .param_type = MAV_PARAM_TYPE_UINT16,
-    },
-    .value = {
-        .db_param_u16 = {
-            .value = 50,
-            .default_value = 50,
-            .min = 1,
-            .max = UINT16_MAX,
+        .db_name = "serial_timeout",
+        .type = UINT16,
+        .mav_t = {
+                .param_name = "SERIAL_T_OUT_MS",
+                .param_index = 13,
+                .param_type = MAV_PARAM_TYPE_UINT16,
+        },
+        .value = {
+                .db_param_u16 = {
+                        .value = 50,
+                        .default_value = 50,
+                        .min = 1,
+                        .max = UINT16_MAX,
+                }
         }
-    }
 };
 
 /**
  * Number of LTM frames per packet
  */
 db_parameter_t db_param_ltm_per_packet = {
-    .db_name = "ltm_per_packet",
-    .type = UINT8,
-    .mav_t = {
-        .param_name = "SERIAL_LTM_PACK",
-        .param_index = 14,
-        .param_type = MAV_PARAM_TYPE_UINT8,
-    },
-    .value = {
-        .db_param_u8 = {
-            .value = 2,
-            .default_value = 2,
-            .min = 1,
-            .max = MAX_LTM_FRAMES_IN_BUFFER,
+        .db_name = "ltm_per_packet",
+        .type = UINT8,
+        .mav_t = {
+                .param_name = "SERIAL_LTM_PACK",
+                .param_index = 14,
+                .param_type = MAV_PARAM_TYPE_UINT8,
+        },
+        .value = {
+                .db_param_u8 = {
+                        .value = 2,
+                        .default_value = 2,
+                        .min = 1,
+                        .max = MAX_LTM_FRAMES_IN_BUFFER,
+                }
         }
-    }
 };
 
 /**
  * Detects armed state from MAVLink & LTM stream and disables radio when autopilot reports armed state.
  */
 db_parameter_t db_param_dis_radio_armed = {
-    .db_name = "radio_dis_onarm",
-    .type = UINT8,
-    .mav_t = {
-        .param_name = "RADIO_DIS_ON_ARM",
-        .param_index = 15,
-        .param_type = MAV_PARAM_TYPE_UINT8,
-    },
-    .value = {
-        .db_param_u8 = {
-            .value = false,
-            .default_value = false,
-            .min = false,
-            .max = true,
+        .db_name = "radio_dis_onarm",
+        .type = UINT8,
+        .mav_t = {
+                .param_name = "RADIO_DIS_ON_ARM",
+                .param_index = 15,
+                .param_type = MAV_PARAM_TYPE_UINT8,
+        },
+        .value = {
+                .db_param_u8 = {
+                        .value = false,
+                        .default_value = false,
+                        .min = false,
+                        .max = true,
+                }
         }
-    }
 };
 
 /**
  * Port for db_param_udp_client_ip
  */
 db_parameter_t db_param_udp_client_port = {
-    .db_name = "udp_client_port",
-    .type = UINT16,
-    .mav_t = {
-        .param_name = "WIFI_UDP_CPORT",
-        .param_index = 16,
-        .param_type = MAV_PARAM_TYPE_UINT16,
-    },
-    .value = {
-        .db_param_u16 = {
-            .value = 0,
-            .default_value = 0,
-            .min = 0,
-            .max = UINT16_MAX,
+        .db_name = "udp_client_port",
+        .type = UINT16,
+        .mav_t = {
+                .param_name = "WIFI_UDP_CPORT",
+                .param_index = 16,
+                .param_type = MAV_PARAM_TYPE_UINT16,
+        },
+        .value = {
+                .db_param_u16 = {
+                        .value = 0,
+                        .default_value = 0,
+                        .min = 0,
+                        .max = UINT16_MAX,
+                }
         }
-    }
+};
+
+/**
+ *  Enable the use of the external antenna of the official DB for ESP32 C6 board
+ */
+db_parameter_t db_param_en_ext_ant = {
+        .db_name = "ant_use_ext",
+        .type = UINT8,
+        .mav_t = {
+                .param_name = "RADIO_EN_EXT_ANT",
+                .param_index = 17,
+                .param_type = MAV_PARAM_TYPE_UINT8,
+        },
+        .value = {
+                .db_param_u8 = {
+                        .value = false,
+                        .default_value = false,
+                        .min = false,
+                        .max = true,
+                }
+        }
+};
+
+/**
+ *  Format/Unit of the reported RSSI as part of MAVLink RADIO STATUS message.
+ *  If set to true (1) the RSSI will be reported as dBm (QGC)
+ *  If set to false (0) the RSSI will be calculated as a value from 0 to 100 (MissionPlanner)
+ */
+db_parameter_t db_param_rssi_dbm = {
+        .db_name = "rep_rssi_dbm",
+        .type = UINT8,
+        .mav_t = {
+                .param_name = "RADIO_RSSI_DBM",
+                .param_index = 18,
+                .param_type = MAV_PARAM_TYPE_UINT8,
+        },
+        .value = {
+                .db_param_u8 = {
+                        .value = true,
+                        .default_value = true,
+                        .min = false,
+                        .max = true,
+                }
+        }
 };
 
 /**
@@ -582,7 +626,9 @@ db_parameter_t *db_params[] = {
         &db_param_serial_read_timeout,
         &db_param_ltm_per_packet,
         &db_param_dis_radio_armed,
-        &db_param_udp_client_port
+        &db_param_udp_client_port,
+        &db_param_en_ext_ant,
+        &db_param_rssi_dbm
 };
 
 //db_parameter_t db_param_init_str_param(uint8_t *db_name, uint8_t *mav_param_name, uint8_t *default_value,
@@ -627,7 +673,8 @@ db_parameter_t *db_params[] = {
 void db_param_set_to_default(db_parameter_t *db_parameter) {
     switch (db_parameter->type) {
         case STRING:
-            strncpy((char *) db_parameter->value.db_param_str.value, (char *) db_parameter->value.db_param_str.default_value,
+            strncpy((char *) db_parameter->value.db_param_str.value,
+                    (char *) db_parameter->value.db_param_str.default_value,
                     DB_PARAM_VALUE_MAXLEN);
             break;
         case UINT8:
@@ -683,7 +730,8 @@ int db_param_print_values_to_buffer(uint8_t *str_buffer) {
                 ESP_LOGE(TAG, "db_param_print_values_to_buffer() -> db_parameter.type unknown!");
                 break;
         }
-        strcat((char *) str_buffer, (char *) param_str_buf); // add the string of the individual printed param to the big buffer
+        strcat((char *) str_buffer,
+               (char *) param_str_buf); // add the string of the individual printed param to the big buffer
     }
     return str_len;
 }
@@ -704,7 +752,6 @@ void db_read_str_nvs(nvs_handle_t my_handle, char *key, char *dst) {
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_str(my_handle, key, read_nvs_val, &required_size));
         memcpy(dst, read_nvs_val, required_size);
         free(read_nvs_val);
-        ESP_LOGI(TAG, "\t%s: %s", key, dst);
     } else {
         ESP_LOGW(TAG, "Could not read key %s from NVS", key);
     }
@@ -719,19 +766,23 @@ void db_param_read_all_params_nvs(const nvs_handle_t *nvs_handle) {
     for (int i = 0; i < sizeof(db_params) / sizeof(db_params[0]); i++) {
         switch (db_params[i]->type) {
             case STRING:
-                db_read_str_nvs(*nvs_handle, (char *) db_params[i]->db_name, (char *) db_params[i]->value.db_param_str.value);
+                db_read_str_nvs(*nvs_handle, (char *) db_params[i]->db_name,
+                                (char *) db_params[i]->value.db_param_str.value);
                 break;
             case UINT8:
                 ESP_ERROR_CHECK_WITHOUT_ABORT(
-                    nvs_get_u8(*nvs_handle, (char *) db_params[i]->db_name, &db_params[i]->value.db_param_u8.value));
+                        nvs_get_u8(*nvs_handle, (char *) db_params[i]->db_name,
+                                   &db_params[i]->value.db_param_u8.value));
                 break;
             case UINT16:
                 ESP_ERROR_CHECK_WITHOUT_ABORT(
-                    nvs_get_u16(*nvs_handle, (char *) db_params[i]->db_name, &db_params[i]->value.db_param_u16.value));
+                        nvs_get_u16(*nvs_handle, (char *) db_params[i]->db_name,
+                                    &db_params[i]->value.db_param_u16.value));
                 break;
             case INT32:
                 ESP_ERROR_CHECK_WITHOUT_ABORT(
-                    nvs_get_i32(*nvs_handle, (char *) db_params[i]->db_name, &db_params[i]->value.db_param_i32.value));
+                        nvs_get_i32(*nvs_handle, (char *) db_params[i]->db_name,
+                                    &db_params[i]->value.db_param_i32.value));
                 break;
             default:
                 ESP_LOGE(TAG, "db_param_read_all_params_to_nvs() -> db_parameter.type unknown!");
@@ -759,14 +810,17 @@ void db_param_write_all_params_nvs(const nvs_handle_t *nvs_handle) {
                     ESP_ERROR_CHECK(nvs_set_u8(*nvs_handle, (char *) db_params[i]->db_name, DB_RADIO_MODE_DESIGNATED));
                 } else {
                     ESP_ERROR_CHECK(
-                        nvs_set_u8(*nvs_handle, (char *) db_params[i]->db_name, db_params[i]->value.db_param_u8.value));
+                            nvs_set_u8(*nvs_handle, (char *) db_params[i]->db_name,
+                                       db_params[i]->value.db_param_u8.value));
                 }
                 break;
             case UINT16:
-                ESP_ERROR_CHECK(nvs_set_u16(*nvs_handle, (char *) db_params[i]->db_name, db_params[i]->value.db_param_u16.value));
+                ESP_ERROR_CHECK(nvs_set_u16(*nvs_handle, (char *) db_params[i]->db_name,
+                                            db_params[i]->value.db_param_u16.value));
                 break;
             case INT32:
-                ESP_ERROR_CHECK(nvs_set_i32(*nvs_handle, (char *) db_params[i]->db_name, db_params[i]->value.db_param_i32.value));
+                ESP_ERROR_CHECK(nvs_set_i32(*nvs_handle, (char *) db_params[i]->db_name,
+                                            db_params[i]->value.db_param_i32.value));
                 break;
             default:
                 ESP_LOGE(TAG, "db_param_write_all_params_to_nvs() -> db_parameter.type unknown!");
@@ -828,20 +882,24 @@ void db_param_write_all_params_json(cJSON *root_obj) {
     for (int i = 0; i < sizeof(db_params) / sizeof(db_params[0]); i++) {
         switch (db_params[i]->type) {
             case STRING:
-                cJSON_AddStringToObject(root_obj, (char *) db_params[i]->db_name,  (char *) db_params[i]->value.db_param_str.value);
-            break;
+                cJSON_AddStringToObject(root_obj, (char *) db_params[i]->db_name,
+                                        (char *) db_params[i]->value.db_param_str.value);
+                break;
             case UINT8:
-                cJSON_AddNumberToObject(root_obj, (char *) db_params[i]->db_name, db_params[i]->value.db_param_u8.value);
-            break;
+                cJSON_AddNumberToObject(root_obj, (char *) db_params[i]->db_name,
+                                        db_params[i]->value.db_param_u8.value);
+                break;
             case UINT16:
-                cJSON_AddNumberToObject(root_obj, (char *) db_params[i]->db_name, db_params[i]->value.db_param_u16.value);
-            break;
+                cJSON_AddNumberToObject(root_obj, (char *) db_params[i]->db_name,
+                                        db_params[i]->value.db_param_u16.value);
+                break;
             case INT32:
-                cJSON_AddNumberToObject(root_obj, (char *) db_params[i]->db_name, db_params[i]->value.db_param_i32.value);
-            break;
+                cJSON_AddNumberToObject(root_obj, (char *) db_params[i]->db_name,
+                                        db_params[i]->value.db_param_i32.value);
+                break;
             default:
                 ESP_LOGE(TAG, "db_param_write_all_params_json() -> db_parameter.type unknown!");
-            break;
+                break;
         }
     }
 }
@@ -855,13 +913,15 @@ void db_param_write_all_params_json(cJSON *root_obj) {
  */
 bool db_param_is_valid_assign_str(const char *new_string_value, db_parameter_t *target_param) {
     // ToDo: Add IPv4 check for strings via custom validation function in db_parameter_t
-    if (strlen(new_string_value) <= target_param->value.db_param_str.max_len && strlen(new_string_value) > 0) {
+    if (strlen(new_string_value) <= target_param->value.db_param_str.max_len &&
+        strlen(new_string_value) >= target_param->value.db_param_str.min_len) {
         strncpy((char *) target_param->value.db_param_str.value, new_string_value, DB_PARAM_VALUE_MAXLEN);
         return true;
     }
     // new value is not valid
-    ESP_LOGE(TAG, "db_param_is_valid_assign_str(): Invalid string length (1-%i) for param %s",
-             target_param->value.db_param_str.max_len, (char *) target_param->db_name);
+    ESP_LOGE(TAG, "db_param_is_valid_assign_str(): Invalid string length (%i-%i) for param %s",
+             target_param->value.db_param_str.min_len, target_param->value.db_param_str.max_len,
+             (char *) target_param->db_name);
     return false;
 }
 
@@ -885,9 +945,9 @@ bool db_param_is_valid_assign_u8(const uint8_t new_u8_value, db_parameter_t *tar
     }
     // new value is not valid
     ESP_LOGE(
-        TAG, "db_param_is_valid_assign_u8(): Value %i is out of valid range (%i-%i) for param %s",
-        new_u8_value, target_param->value.db_param_u8.max, target_param->value.db_param_u8.min,
-        (char *) target_param->db_name);
+            TAG, "db_param_is_valid_assign_u8(): Value %i is out of valid range (%i-%i) for param %s",
+            new_u8_value, target_param->value.db_param_u8.max, target_param->value.db_param_u8.min,
+            (char *) target_param->db_name);
     return false;
 }
 
@@ -899,15 +959,16 @@ bool db_param_is_valid_assign_u8(const uint8_t new_u8_value, db_parameter_t *tar
  * @return true when valid and assigned - else false
  */
 bool db_param_is_valid_assign_u16(const uint16_t new_u16_value, db_parameter_t *target_param) {
-    if (new_u16_value <= target_param->value.db_param_u16.max && new_u16_value >= target_param->value.db_param_u16.min) {
-            target_param->value.db_param_u16.value = new_u16_value; // accept value and assign
+    if (new_u16_value <= target_param->value.db_param_u16.max &&
+        new_u16_value >= target_param->value.db_param_u16.min) {
+        target_param->value.db_param_u16.value = new_u16_value; // accept value and assign
         return true;
     }
     // new value is not valid
     ESP_LOGE(
-        TAG, "db_param_is_valid_assign_u16(): Value %i is out of valid range (%i-%i) for param %s",
-        new_u16_value, target_param->value.db_param_u16.max, target_param->value.db_param_u16.min,
-        (char *) target_param->db_name);
+            TAG, "db_param_is_valid_assign_u16(): Value %i is out of valid range (%i-%i) for param %s",
+            new_u16_value, target_param->value.db_param_u16.max, target_param->value.db_param_u16.min,
+            (char *) target_param->db_name);
     return false;
 }
 
@@ -919,15 +980,16 @@ bool db_param_is_valid_assign_u16(const uint16_t new_u16_value, db_parameter_t *
  * @return true when valid and assigned - else false
  */
 bool db_param_is_valid_assign_i32(const int32_t new_i32_value, db_parameter_t *target_param) {
-    if (new_i32_value <= target_param->value.db_param_i32.max && new_i32_value >= target_param->value.db_param_i32.min) {
+    if (new_i32_value <= target_param->value.db_param_i32.max &&
+        new_i32_value >= target_param->value.db_param_i32.min) {
         target_param->value.db_param_i32.value = new_i32_value; // accept value and assign
         return true;
     }
     // new value is not valid
     ESP_LOGE(
-        TAG, "db_param_is_valid_assign_i32(): Value %li is out of valid range (%li-%li) for param %s",
-        new_i32_value, target_param->value.db_param_i32.max, target_param->value.db_param_i32.min,
-        (char *) target_param->db_name);
+            TAG, "db_param_is_valid_assign_i32(): Value %li is out of valid range (%li-%li) for param %s",
+            new_i32_value, target_param->value.db_param_i32.max, target_param->value.db_param_i32.min,
+            (char *) target_param->db_name);
     return false;
 }
 
