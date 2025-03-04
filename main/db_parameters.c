@@ -261,7 +261,8 @@ db_parameter_t db_param_channel = {
 
 /**
  *  Allow the usage of 802.11bgn mode
- *  disabled: only 802.11b support for client mode - set to true: 802.11bgn mode support
+ *  disabled: only 802.11b support for client mode - set to true: 802.11b/g/n/ax mode support.
+ *  ax only when chip supports it.
  */
 db_parameter_t db_param_wifi_en_gn = {
         .db_name = "wifi_en_gn",

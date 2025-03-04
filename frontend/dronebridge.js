@@ -302,7 +302,7 @@ function get_stats() {
 		} else if ('connected_sta' in json_data) {
 			let a = ""
 			json_data["connected_sta"].forEach((item) => {
-				a = a + "Client: " + item.sta_mac + " RSSI: " + item.sta_rssi + "dBm<br />"
+				a = a + "Client: " + item.sta_mac + " Signal Strength: " + item.sta_rssi + "dBm<br />"
 			});
 			document.getElementById("current_client_ip").innerHTML = a
 		}
