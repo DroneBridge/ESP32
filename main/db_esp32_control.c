@@ -113,7 +113,7 @@ int db_open_serial_udp_broadcast_socket() {
         ESP_LOGE(TAG, "Socket unable to bind Skybrush socket to %i errno %d", UDP_BROADCAST_PORT_SKYBRUSH, errno);
     }
     fcntl(udp_socket, F_SETFL, O_NONBLOCK);
-    ESP_LOGI(TAG, "Opened UDP socket on port %i", UDP_BROADCAST_PORT_SKYBRUSH);
+    ESP_LOGI(TAG, "Opened UDP broadcast enabled socket on port %i", UDP_BROADCAST_PORT_SKYBRUSH);
     return udp_socket;
 }
 #endif
@@ -595,14 +595,14 @@ _Noreturn void control_module_udp_tcp() {
     if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_STA) {
         udp_broadcast_skybrush_socket = db_open_serial_udp_broadcast_socket();
     } else {
-        // we do only support Skybrush WiFi and the broadcast port when in WiFi client mode
+        // we do only support Skybrush Wi-Fi and the broadcast port when in Wi-Fi client mode
     }
 #endif
     int db_internal_telem_udp_sock = -1;
     if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_AP_LR || DB_PARAM_RADIO_MODE == DB_WIFI_MODE_STA) {
         db_internal_telem_udp_sock = db_open_int_telemetry_udp_socket();
     } else {
-        // other WiFi modes do not need this. Only WiFi stations will receive if connected to LR access point.
+        // other Wi-Fi modes do not need this. Only Wi-Fi stations will receive if connected to LR access point.
         // ESP-NOW uses different sockets/systems
     }
     uint8_t udp_buffer[UDP_BUF_SIZE];
@@ -656,13 +656,13 @@ _Noreturn void control_module_udp_tcp() {
         if (recv_length > 0) {
             if (DB_PARAM_SERIAL_PROTO == DB_SERIAL_PROTOCOL_MAVLINK) {
                 // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
-                // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existign packet
+                // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existing packet
                 db_parse_mavlink_from_radio(tcp_clients, udp_conn_list, udp_buffer, recv_length);
             } else {
                 // no parsing with any other protocol - transparent here
                 write_to_serial(udp_buffer, recv_length);
             }
-            // all devices that send us UDP data will be added to the list of MAVLink UDP receivers
+            // all devices that send us UDP data will be added to the list of UDP receivers
             // Allows to register new app on different port. Used e.g. for UDP conn setup in sta-mode.
             // Devices/Ports added this way cannot be removed in sta-mode since UDP is connectionless, and we cannot
             // determine if the client is still existing. This will blow up the list connected devices.
@@ -678,9 +678,11 @@ _Noreturn void control_module_udp_tcp() {
             recv_length = recvfrom(udp_broadcast_skybrush_socket, udp_buffer, UDP_BUF_SIZE, 0,
                                            (struct sockaddr *) &new_db_udp_client.udp_client, &udp_socklen);
             if (recv_length > 0) {
-                // no parsing with any other protocol - transparent here
+                // no parsing - transparent here
                 write_to_serial(udp_buffer, recv_length);
             }
+            // add Skybrush server to known UDP target/distribution list
+            add_to_known_udp_clients(udp_conn_list, new_db_udp_client, false);
         }
 #endif
 
