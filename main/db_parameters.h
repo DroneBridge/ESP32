@@ -37,6 +37,7 @@
 #define DB_PARAM_MAV_CNT            19 // Number of MAVLink parameters returned by ESP32 in the PARAM message. Needed by GCS.
 
 #define DB_PARAM_NAME_MAXLEN        16
+#define DB_PARAM_MAX_MAV_PARAM_NAME_LEN 16
 #define DB_PARAM_VALUE_MAXLEN       64
 #define MAX_LTM_FRAMES_IN_BUFFER    5
 
@@ -105,31 +106,30 @@ enum E_DB_SERIAL_PROTOCOL {
     DB_SERIAL_PROTOCOL_TRANSPARENT = 5
 };
 
-// ToDo: This is not ideal since all parameters are not allocated with 64 bytes. Dynamic allocation is more complex
 typedef struct db_parameter_str_s {
-    uint8_t value[DB_PARAM_VALUE_MAXLEN];
-    uint8_t default_value[DB_PARAM_VALUE_MAXLEN];
+    uint8_t *value;
+    uint8_t *default_value;
     uint8_t min_len;    // valid if >= min_len
     uint8_t max_len;    // valid if <= max_len
 } db_param_str_t;
 
 typedef struct db_parameter_u8_s {
     uint8_t value;
-    const uint8_t default_value;
+    uint8_t default_value;
     uint8_t min;
     uint8_t max;
 } db_param_u8_t;
 
 typedef struct db_parameter_u16_s {
     uint16_t value;
-    const uint16_t default_value;
+    uint16_t default_value;
     uint16_t min;
     uint16_t max;
 } db_param_u16_t;
 
 typedef struct db_parameter_i32_s {
     int32_t value;
-    const int32_t default_value;
+    int32_t default_value;
     int32_t min;
     int32_t max;
 } db_param_i32_t;
@@ -145,7 +145,7 @@ typedef struct db_parameter_s {
     uint8_t db_name[DB_PARAM_NAME_MAXLEN];  // equals the NVS key, JSON object name and web interface input ID
     enum db_param_type_t type;
     struct {    // no string support for mavlink
-      uint8_t param_name[16];
+      uint8_t param_name[DB_PARAM_MAX_MAV_PARAM_NAME_LEN];
       int8_t param_index;           // strings will be ignored for mavlink set to -1 for strings
       MAV_PARAM_TYPE param_type;    // set to MAV_PARAM_TYPE_ENUM_END for strings
     } mav_t;
@@ -187,8 +187,7 @@ extern db_parameter_t db_param_udp_client_port;
 extern db_parameter_t db_param_en_ext_ant;
 extern db_parameter_t db_param_rssi_dbm;
 
-//db_parameter_t db_param_init_str_param(uint8_t *db_name, uint8_t *mav_param_name, uint8_t *default_value,
-//                                       uint8_t max_val_len, uint8_t min_val_len);
+void db_param_init_parameters();
 void db_param_set_to_default(db_parameter_t *db_parameter);
 void db_param_reset_all();
 int db_param_print_values_to_buffer(uint8_t *str_buffer);

@@ -215,7 +215,6 @@ esp_err_t init_fs(void) {
 
 
 #if CONFIG_WEB_DEPLOY_SF
-
 esp_err_t init_fs(void) {
     esp_vfs_spiffs_conf_t conf = {
             .base_path = CONFIG_WEB_MOUNT_POINT,
@@ -246,7 +245,6 @@ esp_err_t init_fs(void) {
     }
     return ret;
 }
-
 #endif
 
 /**
@@ -323,7 +321,7 @@ void db_init_wifi_apmode(int wifi_mode) {
 }
 
 /**
- * Initializes the ESP Wifi client/station mode where we connect to a known access point.
+ * Initializes the ESP Wi-fi client/station mode where we connect to a known access point.
  */
 int db_init_wifi_clientmode() {
     s_wifi_event_group = xEventGroupCreate();
@@ -411,8 +409,8 @@ int db_init_wifi_clientmode() {
 }
 
 /**
- * Initialize WiFi for ESP-NOW mode.
- * If someone uses ESP-NOW over WiFi it is because he wants range over everything else.
+ * Initialize Wi-Fi for ESP-NOW mode.
+ * If someone uses ESP-NOW over Wi-Fi it is because he wants range over everything else.
  * LR mode makes it very inconvenient to change settings but gives the most range. No AP mode since AP will not be
  * visible.
  */
@@ -433,10 +431,10 @@ void db_init_wifi_espnow() {
 }
 
 /**
- * Enables or disables (via reboot) the WiFi if the DB_PARAM_DIS_RADIO_ON_ARM parameter is set. Not used during boot.
- * Usually called when arm state change of the autopilot is detected. As internal check if the WiFi is already enabled/disabled
- * WiFi must be inited first (done during boot).
- * @param enable_wifi True to enable the WiFi and FALSE to disable it
+ * Enables or disables (via reboot) the Wi-Fi if the DB_PARAM_DIS_RADIO_ON_ARM parameter is set. Not used during boot.
+ * Usually called when arm state change of the autopilot is detected. As internal check if the Wi-Fi is already enabled/disabled
+ * Wi-Fi must be inited first (done during boot).
+ * @param enable_wifi True to enable the Wi-Fi and FALSE to disable it
  */
 void db_set_wifi_status(uint8_t enable_wifi) {
     if (DB_PARAM_DIS_RADIO_ON_ARM) {    // check if that feature is enabled by the user
@@ -498,8 +496,8 @@ void save_udp_client_to_nvm(struct db_udp_client_t *new_db_udp_client, bool clea
 
     nvs_handle my_handle;
     ESP_ERROR_CHECK(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &my_handle));
-    ESP_ERROR_CHECK(nvs_set_str(my_handle, "udp_client_ip", ip));
-    ESP_ERROR_CHECK(nvs_set_u16(my_handle, "udp_client_port", port));
+    ESP_ERROR_CHECK(nvs_set_str(my_handle, (char *) db_param_udp_client_ip.db_name, ip));
+    ESP_ERROR_CHECK(nvs_set_u16(my_handle, (char *) db_param_udp_client_port.db_name, port));
 
     ESP_ERROR_CHECK(nvs_commit(my_handle));
     nvs_close(my_handle);
@@ -545,6 +543,7 @@ void db_read_settings_nvs() {
             add_to_known_udp_clients(udp_conn_list, new_udp_client, save_to_nvm);
         } else {
             // no saved UDP client - do nothing
+            ESP_LOGI(TAG, "No saved UDP client - skipping");
         }
     }
 }
@@ -630,6 +629,7 @@ void db_configure_antenna() {
  * Main entry point.
  */
 void app_main() {
+    db_param_init_parameters();
     udp_conn_list = udp_client_list_create();   // http server functions and db_read_settings_nvs expect the list to exist
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES) {

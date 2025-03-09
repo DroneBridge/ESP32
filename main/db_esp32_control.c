@@ -349,6 +349,13 @@ bool add_to_known_udp_clients(udp_conn_list_t *n_udp_conn_list, struct db_udp_cl
     }
     n_udp_conn_list->db_udp_clients[n_udp_conn_list->size] = new_db_udp_client; // Copy the element data to the end of the array
     n_udp_conn_list->size++; // Increment the size of the list
+    // some logging
+    char ip_port_string[INET_ADDRSTRLEN+10];
+    char ip_string[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &(new_db_udp_client.udp_client.sin_addr), ip_string, INET_ADDRSTRLEN);
+    sprintf(ip_port_string, "%s:%d", ip_string, htons (new_db_udp_client.udp_client.sin_port));
+    ESP_LOGI(TAG, "Added %s to udp client distribution list - save to NVM: %i", ip_port_string, save_to_nvm);
+    // save to memory
     if (save_to_nvm) {
         save_udp_client_to_nvm(&new_db_udp_client, false);
     } else {
@@ -477,7 +484,7 @@ _Noreturn void control_module_esp_now(){
 
 /**
  * Sends DroneBridge internal telemetry to tell every connected WiFi station how well we receive their data (rssi).
- * Uses UDP broadcast message. Format: [NUM_Entries - (MAC + RSSI) - (MAC + RSSI) - ...]
+ * Uses UDP multicast message. Format: [NUM_Entries - (MAC + RSSI) - (MAC + RSSI) - ...]
  * Internal telemetry uses DB_ESP32_INTERNAL_TELEMETRY_PORT port
  *
  * @param sta_list
@@ -680,9 +687,9 @@ _Noreturn void control_module_udp_tcp() {
             if (recv_length > 0) {
                 // no parsing - transparent here
                 write_to_serial(udp_buffer, recv_length);
+                // add Skybrush server to known UDP target/distribution list
+                add_to_known_udp_clients(udp_conn_list, new_db_udp_client, false);
             }
-            // add Skybrush server to known UDP target/distribution list
-            add_to_known_udp_clients(udp_conn_list, new_db_udp_client, false);
         }
 #endif
 

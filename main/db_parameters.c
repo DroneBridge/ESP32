@@ -45,153 +45,8 @@ uint8_t DB_RADIO_MODE_DESIGNATED = DB_WIFI_MODE_AP; // initially assign the same
 
 /* ---------- String based parameters - not available via MAVLink ---------- */
 
-/**
- * Wi-Fi AP SSID name OR Wi-Fi AP SSID name to connect to in Wi-Fi client mode
- */
-db_parameter_t db_param_ssid = {
-        .db_name = "ssid",
-        .type = STRING,
-        .mav_t = {
-                .param_name = "SYS_SSID",
-                .param_index = -1,
-                .param_type = MAV_PARAM_TYPE_ENUM_END, // no string support so far
-        },
-        .value = {
-                .db_param_str = {
-                        .value = "DroneBridge for ESP32",
-                        .default_value = "DroneBridge for ESP32",
-                        .min_len = 1,
-                        .max_len = MAX_SSID_LEN,
-                }
-        }
-};
-
-/**
- * Password for ESP-NOW encryption.
- * Password for Wi-Fi connections.
- */
-db_parameter_t db_param_pass = {
-        .db_name = "wifi_pass",
-        .type = STRING,
-        .mav_t = {
-                .param_name = "SYS_PASS",
-                .param_index = -1,
-                .param_type = MAV_PARAM_TYPE_ENUM_END, // no string support so far
-        },
-        .value = {
-                .db_param_str = {
-                        .value = "dronebridge",
-                        .default_value = "dronebridge",
-                        .min_len = 7,
-                        .max_len = 64
-                }
-        }
-};
-
-/**
- * IPv4 of the Wi-Fi access point when in Wi-Fi AP mode
- */
-db_parameter_t db_param_wifi_ap_ip = {
-        .db_name = "ap_ip",
-        .type = STRING,
-        .mav_t = {
-                .param_name = "WIFI_AP_IP",
-                .param_index = -1,
-                .param_type = MAV_PARAM_TYPE_ENUM_END, // no string support so far
-        },
-        .value = {
-                .db_param_str = {
-                        .value = "192.168.2.1",
-                        .default_value = "192.168.2.1",
-                        .min_len = 8,
-                        .max_len = IP4ADDR_STRLEN_MAX
-                }
-        }
-};
-
-/**
- * User can specify static IP when in Wi-Fi client mode. If this is empty use auto IP.
- */
-db_parameter_t db_param_wifi_sta_ip = {
-        .db_name = "ip_sta",
-        .type = STRING,
-        .mav_t = {
-                .param_name = "WIFI_STA_IP",
-                .param_index = -1,
-                .param_type = MAV_PARAM_TYPE_ENUM_END, // no string support so far
-        },
-        .value = {
-                .db_param_str = {
-                        .value = "",
-                        .default_value = "",
-                        .min_len = 0,   // can be empty
-                        .max_len = IP4ADDR_STRLEN_MAX
-                }
-        }
-};
-
-/**
- * If db_param_wifi_sta_ip is set then this must be set to the GW IP
- */
-db_parameter_t db_param_wifi_sta_gw = {
-        .db_name = "ip_sta_gw",
-        .type = STRING,
-        .mav_t = {
-                .param_name = "WIFI_STA_GW",
-                .param_index = -1,
-                .param_type = MAV_PARAM_TYPE_ENUM_END, // no string support so far
-        },
-        .value = {
-                .db_param_str = {
-                        .value = "",
-                        .default_value = "",
-                        .min_len = 0,
-                        .max_len = IP4ADDR_STRLEN_MAX
-                }
-        }
-};
-
-/**
- * If db_param_wifi_sta_ip is set: Netmask when settings static IP in Wi-Fi client mode
- */
-db_parameter_t db_param_wifi_sta_netmask = {
-        .db_name = "ip_sta_netmsk",
-        .type = STRING,
-        .mav_t = {
-                .param_name = "WIFI_STA_NETM",
-                .param_index = -1,
-                .param_type = MAV_PARAM_TYPE_ENUM_END, // no string support so far
-        },
-        .value = {
-                .db_param_str = {
-                        .value = "",
-                        .default_value = "",
-                        .min_len = 0,
-                        .max_len = IP4ADDR_STRLEN_MAX
-                }
-        }
-};
-
-/**
- * Users can add custom UDP client targets. This is the IP of the first target added. Only the first one is saved to NVM.
- */
-db_parameter_t db_param_udp_client_ip = {
-        .db_name = "udp_client_ip",
-        .type = STRING,
-        .mav_t = {
-                .param_name = "WIFI_UDP_IP",
-                .param_index = -1,
-                .param_type = MAV_PARAM_TYPE_ENUM_END, // no string support so far
-        },
-        .value = {
-                .db_param_str = {
-                        .value = "\0",
-                        .default_value = "\0",
-                        .min_len = 0,
-                        .max_len = IP4ADDR_STRLEN_MAX
-                }
-        }
-};
+db_parameter_t db_param_ssid, db_param_pass, db_param_wifi_ap_ip, db_param_wifi_sta_ip, db_param_wifi_sta_gw,
+    db_param_wifi_sta_netmask, db_param_udp_client_ip = {0};
 
 /* ---------- From here with increasing param_index all parameters that are also available via MAVLink ---------- */
 
@@ -601,71 +456,109 @@ db_parameter_t db_param_rssi_dbm = {
 };
 
 /**
- * Array containing all references to the DB parameters
+ * Array containing all references to the DB parameters assigned with db_param_init_parameters()
  */
-db_parameter_t *db_params[] = {
-        &db_param_ssid,
-        &db_param_pass,
-        &db_param_wifi_ap_ip,
-        &db_param_wifi_sta_ip,
-        &db_param_wifi_sta_gw,
-        &db_param_wifi_sta_netmask,
-        &db_param_udp_client_ip,
-        &db_param_radio_mode,
-        &db_param_sw_version,
-        &db_param_channel,
-        &db_param_wifi_en_gn,
-        &db_param_wifi_ant_ext,
-        &db_param_baud,
-        &db_param_gpio_tx,
-        &db_param_gpio_rx,
-        &db_param_gpio_rts,
-        &db_param_gpio_cts,
-        &db_param_gpio_rts_thresh,
-        &db_param_proto,
-        &db_param_serial_pack_size,
-        &db_param_serial_read_timeout,
-        &db_param_ltm_per_packet,
-        &db_param_dis_radio_armed,
-        &db_param_udp_client_port,
-        &db_param_en_ext_ant,
-        &db_param_rssi_dbm
-};
+db_parameter_t *db_params[DB_PARAM_TOTAL_NUM] = {NULL};
 
-//db_parameter_t db_param_init_str_param(uint8_t *db_name, uint8_t *mav_param_name, uint8_t *default_value,
-//                                       uint8_t max_val_len, uint8_t min_val_len) {
-//    db_parameter_t db_str_param = {
-//            .db_name = "",
-//            .type = STRING,
-//            .mav_t = {
-//                    .param_name = "",
-//                    .param_index = -1,
-//                    .param_type = MAV_PARAM_TYPE_ENUM_END, // no string support so far
-//            },
-//            .value = {
-//                    .db_param_str = {
-//                            .min_len = min_val_len,
-//                            .max_len = max_val_len,
-//                    }
-//            }
-//    };
-//    strncpy((char *) db_str_param.db_name, (char *) db_name, DB_PARAM_NAME_MAXLEN);
-//    strncpy((char *) db_str_param.mav_t.param_name, (char *) mav_param_name, 16);
-//    db_str_param.value.db_param_str.default_value = (uint8_t *) strdup((char *) default_value);
-//    db_str_param.value.db_param_str.value = malloc(max_val_len);
-//    if (db_str_param.value.db_param_str.value == NULL) {
-//        ESP_LOGE(TAG, "Error allocating space for string parameter %s", db_name);
-//    } else {
-//        // all good
-//    }
-//    return db_str_param;
-//}
-//
-//void db_param_init_parameters() {
-//    // Wi-Fi AP SSID name OR Wi-Fi AP SSID name to connect to in Wi-Fi client mode
-//    db_param_init_str_param("ssid", "SYS_SSID", "DroneBridge for ESP32", MAX_SSID_LEN, 1);
-//
-//}
+/**
+ * Leaks memory. Only call during init of the parameters.
+ * Inits a string parameter with the supplied values and ranges.
+ * @param db_name NVM & web interface name/identifier
+ * @param mav_param_name MAVLink parameter name
+ * @param default_value Default value
+ * @param min_val_len minimum length of the string (used for validation)
+ * @param max_val_len maximum length of the string (used for memory allocation and validation)
+ * @return The inited string parameter
+ */
+db_parameter_t db_param_init_str_param(char *db_name, char *mav_param_name, const char *default_value,
+                                       uint8_t min_val_len, uint8_t max_val_len) {
+    db_parameter_t db_str_param = {
+            .db_name = "",
+            .type = STRING,
+            .mav_t = {
+                    .param_name = "",
+                    .param_index = -1,
+                    .param_type = MAV_PARAM_TYPE_ENUM_END, // no string support so far
+            },
+            .value = {
+                    .db_param_str = {
+                            .min_len = min_val_len,
+                            .max_len = max_val_len,
+                    }
+            }
+    };
+    strncpy((char *) db_str_param.db_name, db_name, DB_PARAM_NAME_MAXLEN-1);
+    uint mav_param_name_str_len = strlen(mav_param_name);
+    if (mav_param_name_str_len < DB_PARAM_MAX_MAV_PARAM_NAME_LEN) {
+        // normal case - param name + string terminator fit into allocated memory
+        strncpy((char *) db_str_param.mav_t.param_name, mav_param_name, DB_PARAM_MAX_MAV_PARAM_NAME_LEN - 1);
+    } else {
+        // mav param name is allowed to be 16 chars long - it is valid without string terminator if len = 16
+        // copy first 16 chars of string without string terminator
+        memcpy((char *) db_str_param.mav_t.param_name, mav_param_name, DB_PARAM_MAX_MAV_PARAM_NAME_LEN);
+    }
+    db_str_param.value.db_param_str.default_value = (uint8_t *) strdup(default_value);
+    db_str_param.value.db_param_str.value = malloc(max_val_len);
+    if (db_str_param.value.db_param_str.value == NULL) {
+        ESP_LOGE(TAG, "Error allocating %i bytes for string parameter %s", max_val_len, db_name);
+    } else {
+        // all good
+        db_str_param.value.db_param_str.value[0] = '\0';
+    }
+    return db_str_param;
+}
+
+/**
+ * Initializes the parameters used for storing user settings. All parameters are collected in an array.
+ * Leaks memory. Only call once during startup!
+ * Add new parameters here!
+ */
+void db_param_init_parameters() {
+    // Wi-Fi AP SSID name OR Wi-Fi AP SSID name to connect to in Wi-Fi client mode
+    db_param_ssid = db_param_init_str_param("ssid", "SYS_SSID", "DroneBridge for ESP32", 1, MAX_SSID_LEN);
+    // Password for Wi-Fi connections & ESP-NOW encryption.
+    db_param_pass = db_param_init_str_param("wifi_pass", "SYS_PASS", "dronebridge", 7, 64);
+    // IPv4 of the Wi-Fi access point when in Wi-Fi AP mode
+    db_param_wifi_ap_ip = db_param_init_str_param("ap_ip", "WIFI_AP_IP", "192.168.2.1", 8, IP4ADDR_STRLEN_MAX);
+    // User can specify static IP when in Wi-Fi client mode. If this is empty use auto IP.
+    db_param_wifi_sta_ip = db_param_init_str_param("ip_sta", "WIFI_STA_IP", "", 0, IP4ADDR_STRLEN_MAX);
+    // If db_param_wifi_sta_ip is set then this must be set to the gateway IP
+    db_param_wifi_sta_gw = db_param_init_str_param("ip_sta_gw", "WIFI_STA_GW", "", 0, IP4ADDR_STRLEN_MAX);
+    // If db_param_wifi_sta_ip is set: Netmask when settings static IP in Wi-Fi client mode
+    db_param_wifi_sta_netmask = db_param_init_str_param("ip_sta_netmsk", "WIFI_STA_NETM", "", 0, IP4ADDR_STRLEN_MAX);
+    // Users can add custom UDP client targets. This is the IP of the first target added. Only the first one is saved to NVM.
+    db_param_udp_client_ip = db_param_init_str_param("udp_client_ip", "WIFI_UDP_IP", "", 0, IP4ADDR_STRLEN_MAX);
+
+    db_parameter_t *db_params_l[] = {
+            &db_param_ssid,
+            &db_param_pass,
+            &db_param_wifi_ap_ip,
+            &db_param_wifi_sta_ip,
+            &db_param_wifi_sta_gw,
+            &db_param_wifi_sta_netmask,
+            &db_param_udp_client_ip,
+            &db_param_radio_mode,
+            &db_param_sw_version,
+            &db_param_channel,
+            &db_param_wifi_en_gn,
+            &db_param_wifi_ant_ext,
+            &db_param_baud,
+            &db_param_gpio_tx,
+            &db_param_gpio_rx,
+            &db_param_gpio_rts,
+            &db_param_gpio_cts,
+            &db_param_gpio_rts_thresh,
+            &db_param_proto,
+            &db_param_serial_pack_size,
+            &db_param_serial_read_timeout,
+            &db_param_ltm_per_packet,
+            &db_param_dis_radio_armed,
+            &db_param_udp_client_port,
+            &db_param_en_ext_ant,
+            &db_param_rssi_dbm
+    };
+    memcpy(db_params, db_params_l, sizeof(db_params_l));
+}
 
 /**
  * Sets the value of the supplied the parameter to its default value
@@ -842,6 +735,7 @@ void db_param_read_all_params_json(const cJSON *root_obj) {
         switch (db_params[i]->type) {
             case STRING:
                 if (jobject) {
+                    ESP_LOGI(TAG, "Checking param %s with new value %s for validity", db_params[i]->db_name, jobject->valuestring);
                     db_param_is_valid_assign_str(jobject->valuestring, db_params[i]);
                 } else {
                     // do nothing - param was not found in the json

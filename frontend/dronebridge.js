@@ -23,14 +23,17 @@ function change_ap_ip_visibility(){
 	let disclamer_div = document.getElementById("esp-lr-ap-disclaimer");
 	let wifi_ssid_div = document.getElementById("wifi_ssid_div");
 	let wifi_en_gn_div = document.getElementById("wifi_en_gn_div");
+	let static_ip_config_div = document.getElementById("static_ip_config_div");
 	if (document.getElementById("esp32_mode").value === "2") {
 		ap_ip_div.style.display = "none";
 		ap_channel_div.style.display = "none";
 		wifi_en_gn_div.style.display = "block";
+		static_ip_config_div.style.display = "block";
 	} else {
 		ap_ip_div.style.display = "block";
 		ap_channel_div.style.display = "block";
 		wifi_en_gn_div.style.display = "none";
+		static_ip_config_div.style.display = "none";
 	}
 	if (document.getElementById("esp32_mode").value > "2") {
 		disclamer_div.style.display = "block";
