@@ -278,89 +278,6 @@ static esp_err_t settings_clients_clear_udp_get(httpd_req_t *req) {
 }
 
 /**
- * Sets the static IP of the ESP32 when in Wi-Fi client mode
- * Expecting JSON in the form of:
- * {
- *   "client_ip": "XXX.XXX.XXX.XXX",
- *   "netmask": "XXX.XXX.XXX.XXX",
- *   "gw_ip": "XXX.XXX.XXX.XXX"
- * }
- *
- * To reset static IP (dyn. IP) send JSON with empty strings:
-* {
- *   "client_ip": "",
- *   "netmask": "",
- *   "gw_ip": ""
- * }
- * @param req
- * @return ESP_OK on success & ESP_FAIL on failure
- */
-static esp_err_t settings_static_ip_post_handler(httpd_req_t *req) {
-    int total_len = req->content_len;
-    int cur_len = 0;
-    char *buf = ((rest_server_context_t *) (req->user_ctx))->scratch;
-    int received = 0;
-    if (total_len >= SCRATCH_BUFSIZE) {
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "content too long");
-        return ESP_FAIL;
-    }
-    while (cur_len < total_len) {
-        received = httpd_req_recv(req, buf + cur_len, total_len);
-        if (received <= 0) {
-            /* Respond with 500 Internal Server Error */
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to post control value");
-            return ESP_FAIL;
-        }
-        cur_len += received;
-    }
-    buf[total_len] = '\0';
-    // Obtain & process JSON from request
-    cJSON *root = cJSON_Parse(buf);
-
-    esp_err_t err = ESP_OK;
-    cJSON *json = cJSON_GetObjectItem(root, (char *) db_param_wifi_sta_ip.db_name);
-    if (json) {
-        strncpy((char *) DB_PARAM_STA_IP, json->valuestring, sizeof(DB_PARAM_STA_IP));
-        DB_PARAM_STA_IP[IP4ADDR_STRLEN_MAX-1] = '\0';    // to remove warning and to be sure
-    } else {
-        err = ESP_FAIL;
-    }
-
-    json = cJSON_GetObjectItem(root, (char *) db_param_wifi_sta_netmask.db_name);
-    if (json) {
-        strncpy((char *) DB_PARAM_STA_IP_NETMASK, json->valuestring, sizeof(DB_PARAM_STA_IP_NETMASK));
-        DB_PARAM_STA_IP_NETMASK[IP4ADDR_STRLEN_MAX-1] = '\0';    // to remove warning and to be sure
-    } else {
-        err = ESP_FAIL;
-    }
-
-    json = cJSON_GetObjectItem(root, (char *) db_param_wifi_sta_gw.db_name);
-    if (json) {
-        strncpy((char *) DB_PARAM_STA_GW, json->valuestring, sizeof(DB_PARAM_STA_GW));
-        DB_PARAM_STA_GW[IP4ADDR_STRLEN_MAX-1] = '\0';    // to remove warning and to be sure
-    } else {
-        err = ESP_FAIL;
-    }
-
-    // Clean up
-    cJSON_Delete(root);
-    db_write_settings_to_nvs();
-
-    if (err == ESP_OK) {
-        httpd_resp_sendstr(req, "{\n"
-                                "    \"status\": \"success\",\n"
-                                "    \"msg\": \"Updated static IP when in Wi-Fi client mode!\"\n"
-                                "  }");
-    } else {
-        httpd_resp_sendstr(req, "{\n"
-                                "    \"status\": \"failed\",\n"
-                                "    \"msg\": \"Failed to update static IP when in Wi-Fi client mode\"\n"
-                                "  }");
-    }
-    return ESP_OK;
-}
-
-/**
  * Returns build information esp-idf version and build version
  * @param req
  * @return
@@ -564,15 +481,6 @@ esp_err_t start_rest_server(const char *base_path) {
             .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &settings_clients_clear_udp_get_uri);
-
-    /* URI handler for setting a static IP for the ESP32 in Wi-Fi client mode */
-    httpd_uri_t settings_static_ip_port_uri = {
-            .uri = "/api/settings/static-ip",
-            .method = HTTP_POST,
-            .handler = settings_static_ip_post_handler,
-            .user_ctx = rest_context
-    };
-    httpd_register_uri_handler(server, &settings_static_ip_port_uri);
 
     /* URI handler for getting web server files */
     httpd_uri_t common_get_uri = {

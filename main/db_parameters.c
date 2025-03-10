@@ -46,7 +46,7 @@ uint8_t DB_RADIO_MODE_DESIGNATED = DB_WIFI_MODE_AP; // initially assign the same
 /* ---------- String based parameters - not available via MAVLink ---------- */
 
 db_parameter_t db_param_ssid, db_param_pass, db_param_wifi_ap_ip, db_param_wifi_sta_ip, db_param_wifi_sta_gw,
-    db_param_wifi_sta_netmask, db_param_udp_client_ip = {0};
+    db_param_wifi_sta_netmask, db_param_udp_client_ip, db_param_wifi_hostname = {0};
 
 /* ---------- From here with increasing param_index all parameters that are also available via MAVLink ---------- */
 
@@ -528,6 +528,8 @@ void db_param_init_parameters() {
     db_param_wifi_sta_netmask = db_param_init_str_param("ip_sta_netmsk", "WIFI_STA_NETM", "", 0, IP4ADDR_STRLEN_MAX);
     // Users can add custom UDP client targets. This is the IP of the first target added. Only the first one is saved to NVM.
     db_param_udp_client_ip = db_param_init_str_param("udp_client_ip", "WIFI_UDP_IP", "", 0, IP4ADDR_STRLEN_MAX);
+    // Specifies the hostname. Used in Wi-Fi ap & client mode.
+    db_param_wifi_hostname = db_param_init_str_param("wifi_hostname", "WIFI_HOSTNAME", CONFIG_LWIP_LOCAL_HOSTNAME, 1, 32);
 
     db_parameter_t *db_params_l[] = {
             &db_param_ssid,
@@ -537,6 +539,7 @@ void db_param_init_parameters() {
             &db_param_wifi_sta_gw,
             &db_param_wifi_sta_netmask,
             &db_param_udp_client_ip,
+            &db_param_wifi_hostname,
             &db_param_radio_mode,
             &db_param_sw_version,
             &db_param_channel,
@@ -735,8 +738,12 @@ void db_param_read_all_params_json(const cJSON *root_obj) {
         switch (db_params[i]->type) {
             case STRING:
                 if (jobject) {
-                    ESP_LOGI(TAG, "Checking param %s with new value %s for validity", db_params[i]->db_name, jobject->valuestring);
-                    db_param_is_valid_assign_str(jobject->valuestring, db_params[i]);
+                    if (!cJSON_IsNull(jobject)) {
+                        db_param_is_valid_assign_str(jobject->valuestring, db_params[i]);
+                    } else {
+                        // received empty string
+                        db_params[i]->value.db_param_str.value[0] = '\0';
+                    }
                 } else {
                     // do nothing - param was not found in the json
                 }
@@ -808,13 +815,15 @@ void db_param_write_all_params_json(cJSON *root_obj) {
  */
 bool db_param_is_valid_assign_str(const char *new_string_value, db_parameter_t *target_param) {
     // ToDo: Add IPv4 check for strings via custom validation function in db_parameter_t
-    if (strlen(new_string_value) <= target_param->value.db_param_str.max_len &&
-        strlen(new_string_value) >= target_param->value.db_param_str.min_len) {
+    if (new_string_value != NULL &&
+        strlen(new_string_value) <= target_param->value.db_param_str.max_len &&
+        strlen(new_string_value) >= target_param->value.db_param_str.min_len)
+    {
         strncpy((char *) target_param->value.db_param_str.value, new_string_value, DB_PARAM_VALUE_MAXLEN);
         return true;
     }
     // new value is not valid
-    ESP_LOGE(TAG, "db_param_is_valid_assign_str(): Invalid string length (%i-%i) for param %s",
+    ESP_LOGE(TAG, "db_param_is_valid_assign_str(): Invalid string length (%i-%i) or NULL for param %s",
              target_param->value.db_param_str.min_len, target_param->value.db_param_str.max_len,
              (char *) target_param->db_name);
     return false;

@@ -312,7 +312,7 @@ void db_init_wifi_apmode(int wifi_mode) {
     ESP_ERROR_CHECK(esp_netif_set_ip_info(esp_default_netif, &ip));
     ESP_ERROR_CHECK(esp_netif_dhcps_start(esp_default_netif));
 
-    ESP_ERROR_CHECK(esp_netif_set_hostname(esp_default_netif, "DBESP32"));
+    ESP_ERROR_CHECK(esp_netif_set_hostname(esp_default_netif, (char *) db_param_wifi_hostname.value.db_param_str.value));
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstringop-truncation"
     strncpy(CURRENT_CLIENT_IP, DB_PARAM_AP_IP, sizeof(CURRENT_CLIENT_IP));
@@ -329,6 +329,7 @@ int db_init_wifi_clientmode() {
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     esp_default_netif = esp_netif_create_default_wifi_sta();
     assert(esp_default_netif);
+    ESP_ERROR_CHECK(esp_netif_set_hostname(esp_default_netif, (char *) db_param_wifi_hostname.value.db_param_str.value));
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));

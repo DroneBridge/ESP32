@@ -33,7 +33,7 @@
 #define DB_PATCH_VERSION 0
 #define DB_MATURITY_VERSION "RC2"
 
-#define DB_PARAM_TOTAL_NUM          26  // total number of db parameters
+#define DB_PARAM_TOTAL_NUM          27  // total number of db parameters
 #define DB_PARAM_MAV_CNT            19 // Number of MAVLink parameters returned by ESP32 in the PARAM message. Needed by GCS.
 
 #define DB_PARAM_NAME_MAXLEN        16
@@ -167,6 +167,7 @@ extern db_parameter_t db_param_wifi_sta_ip;
 extern db_parameter_t db_param_wifi_sta_gw;
 extern db_parameter_t db_param_wifi_sta_netmask;
 extern db_parameter_t db_param_udp_client_ip;
+extern db_parameter_t db_param_wifi_hostname;
 extern db_parameter_t db_param_sw_version;
 extern db_parameter_t db_param_radio_mode;
 extern db_parameter_t db_param_channel;
