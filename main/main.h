@@ -34,6 +34,7 @@ enum E_DB_WIFI_MODE {
     DB_WIFI_MODE_ESPNOW_AIR = 4,    // ESP-NOW Mode for broadcasting device
     DB_WIFI_MODE_ESPNOW_GND = 5,    // ESP-NOW Mode for GND station
     DB_WIFI_MODE_ESPNOW_END = 6,    // End of enum
+    DB_BLUETOOTH_MODE_SPP = 7            // BLE SPP Mode
 };
 
 enum E_DB_SERIAL_PROTOCOL {

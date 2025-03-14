@@ -39,6 +39,7 @@
 #include "main.h"
 #include "mdns.h"
 #include "db_esp_now.h"
+#include "db_ble.h"
 #include "iot_button.h"
 #include "db_serial.h"
 #include "globals.h"
@@ -789,17 +790,28 @@ void app_main() {
     DB_RADIO_MODE_DESIGNATED = DB_RADIO_MODE; // must always match, mismatch only allowed when changed by user action and not rebooted, yet.
     set_reset_trigger();
     db_configure_antenna();
-    if (DB_RADIO_MODE == DB_WIFI_MODE_AP || DB_RADIO_MODE == DB_WIFI_MODE_AP_LR) {
-        db_init_wifi_apmode(DB_RADIO_MODE);
-    } else if (DB_RADIO_MODE == DB_WIFI_MODE_ESPNOW_AIR || DB_RADIO_MODE == DB_WIFI_MODE_ESPNOW_GND) {
-        db_init_wifi_espnow();
-        db_start_espnow_module();
-    } else {
-        // Wi-Fi client mode with LR mode enabled
-        if (db_init_wifi_clientmode() < 0) {
+
+    switch (DB_RADIO_MODE) {
+        case DB_WIFI_MODE_AP:
+        case DB_WIFI_MODE_AP_LR:
+          db_init_wifi_apmode(DB_RADIO_MODE);
+          break;
+      
+        case DB_WIFI_MODE_ESPNOW_AIR:
+        case DB_WIFI_MODE_ESPNOW_GND:
+          db_init_wifi_espnow();
+          db_start_espnow_module();
+          break;
+      
+        default:
+          // Wi-Fi client mode with LR mode enabled
+          if (db_init_wifi_clientmode() < 0) {
             ESP_LOGE(TAG, "Failed to init Wifi Client Mode");
-        }
+          }
+          break;
     }
+
+    db_ble_init();
 
     if (DB_RADIO_MODE != DB_WIFI_MODE_ESPNOW_AIR && DB_RADIO_MODE != DB_WIFI_MODE_ESPNOW_GND) {
         // no need to start these services - won`t be available anyway - safe the resources

@@ -238,33 +238,36 @@ void db_send_to_all_espnow(uint8_t data[], const uint16_t *data_length) {
  * @param data payload to send
  * @param data_length Length of payload to send
  */
-void db_send_to_all_clients(int tcp_clients[], udp_conn_list_t *n_udp_conn_list, uint8_t data[], uint16_t data_length) {
-    if (DB_RADIO_MODE != DB_WIFI_MODE_ESPNOW_AIR && DB_RADIO_MODE != DB_WIFI_MODE_ESPNOW_GND) {
-        db_send_to_all_tcp_clients(tcp_clients, data, data_length);
-        db_send_to_all_udp_clients(n_udp_conn_list, data, data_length);
-    } else {
-        // ESP-NOW mode
-        // Check if payload fits into one ESP-NOW packet
-        if (data_length > DB_ESPNOW_PAYLOAD_MAXSIZE) {
-            // data not properly sized (MAVLink implementation already sends properly sized chunks but MSP parser will not)
-            // split into multiple packets
-            uint16_t sent_bytes = 0;
-            uint16_t next_chunk_len = 0;
-            do {
-                next_chunk_len = data_length - sent_bytes;
-                if (next_chunk_len > DB_ESPNOW_PAYLOAD_MAXSIZE) {
-                    next_chunk_len = DB_ESPNOW_PAYLOAD_MAXSIZE;
-                } else {
-                    // do nothing - chunk will fit into the ESP-NOW payload field
-                }
-                db_send_to_all_espnow(&data[sent_bytes], &next_chunk_len);
-                sent_bytes += next_chunk_len;
-            } while (sent_bytes < data_length);
-        } else {
-            // packet is properly sized - send to ESP-NOW outbound queue
-            db_send_to_all_espnow(data, &data_length);
+void db_send_to_all_clients(int tcp_clients[], udp_conn_list_t *n_udp_conn_list,
+                            uint8_t data[], uint16_t data_length) {
+  switch (DB_RADIO_MODE) {
+  case DB_WIFI_MODE_ESPNOW_AIR:
+  case DB_WIFI_MODE_ESPNOW_GND:
+    // ESP-NOW mode
+    if (data_length > DB_ESPNOW_PAYLOAD_MAXSIZE) {
+      // Data needs to be split into multiple ESP-NOW packets
+      uint16_t sent_bytes = 0;
+      uint16_t next_chunk_len = 0;
+      do {
+        next_chunk_len = data_length - sent_bytes;
+        if (next_chunk_len > DB_ESPNOW_PAYLOAD_MAXSIZE) {
+          next_chunk_len = DB_ESPNOW_PAYLOAD_MAXSIZE;
         }
+        db_send_to_all_espnow(&data[sent_bytes], &next_chunk_len);
+        sent_bytes += next_chunk_len;
+      } while (sent_bytes < data_length);
+    } else {
+      // Packet fits within ESP-NOW limits
+      db_send_to_all_espnow(data, &data_length);
     }
+    break;
+
+  default:
+    // Send data over TCP and UDP
+    db_send_to_all_tcp_clients(tcp_clients, data, data_length);
+    db_send_to_all_udp_clients(n_udp_conn_list, data, data_length);
+    break;
+  }
 }
 
 /**
@@ -719,6 +722,61 @@ _Noreturn void control_module_udp_tcp() {
     vTaskDelete(NULL);
 }
 
+_Noreturn void control_module_ble() {
+  ESP_LOGI(TAG, "Starting control module (Bluetooth)");
+
+  /* Initialize error code as failed, because UART is not initialized*/
+  esp_err_t serial_socket = ESP_FAIL;
+
+  /* open serial socket for comms with FC or GCS */
+  serial_socket = open_serial_socket();
+  if (serial_socket == ESP_FAIL) {
+    ESP_LOGE(TAG, "UART socket not opened. Aborting start of control module.");
+    vTaskDelete(NULL);
+  }
+#ifdef CONFIG_DB_SERIAL_OPTION_JTAG
+  else {
+    db_jtag_serial_info_print();
+  }
+#endif
+
+  uint transparent_buff_pos = 0;
+  uint msp_ltm_buff_pos = 0;
+  uint8_t msp_message_buffer[UART_BUF_SIZE];
+  uint8_t serial_buffer[DB_TRANS_BUF_SIZE];
+  msp_ltm_port_t db_msp_ltm_port;
+  db_espnow_queue_event_t db_espnow_uart_evt;
+  uint delay_timer_cnt = 0;
+
+  ESP_LOGI(TAG, "Started control module (ESP-NOW)");
+
+  /* Event Loop*/
+  while (1) {
+    /* Read Uart and send data to BLE (needs to be implemented)*/
+    read_process_serial_link(
+        NULL,                  // NULL, not using TCP
+        &transparent_buff_pos, // transparent buffer position
+        &msp_ltm_buff_pos,     // msp buffer position
+        msp_message_buffer,    // msp buffer
+        serial_buffer,         // serial buffer
+        &db_msp_ltm_port       // msp port
+    );
+
+    // TO-DO: Implement read handling for BLE and Write handling for BLE
+
+    /**Yield to the scheduler if delay_timer_cnt reaches 5000,allowing other
+     * tasks to execute and preventing starvation.
+     */
+    if (delay_timer_cnt == 5000) {
+      vTaskDelay(10 / portTICK_PERIOD_MS);
+      delay_timer_cnt = 0;
+    } else {
+      delay_timer_cnt++;
+    }
+  }
+  vTaskDelete(NULL);
+}
+
 /**
  * @brief DroneBridge control module implementation for a ESP32 device. Bidirectional link between FC and ground. Can
  * handle MSPv1, MSPv2, LTM and MAVLink.
@@ -726,9 +784,37 @@ _Noreturn void control_module_udp_tcp() {
  * MAVLink is passed through (fully transparent). Can be used with any protocol.
  */
 void db_start_control_module() {
-    if (DB_RADIO_MODE != DB_WIFI_MODE_ESPNOW_GND && DB_RADIO_MODE != DB_WIFI_MODE_ESPNOW_AIR) {
-        xTaskCreate(&control_module_udp_tcp, "control_wifi", 46080, NULL, 5, NULL);
-    } else {
-        xTaskCreate(&control_module_esp_now, "control_espnow", 40960, NULL, 5, NULL);
-    }
+    switch (DB_RADIO_MODE) {
+        case DB_WIFI_MODE_ESPNOW_GND:
+        case DB_WIFI_MODE_ESPNOW_AIR:
+            xTaskCreate(
+                &control_module_esp_now, // Pointer to the task to be executed, esp now control module
+                "control_espnow",        // Name of the task (for debugging purposes)
+                40960,                   // Stack size (in bytes) allocated for the task
+                NULL,                    // Pointer to parameters passed to the task (NULL if not used)
+                5,                       // Task priority (higher values indicate higher priority)
+                NULL                     // Task handle (can be used to reference the task, NULL if not needed)
+            );
+            break;
+        case DB_BLUETOOTH_MODE_SPP:
+            xTaskCreate(
+                &control_module_ble,     // Pointer to the task to be executed, esp bluetooth module
+                "control_bluetooth",     // Name of the task (for debugging purposes)
+                40960,                   // Stack size (in bytes) allocated for the task
+                NULL,                    // Pointer to parameters passed to the task (NULL if not used)
+                5,                       // Task priority (higher values indicate higher priority)
+                NULL                     // Task handle (can be used to reference the task, NULL if not needed)
+            );
+            break;
+        default:
+            xTaskCreate(
+                &control_module_udp_tcp, // Pointer to the task to be executed, esp udp/tcp module
+                "control_wifi",          // Name of the task (for debugging purposes)
+                46080,                   // Stack size (in bytes) allocated for the task
+                NULL,                    // Pointer to parameters passed to the task (NULL if not used)
+                5,                       // Task priority (higher values indicate higher priority)
+                NULL                     // Task handle (can be used to reference the task, NULL if not needed)
+            );
+            break;
+    }    
 }
