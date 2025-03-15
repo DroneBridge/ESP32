@@ -26,10 +26,10 @@
 
 #define MAX_LTM_FRAMES_IN_BUFFER 5
 
-#define DB_BUILD_VERSION 15
-#define DB_MAJOR_VERSION 2
-#define DB_MINOR_VERSION 1
-#define DB_PATCH_VERSION 0
+#define DB_BUILD_VERSION    15
+#define DB_MAJOR_VERSION    2
+#define DB_MINOR_VERSION    1
+#define DB_PATCH_VERSION    0
 #define DB_MATURITY_VERSION "RC1"
 
 /* DroneBridge Parameters */
@@ -68,6 +68,7 @@ extern int8_t num_connected_tcp_clients;                  //
 extern udp_conn_list_t *udp_conn_list;                    // List of UDP clients that the ESP32 will send to
                                                           //
 extern QueueHandle_t db_uart_write_queue_global;          // Global queue for data to be written to UART, filled by wireless communication interface task
+extern QueueHandle_t db_uart_read_queue_global;           // Global queue for data to be written to Wireless communication interface, filled by UART
 
 // extern int WIFI_ESP_MAXIMUM_RETRY;
 

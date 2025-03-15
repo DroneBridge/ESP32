@@ -288,6 +288,16 @@ void db_send_to_all_clients(int tcp_clients[], udp_conn_list_t *n_udp_conn_list,
     }
     break;
 
+  case DB_BLUETOOTH_MODE_SPP:
+    BleData_t bleData;
+    size_t copy_len = (data_length > sizeof(bleData.data)) ? sizeof(bleData.data) : data_length;
+    memcpy(&bleData, data, copy_len);
+    bleData.length=data_length;
+    if (xQueueSend(db_uart_read_queue_global, &bleData, portMAX_DELAY) != pdPASS) {
+      ESP_LOGE(TAG, "Failed to send BLE data to queue");
+    }
+    break;
+
   default:
     // Send data over TCP and UDP
     db_send_to_all_tcp_clients(tcp_clients, data, data_length);
@@ -784,6 +794,7 @@ _Noreturn void control_module_ble() {
     db_jtag_serial_info_print();
   }
 #endif
+
   uint8_t msp_message_buffer[UART_BUF_SIZE];
   uint8_t serial_buffer[DB_TRANS_BUF_SIZE];
   msp_ltm_port_t db_msp_ltm_port;
