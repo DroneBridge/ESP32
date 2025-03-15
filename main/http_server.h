@@ -22,6 +22,19 @@
 #ifndef DB_ESP32_HTTP_SERVER_NEW_H
 #define DB_ESP32_HTTP_SERVER_NEW_H
 
+/***************************************************************************************************************************
+ * Public Function Declaration
+ **************************************************************************************************************************/
+
+/***************************************************************************************************************************
+ * @brief Starts the RESTful web server.
+ *
+ * This function initializes and starts an HTTP server with predefined URI handlers to serve system information, settings,
+ * and client management APIs.
+ *
+ * @param base_path Base path for serving static files.
+ * @return ESP_OK on successful server start, ESP_FAIL otherwise.
+ **************************************************************************************************************************/
 esp_err_t start_rest_server(const char *base_path);
 
-#endif //DB_ESP32_HTTP_SERVER_NEW_H
+#endif // DB_ESP32_HTTP_SERVER_NEW_H

@@ -17,7 +17,6 @@
  *
  */
 
-
 #ifndef DB_ESP32_MAIN_H
 #define DB_ESP32_MAIN_H
 
@@ -27,20 +26,26 @@
 #define DB_HAS_RF_SWITCH 0
 #endif
 
-enum E_DB_WIFI_MODE {
-    DB_WIFI_MODE_AP = 1,            // Wi-Fi access point mode with 802.11b mode enabled
-    DB_WIFI_MODE_STA = 2,           // Wi-Fi client mode with 802.11b and LR mode enabled
-    DB_WIFI_MODE_AP_LR = 3,         // ESP32 WiFi LR Mode 802.11b
-    DB_WIFI_MODE_ESPNOW_AIR = 4,    // ESP-NOW Mode for broadcasting device
-    DB_WIFI_MODE_ESPNOW_GND = 5,    // ESP-NOW Mode for GND station
-    DB_WIFI_MODE_ESPNOW_END = 6,    // End of enum
-    DB_BLUETOOTH_MODE_SPP = 7            // BLE SPP Mode
-};
+/**
+ * @brief Enumeration for radio modes
+ */
+typedef enum {
+  DB_WIFI_MODE_AP         = 1, /**< Wi-Fi access point mode with 802.11b mode enabled */
+  DB_WIFI_MODE_STA        = 2, /**< Wi-Fi client mode with 802.11b and LR mode enabled */
+  DB_WIFI_MODE_AP_LR      = 3, /**< ESP32 WiFi LR Mode 802.11b */
+  DB_WIFI_MODE_ESPNOW_AIR = 4, /**< ESP-NOW mode for broadcasting device */
+  DB_WIFI_MODE_ESPNOW_GND = 5, /**< ESP-NOW mode for ground station */
+  DB_WIFI_MODE_ESPNOW_END = 6, /**< End of ESP-NOW mode enum */
+  DB_BLUETOOTH_MODE_SPP   = 7  /**< Bluetooth SPP (Serial Port Profile) mode */
+} E_DB_WIFI_MODE;
 
+/**
+ * @brief Enumeration for different serial communication protocols.
+ */
 enum E_DB_SERIAL_PROTOCOL {
-    DB_SERIAL_PROTOCOL_MSPLTM = 1,
-    DB_SERIAL_PROTOCOL_MAVLINK = 4,
-    DB_SERIAL_PROTOCOL_TRANSPARENT = 5
+  DB_SERIAL_PROTOCOL_MSPLTM      = 1, /**< MSP/LTM (MultiWii Serial Protocol / Lightweight Telemetry) */
+  DB_SERIAL_PROTOCOL_MAVLINK     = 4, /**< MAVLink protocol for UAV communication */
+  DB_SERIAL_PROTOCOL_TRANSPARENT = 5  /**< Transparent serial data forwarding */
 };
 
 void db_jtag_serial_info_print();
@@ -48,4 +53,4 @@ void db_write_settings_to_nvs();
 void save_udp_client_to_nvm(struct db_udp_client_t *new_db_udp_client, bool clear_client);
 void db_set_wifi_status(uint8_t enable_wifi);
 
-#endif //DB_ESP32_MAIN_H
+#endif // DB_ESP32_MAIN_H
