@@ -2,7 +2,7 @@
  * @file db_ble.c
  * @brief DroneBridge ESP32 BLE Source File
  *
- * This file is part of CosmicBridge
+ * This file is part of DroneBridge and CosmicBridge
  *
  * This file contains the NimBLE Initialisation functions to start the BLE Host
  * stack and start advertising the BLE Service
@@ -26,6 +26,7 @@
  * Header Inclusion
  *************************************************************************/
 #include "db_ble.h"
+#include "globals.h"
 
 /**************************************************************************
  * ESP-IDF APIs
@@ -50,47 +51,6 @@
 #define TAG "DB_BLE_MSGS"
 
 /**************************************************************************
- * Callback Function Definition
- *************************************************************************/
-
-/**
- * @brief Callback Function called when the BLE host stack is reset
- */
-static void on_stack_reset(int reason);
-
-/**
- * @brief Callback Function called when the BLE host stack synchronises
- */
-
-static void on_stack_sync(void);
-
-/**
- * @brief GATT service register callback function
- */
-static void gatt_svr_register_cb(struct ble_gatt_register_ctxt *ctxt,
-                                 void *arg);
-
-/**
- * @brief Callback function to handle gap events
- */
-static int gap_event_handler(struct ble_gap_event *event, void *arg);
-
-/**
- * @brief Handler for BLE GATT service.
- *
- * This Callback function handles BLE GATT service events.
- *
- * @param conn_handle The connection handle.
- * @param attr_handle The attribute handle.
- * @param ctxt The GATT access context.
- * @param arg Additional arguments.
- *
- * @return Status code indicating the result of the handler.
- */
-static int ble_svc_gatt_handler(uint16_t conn_handle, uint16_t attr_handle,
-                                struct ble_gatt_access_ctxt *ctxt, void *arg);
-
-/**************************************************************************
  * Private Variables
  *************************************************************************/
 static uint8_t own_addr_type;
@@ -98,30 +58,6 @@ static uint8_t addr_val[6] = {0};
 static bool conn_handle_subs[CONFIG_BT_NIMBLE_MAX_CONNECTIONS + 1];
 static char *DEVICE_NAME = "DroneBridge";
 static uint16_t ble_spp_svc_gatt_read_val_handle;
-
-static const struct ble_gatt_svc_def new_ble_svc_gatt_defs[] = {
-    {
-        /*** Service: SPP */
-        .type = BLE_GATT_SVC_TYPE_PRIMARY,
-        .uuid = BLE_UUID16_DECLARE(BLE_SVC_SPP_UUID16),
-        .characteristics =
-            (struct ble_gatt_chr_def[]){
-                {
-                    /* Support SPP service */
-                    .uuid = BLE_UUID16_DECLARE(BLE_SVC_SPP_CHR_UUID16),
-                    .access_cb = ble_svc_gatt_handler,
-                    .val_handle = &ble_spp_svc_gatt_read_val_handle,
-                    .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE |
-                             BLE_GATT_CHR_F_NOTIFY,
-                },
-                {
-                    0, /* No more characteristics */
-                }},
-    },
-    {
-        0, /* No more services. */
-    },
-};
 
 /**************************************************************************
  * Library Function Declaration
@@ -178,6 +114,73 @@ static int gatt_svr_init();
  * @brief Function to initialize advertising
  */
 static void adv_init(void);
+
+/**************************************************************************
+ * Callback Function Declaration
+ *************************************************************************/
+
+/**
+ * @brief Callback Function called when the BLE host stack is reset
+ */
+static void on_stack_reset(int reason);
+
+/**
+ * @brief Callback Function called when the BLE host stack synchronises
+ */
+
+static void on_stack_sync(void);
+
+/**
+ * @brief GATT service register callback function
+ */
+static void gatt_svr_register_cb(struct ble_gatt_register_ctxt *ctxt,
+                                 void *arg);
+
+/**
+ * @brief Callback function to handle gap events
+ */
+static int gap_event_handler(struct ble_gap_event *event, void *arg);
+
+/**
+ * @brief Handler for BLE GATT service.
+ *
+ * This Callback function handles BLE GATT service events.
+ *
+ * @param conn_handle The connection handle.
+ * @param attr_handle The attribute handle.
+ * @param ctxt The GATT access context.
+ * @param arg Additional arguments.
+ *
+ * @return Status code indicating the result of the handler.
+ */
+static int ble_svc_gatt_handler(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg);
+
+/**************************************************************************
+ * BLE GATT service table
+ *************************************************************************/
+static const struct ble_gatt_svc_def new_ble_svc_gatt_defs[] = {
+    {
+        /*** Service: SPP */
+        .type = BLE_GATT_SVC_TYPE_PRIMARY,
+        .uuid = BLE_UUID16_DECLARE(BLE_SVC_SPP_UUID16),
+        .characteristics =
+            (struct ble_gatt_chr_def[]){
+                {
+                    /* Support SPP service */
+                    .uuid       = BLE_UUID16_DECLARE(BLE_SVC_SPP_CHR_UUID16),
+                    .access_cb  = ble_svc_gatt_handler,
+                    .val_handle = &ble_spp_svc_gatt_read_val_handle,
+                    .flags      = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE |
+                             BLE_GATT_CHR_F_NOTIFY,
+                },
+                {
+                    0, /* No more characteristics */
+                }},
+    },
+    {
+        0, /* No more services. */
+    },
+};
 
 /**************************************************************************
  * Private Function Definition
@@ -283,15 +286,15 @@ static void start_advertising(void) {
    * special value BLE_HS_ADV_TX_PWR_LVL_AUTO.
    */
   fields.tx_pwr_lvl_is_present = 1;
-  fields.tx_pwr_lvl = BLE_HS_ADV_TX_PWR_LVL_AUTO;
+  fields.tx_pwr_lvl            = BLE_HS_ADV_TX_PWR_LVL_AUTO;
 
-  name = ble_svc_gap_device_name();
-  fields.name = (uint8_t *)name;
-  fields.name_len = strlen(name);
+  name                    = ble_svc_gap_device_name();
+  fields.name             = (uint8_t *)name;
+  fields.name_len         = strlen(name);
   fields.name_is_complete = 1;
 
-  fields.uuids16 = (ble_uuid16_t[]){BLE_UUID16_INIT(BLE_SVC_SPP_UUID16)};
-  fields.num_uuids16 = 1;
+  fields.uuids16             = (ble_uuid16_t[]){BLE_UUID16_INIT(BLE_SVC_SPP_UUID16)};
+  fields.num_uuids16         = 1;
   fields.uuids16_is_complete = 1;
 
   rc = ble_gap_adv_set_fields(&fields);
@@ -304,14 +307,12 @@ static void start_advertising(void) {
   memset(&adv_params, 0, sizeof adv_params);
   adv_params.conn_mode = BLE_GAP_CONN_MODE_UND;
   adv_params.disc_mode = BLE_GAP_DISC_MODE_GEN;
-  rc = ble_gap_adv_start(own_addr_type, // Type of address that stack should use
-                         NULL, // Peer address for direct advertising, null for
-                               // in-direct advertising
-                         BLE_HS_FOREVER, // Duration of advertisement,
-                                         // BLE_HS_FOREVER for no expiration
-                         &adv_params, // Additional arguments for advertismenet
-                         gap_event_handler, // Gap event handler callback
-                         NULL);             // Callback arguments
+  rc                   = ble_gap_adv_start(own_addr_type,     // Type of address that stack should use
+                                           NULL,              // Peer address for direct advertising, null for in-direct advertising
+                                           BLE_HS_FOREVER,    // Duration of advertisement, BLE_HS_FOREVER for no expiration
+                                           &adv_params,       // Additional arguments for advertismenet
+                                           gap_event_handler, // Gap event handler callback
+                                           NULL);             // Callback arguments
   if (rc != 0) {
     MODLOG_DFLT(ERROR, "error enabling advertisement; rc=%d\n", rc);
     return;
@@ -323,29 +324,28 @@ inline static void format_addr(char *addr_str, uint8_t addr[]) {
           addr[3], addr[4], addr[5]);
 }
 
-static int ble_svc_gatt_handler(uint16_t conn_handle, uint16_t attr_handle,
-                                struct ble_gatt_access_ctxt *ctxt, void *arg) {
+static int ble_svc_gatt_handler(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg) {
   switch (ctxt->op) {
   case BLE_GATT_ACCESS_OP_READ_CHR:
     MODLOG_DFLT(INFO, "Callback for read");
     break;
 
   case BLE_GATT_ACCESS_OP_WRITE_CHR:
-    MODLOG_DFLT(
-        INFO, "Data received in write event,conn_handle = %x,attr_handle = %x",
-        conn_handle, attr_handle);
+    MODLOG_DFLT(INFO, "Data received in write event,conn_handle = %x,attr_handle = %x", conn_handle, attr_handle);
     struct os_mbuf *om = ctxt->om; // Get the received data buffer
-    uint8_t buf[128];              // Buffer to store received data
     int len = OS_MBUF_PKTLEN(om);  // Get total length of received data
+    BleData_t bleData;             // Create a struct instance
+    // Ensure len does not exceed buffer size
+    bleData.length = (len < sizeof(bleData.data)) ? len : sizeof(bleData.data);
 
-    if (len > sizeof(buf) - 1) {
-      len = sizeof(buf) - 1; // Avoid buffer overflow
+    os_mbuf_copydata(om, 0, bleData.length, bleData.data); // Copy data to buffer
+    bleData.data[bleData.length] = '\0';                   // Null-terminate for printing as a string
+
+    // Send the received data to the FreeRTOS queue
+    if (xQueueSend(db_uart_write_queue_global, &bleData, portMAX_DELAY) != pdPASS) {
+      MODLOG_DFLT(ERROR, "Failed to send BLE data to queue");
     }
-
-    os_mbuf_copydata(om, 0, len, buf); // Copy data to buffer
-    buf[len] = '\0'; // Null-terminate for printing as a string
-
-    MODLOG_DFLT(INFO, "Received Data: %s", buf); // Print received data
+    MODLOG_DFLT(INFO, "Received Data: %s", bleData.data); // Print received data
     break;
 
   default:
@@ -357,7 +357,7 @@ static int ble_svc_gatt_handler(uint16_t conn_handle, uint16_t attr_handle,
 
 static void adv_init(void) {
   /* Local variables */
-  int rc = 0;
+  int rc            = 0;
   char addr_str[18] = {0};
 
   /* Make sure we have proper BT identity address set */
@@ -468,11 +468,12 @@ static void gatt_svr_register_cb(struct ble_gatt_register_ctxt *ctxt,
 
 static void nimble_host_config_init() {
   // Set Host callbacks
-  ble_hs_cfg.reset_cb = on_stack_reset;
-  ble_hs_cfg.sync_cb = on_stack_sync;
+  ble_hs_cfg.reset_cb          = on_stack_reset;
+  ble_hs_cfg.sync_cb           = on_stack_sync;
   ble_hs_cfg.gatts_register_cb = gatt_svr_register_cb;
-  ble_hs_cfg.store_status_cb = ble_store_util_status_rr;
+  ble_hs_cfg.store_status_cb   = ble_store_util_status_rr;
 
+  /* WittyWizard: Figure out what they do later*/
   //   ble_hs_cfg.sm_io_cap = CONFIG_EXAMPLE_IO_TYPE;
   // #ifdef CONFIG_EXAMPLE_BONDING
   //   ble_hs_cfg.sm_bonding = 1;
@@ -519,7 +520,7 @@ static void nimble_host_task(void *param) {
  * Public Function Definition
  *************************************************************************/
 
-void db_ble_init() {
+void db_init_ble() {
   ESP_LOGI("BLE", "Initializing BLE stack");
 
   /* NimBLE host stack initialization */

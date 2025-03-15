@@ -1,0 +1,5 @@
+BasedOnStyle: LLVM
+AlignConsecutiveAssignments: true
+AlignConsecutiveMacros: true
+AlignTrailingComments: true
+ColumnLimit: 0 # Disables line wrapping

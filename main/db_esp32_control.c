@@ -17,29 +17,55 @@
  *   limitations under the License.
  *
  */
+
+/**************************************************************************
+ * Standard & System Headers
+ *************************************************************************/
+#include <stdint-gcc.h>
+#include <string.h>
 #include <sys/cdefs.h>
 #include <sys/fcntl.h>
 #include <sys/param.h>
-#include <string.h>
-#include <esp_task_wdt.h>
-#include <esp_vfs_dev.h>
-#include <lwip/inet.h>
-#include <esp_timer.h>
-#include <esp_wifi.h>
-#include <stdint-gcc.h>
 #include <sys/types.h>
+
+/**************************************************************************
+ * ESP-IDF Headers
+ *************************************************************************/
+#include <esp_log.h>
+#include <esp_task_wdt.h>
+#include <esp_timer.h>
+#include <esp_vfs_dev.h>
+#include <esp_wifi.h>
+
+/**************************************************************************
+ * LWIP (Lightweight IP) Headers
+ *************************************************************************/
+#include <lwip/inet.h>
 #include <lwip/netdb.h>
-#include "esp_log.h"
-#include "lwip/sockets.h"
+#include <lwip/sockets.h>
+
+/**************************************************************************
+ * ESP32 Driver Headers
+ *************************************************************************/
 #include "driver/uart.h"
-#include "globals.h"
-#include "msp_ltm_serial.h"
-#include "db_protocol.h"
-#include "tcp_server.h"
+
+/**************************************************************************
+ * DroneBridge (DB) API Headers
+ *************************************************************************/
+#include "db_ble.h"
 #include "db_esp32_control.h"
-#include "main.h"
-#include "db_serial.h"
 #include "db_esp_now.h"
+#include "db_protocol.h"
+#include "db_serial.h"
+
+/**************************************************************************
+ * Other Project-Specific Headers
+ *************************************************************************/
+#include "globals.h"
+#include "main.h"
+#include "msp_ltm_serial.h"
+#include "tcp_server.h"
+
 
 #define TAG "DB_CONTROL"
 
@@ -421,58 +447,65 @@ void read_process_serial_link(int *tcp_clients, uint *transparent_buff_pos, uint
  * Thread that manages all incoming and outgoing ESP-NOW and serial (UART) connections.
  * Called only when ESP-NOW mode is selected
  */
-_Noreturn void control_module_esp_now(){
-    ESP_LOGI(TAG, "Starting control module (ESP-NOW)");
-    esp_err_t serial_socket = ESP_FAIL;
-    // open serial socket for comms with FC or GCS
-    serial_socket = open_serial_socket();
-    if (serial_socket == ESP_FAIL) {
-        ESP_LOGE(TAG, "UART socket not opened. Aborting start of control module.");
-        vTaskDelete(NULL);
-    } else {
+_Noreturn void control_module_esp_now() {
+  ESP_LOGI(TAG, "Starting control module (ESP-NOW)");
+  esp_err_t serial_socket = ESP_FAIL;
+  // open serial socket for comms with FC or GCS
+  serial_socket = open_serial_socket();
+  if (serial_socket == ESP_FAIL) {
+    ESP_LOGE(TAG, "UART socket not opened. Aborting start of control module.");
+    vTaskDelete(NULL);
+  } else {
 #ifdef CONFIG_DB_SERIAL_OPTION_JTAG
     db_jtag_serial_info_print();
 #endif
-    }
+  }
 
-    uint transparent_buff_pos = 0;
-    uint msp_ltm_buff_pos = 0;
-    uint8_t msp_message_buffer[UART_BUF_SIZE];
-    uint8_t serial_buffer[DB_TRANS_BUF_SIZE];
-    msp_ltm_port_t db_msp_ltm_port;
-    db_espnow_queue_event_t db_espnow_uart_evt;
-    uint delay_timer_cnt = 0;
+  uint transparent_buff_pos = 0;
+  uint msp_ltm_buff_pos     = 0;
+  uint8_t msp_message_buffer[UART_BUF_SIZE];
+  uint8_t serial_buffer[DB_TRANS_BUF_SIZE];
+  msp_ltm_port_t db_msp_ltm_port;
+  db_espnow_queue_event_t db_espnow_uart_evt;
+  uint delay_timer_cnt = 0;
 
-    ESP_LOGI(TAG, "Started control module (ESP-NOW)");
-    while (1) {
-        // read UART (and split into packets & process MAVLink if desired); send to ESP-NOW queue to be processed by esp-now task
-        read_process_serial_link(NULL, &transparent_buff_pos, &msp_ltm_buff_pos, msp_message_buffer, serial_buffer,
-                                 &db_msp_ltm_port);
-        // read queue that was filled by esp-now task to check for data that needs to be sent via serial link
-        if (db_uart_write_queue != NULL && xQueueReceive(db_uart_write_queue, &db_espnow_uart_evt, 0) == pdTRUE) {
-            if (DB_SERIAL_PROTOCOL == DB_SERIAL_PROTOCOL_MAVLINK) {
-                // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
-                // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existing packet
-                db_parse_mavlink_from_radio(NULL, NULL, db_espnow_uart_evt.data, db_espnow_uart_evt.data_len);
-            } else {
-                // no parsing with any other protocol - transparent here - just pass through
-                write_to_serial(db_espnow_uart_evt.data, db_espnow_uart_evt.data_len);
-            }
-            free(db_espnow_uart_evt.data);
-        } else {
-            if (db_uart_write_queue == NULL) ESP_LOGE(TAG, "db_uart_write_queue is NULL!");
-            // no new data available to be sent via serial link do nothing
-        }
-        if (delay_timer_cnt == 5000) {
-            /* all actions are non-blocking so allow some delay so that the IDLE task of FreeRTOS and the watchdog can run
-            read: https://esp32developer.com/programming-in-c-c/tasks/tasks-vs-co-routines for reference */
-            vTaskDelay(10 / portTICK_PERIOD_MS);
-            delay_timer_cnt = 0;
-        } else {
-            delay_timer_cnt++;
-        }
+  ESP_LOGI(TAG, "Started control module (ESP-NOW)");
+  while (1) {
+    // read UART (and split into packets & process MAVLink if desired); send to ESP-NOW queue to be processed by esp-now task
+    read_process_serial_link(NULL,
+                             &transparent_buff_pos,
+                             &msp_ltm_buff_pos,
+                             msp_message_buffer,
+                             serial_buffer,
+                             &db_msp_ltm_port
+                            );
+
+    // read queue that was filled by esp-now task to check for data that needs to be sent via serial link
+    if (db_uart_write_queue != NULL && xQueueReceive(db_uart_write_queue, &db_espnow_uart_evt, 0) == pdTRUE) {
+      if (DB_SERIAL_PROTOCOL == DB_SERIAL_PROTOCOL_MAVLINK) {
+        // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
+        // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existing packet
+        db_parse_mavlink_from_radio(NULL, NULL, db_espnow_uart_evt.data, db_espnow_uart_evt.data_len);
+      } else {
+        // no parsing with any other protocol - transparent here - just pass through
+        write_to_serial(db_espnow_uart_evt.data, db_espnow_uart_evt.data_len);
+      }
+      free(db_espnow_uart_evt.data);
+    } else {
+      if (db_uart_write_queue == NULL)
+        ESP_LOGE(TAG, "db_uart_write_queue is NULL!");
+      // no new data available to be sent via serial link do nothing
     }
-    vTaskDelete(NULL);
+    if (delay_timer_cnt == 5000) {
+      /* all actions are non-blocking so allow some delay so that the IDLE task of FreeRTOS and the watchdog can run
+      read: https://esp32developer.com/programming-in-c-c/tasks/tasks-vs-co-routines for reference */
+      vTaskDelay(10 / portTICK_PERIOD_MS);
+      delay_timer_cnt = 0;
+    } else {
+      delay_timer_cnt++;
+    }
+  }
+  vTaskDelete(NULL);
 }
 
 /**
@@ -624,35 +657,47 @@ _Noreturn void control_module_udp_tcp() {
         // Wi-Fi based modes that use TCP and UDP communication
         handle_tcp_master(tcp_master_socket, tcp_clients);
         for (int i = 0; i < CONFIG_LWIP_MAX_ACTIVE_TCP; i++) {  // handle TCP clients
-            if (tcp_clients[i] > 0) {
-                ssize_t recv_length = recv(tcp_clients[i], tcp_client_buffer, TCP_BUFF_SIZ, 0);
-                if (recv_length > 0) {
-                    if (DB_SERIAL_PROTOCOL == DB_SERIAL_PROTOCOL_MAVLINK) {
-                        // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
-                        // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existign packet
-                        db_parse_mavlink_from_radio(tcp_clients, udp_conn_list, tcp_client_buffer, recv_length);
-                    } else {
-                        // no parsing with any other protocol - transparent here
-                        write_to_serial(tcp_client_buffer, recv_length);
-                    }
-                } else if (recv_length == 0) {
-                    shutdown(tcp_clients[i], 0);
-                    close(tcp_clients[i]);
-                    tcp_clients[i] = -1;
-                    ESP_LOGI(TAG, "TCP client disconnected");
-                    num_connected_tcp_clients--;
-                } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                    ESP_LOGE(TAG, "Error receiving from TCP client %i (fd: %i): %d", i, tcp_clients[i], errno);
-                    shutdown(tcp_clients[i], 0);
-                    close(tcp_clients[i]);
-                    num_connected_tcp_clients--;
-                    tcp_clients[i] = -1;
-                }
+          if (tcp_clients[i] > 0) {
+            ssize_t recv_length = recv(tcp_clients[i], tcp_client_buffer, TCP_BUFF_SIZ, 0);
+            switch (recv_length) {
+            case -1:
+              if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                ESP_LOGE(TAG, "Error receiving from TCP client %i (fd: %i): %d", i, tcp_clients[i], errno);
+                shutdown(tcp_clients[i], 0);
+                close(tcp_clients[i]);
+                num_connected_tcp_clients--;
+                tcp_clients[i] = -1;
+              }
+              break;
+            case 0:
+              shutdown(tcp_clients[i], 0);
+              close(tcp_clients[i]);
+              tcp_clients[i] = -1;
+              ESP_LOGI(TAG, "TCP client disconnected");
+              num_connected_tcp_clients--;
+              break;
+            default:
+              if (DB_SERIAL_PROTOCOL == DB_SERIAL_PROTOCOL_MAVLINK) {
+                // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
+                // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existing packet
+                db_parse_mavlink_from_radio(tcp_clients, udp_conn_list, tcp_client_buffer, recv_length);
+              } else {
+                // no parsing with any other protocol - transparent here
+                write_to_serial(tcp_client_buffer, recv_length);
+              }
+              break;
             }
+          }
         }
         // handle incoming UDP data on main port 14550 - Read UDP and forward to UART
-        ssize_t recv_length = recvfrom(udp_conn_list->udp_socket, udp_buffer, UDP_BUF_SIZE, 0,
-                                       (struct sockaddr *) &new_db_udp_client.udp_client, &udp_socklen);
+        ssize_t recv_length = recvfrom(udp_conn_list->udp_socket,                        // Socket descriptor
+                                       udp_buffer,                                       // Buffer to store received data
+                                       UDP_BUF_SIZE,                                     // Maximum buffer size
+                                       0,                                                // Flags (0 = no special options)
+                                       (struct sockaddr *)&new_db_udp_client.udp_client, // Sender's address (filled by recvfrom)
+                                       &udp_socklen                                      // Length of the sender's address structure
+        );
+
         if (recv_length > 0) {
             if (DB_SERIAL_PROTOCOL == DB_SERIAL_PROTOCOL_MAVLINK) {
                 // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
@@ -712,9 +757,9 @@ _Noreturn void control_module_udp_tcp() {
             } else {
                 // no way of getting RSSI here. Do nothing
             }
-//            size_t free_dram = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-//            size_t lowmark_dram = heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT);
-//            ESP_LOGI(TAG, "Free heap: %i, low mark: %i", free_dram, lowmark_dram);
+            //            size_t free_dram = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+            //            size_t lowmark_dram = heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT);
+            //            ESP_LOGI(TAG, "Free heap: %i, low mark: %i", free_dram, lowmark_dram);
         } else {
             delay_timer_cnt++;
         }
@@ -739,20 +784,19 @@ _Noreturn void control_module_ble() {
     db_jtag_serial_info_print();
   }
 #endif
-
-  uint transparent_buff_pos = 0;
-  uint msp_ltm_buff_pos = 0;
   uint8_t msp_message_buffer[UART_BUF_SIZE];
   uint8_t serial_buffer[DB_TRANS_BUF_SIZE];
   msp_ltm_port_t db_msp_ltm_port;
-  db_espnow_queue_event_t db_espnow_uart_evt;
-  uint delay_timer_cnt = 0;
+  BleData_t bleData;  
+  uint transparent_buff_pos = 0;
+  uint msp_ltm_buff_pos     = 0;
+  uint delay_timer_cnt      = 0;
 
   ESP_LOGI(TAG, "Started control module (ESP-NOW)");
 
-  /* Event Loop*/
+  /* Event Loop */
   while (1) {
-    /* Read Uart and send data to BLE (needs to be implemented)*/
+    /* Read Uart and send data to BLE (needs to be implemented) */
     read_process_serial_link(
         NULL,                  // NULL, not using TCP
         &transparent_buff_pos, // transparent buffer position
@@ -762,7 +806,20 @@ _Noreturn void control_module_ble() {
         &db_msp_ltm_port       // msp port
     );
 
-    // TO-DO: Implement read handling for BLE and Write handling for BLE
+    if (db_uart_write_queue_global != NULL && xQueueReceive(db_uart_write_queue_global, &bleData, 0) == pdTRUE) {
+        if (DB_SERIAL_PROTOCOL == DB_SERIAL_PROTOCOL_MAVLINK) {
+            // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
+            // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existing packet
+            db_parse_mavlink_from_radio(NULL, NULL, bleData.data, bleData.length);
+          } else {
+            // no parsing with any other protocol - transparent here - just pass through
+            write_to_serial(bleData.data, bleData.length);
+          }
+    } else {
+      if (db_uart_write_queue_global == NULL)
+        ESP_LOGE(TAG, "db_uart_write_queue is NULL!");
+      // no new data available to be sent via serial link do nothing
+    }
 
     /**Yield to the scheduler if delay_timer_cnt reaches 5000,allowing other
      * tasks to execute and preventing starvation.
@@ -784,37 +841,45 @@ _Noreturn void control_module_ble() {
  * MAVLink is passed through (fully transparent). Can be used with any protocol.
  */
 void db_start_control_module() {
-    switch (DB_RADIO_MODE) {
-        case DB_WIFI_MODE_ESPNOW_GND:
-        case DB_WIFI_MODE_ESPNOW_AIR:
-            xTaskCreate(
-                &control_module_esp_now, // Pointer to the task to be executed, esp now control module
-                "control_espnow",        // Name of the task (for debugging purposes)
-                40960,                   // Stack size (in bytes) allocated for the task
-                NULL,                    // Pointer to parameters passed to the task (NULL if not used)
-                5,                       // Task priority (higher values indicate higher priority)
-                NULL                     // Task handle (can be used to reference the task, NULL if not needed)
-            );
-            break;
-        case DB_BLUETOOTH_MODE_SPP:
-            xTaskCreate(
-                &control_module_ble,     // Pointer to the task to be executed, esp bluetooth module
-                "control_bluetooth",     // Name of the task (for debugging purposes)
-                40960,                   // Stack size (in bytes) allocated for the task
-                NULL,                    // Pointer to parameters passed to the task (NULL if not used)
-                5,                       // Task priority (higher values indicate higher priority)
-                NULL                     // Task handle (can be used to reference the task, NULL if not needed)
-            );
-            break;
-        default:
-            xTaskCreate(
-                &control_module_udp_tcp, // Pointer to the task to be executed, esp udp/tcp module
-                "control_wifi",          // Name of the task (for debugging purposes)
-                46080,                   // Stack size (in bytes) allocated for the task
-                NULL,                    // Pointer to parameters passed to the task (NULL if not used)
-                5,                       // Task priority (higher values indicate higher priority)
-                NULL                     // Task handle (can be used to reference the task, NULL if not needed)
-            );
-            break;
-    }    
+  switch (DB_RADIO_MODE) {
+  case DB_WIFI_MODE_ESPNOW_GND:
+  case DB_WIFI_MODE_ESPNOW_AIR:
+    xTaskCreate(
+        &control_module_esp_now, // Pointer to the task to be executed, esp now control module
+        "control_espnow",        // Name of the task (for debugging purposes)
+        40960,                   // Stack size (in bytes) allocated for the task
+        NULL,                    // Pointer to parameters passed to the task (NULL if not used)
+        5,                       // Task priority (higher values indicate higher priority)
+        NULL                     // Task handle (can be used to reference the task, NULL if not needed)
+    );
+    break;
+  case DB_BLUETOOTH_MODE_SPP:
+    xTaskCreate(
+        &control_module_ble, // Pointer to the task to be executed, esp bluetooth module
+        "control_bluetooth", // Name of the task (for debugging purposes)
+        40960,               // Stack size (in bytes) allocated for the task
+        NULL,                // Pointer to parameters passed to the task (NULL if not used)
+        5,                   // Task priority (higher values indicate higher priority)
+        NULL                 // Task handle (can be used to reference the task, NULL if not needed)
+    );
+    break;
+  default:
+    xTaskCreate(
+        &control_module_ble, // Pointer to the task to be executed, esp bluetooth module
+        "control_bluetooth", // Name of the task (for debugging purposes)
+        40960,               // Stack size (in bytes) allocated for the task
+        NULL,                // Pointer to parameters passed to the task (NULL if not used)
+        5,                   // Task priority (higher values indicate higher priority)
+        NULL                 // Task handle (can be used to reference the task, NULL if not needed)
+    );
+    // xTaskCreate(
+    //     &control_module_udp_tcp, // Pointer to the task to be executed, esp udp/tcp module
+    //     "control_wifi",          // Name of the task (for debugging purposes)
+    //     46080,                   // Stack size (in bytes) allocated for the task
+    //     NULL,                    // Pointer to parameters passed to the task (NULL if not used)
+    //     5,                       // Task priority (higher values indicate higher priority)
+    //     NULL                     // Task handle (can be used to reference the task, NULL if not needed)
+    // );
+    break;
+  }
 }

@@ -17,32 +17,60 @@
  *
  */
 
+/**************************************************************************
+ * Standard C Library Headers
+ *************************************************************************/
 #include <stdio.h>
-#include <nvs_flash.h>
-#include <esp_wifi_types.h>
 #include <string.h>
-#include <driver/gpio.h>
+
+/**************************************************************************
+ * ESP-IDF System Headers
+ *************************************************************************/
+#include <esp_event.h>
+#include <esp_log.h>
+#include <esp_mac.h>
+#include <esp_spiffs.h>
+#include <esp_vfs_semihost.h>
+#include <esp_wifi.h>
+#include <esp_wifi_types.h>
+#include <nvs_flash.h>
+
+/**************************************************************************
+ * FreeRTOS Headers
+ *************************************************************************/
+#include "freertos/event_groups.h"
+
+/**************************************************************************
+ * LWIP (Lightweight IP) Headers
+ *************************************************************************/
 #include <lwip/apps/netbiosns.h>
 
-#include "freertos/event_groups.h"
-#include "esp_mac.h"
-#include "esp_wifi.h"
-#include "esp_wifi_types.h"
-#include "esp_log.h"
-#include "esp_event.h"
-#include "db_esp32_control.h"
-#include "http_server.h"
-#include "db_protocol.h"
-#include "esp_vfs_semihost.h"
-#include "esp_spiffs.h"
-#include "http_server.h"
-#include "main.h"
-#include "mdns.h"
-#include "db_esp_now.h"
+/**************************************************************************
+ * ESP32 Driver Headers
+ *************************************************************************/
+#include <driver/gpio.h>
+
+/**************************************************************************
+ * DroneBridge (DB) API Headers
+ *************************************************************************/
 #include "db_ble.h"
-#include "iot_button.h"
+#include "db_esp32_control.h"
+#include "db_esp_now.h"
+#include "db_protocol.h"
 #include "db_serial.h"
+
+/**************************************************************************
+ * Networking & Web Server Headers
+ *************************************************************************/
+#include "http_server.h"
+#include "mdns.h"
+
+/**************************************************************************
+ * Other Project-Specific Headers
+ *************************************************************************/
 #include "globals.h"
+#include "iot_button.h"
+#include "main.h"
 
 #define NVS_NAMESPACE "settings"
 
@@ -62,62 +90,63 @@
 #endif
 
 #ifdef CONFIG_DB_OFFICIAL_BOARD_1_X
-#define DB_DEFAULT_UART_TX_PIN GPIO_NUM_5
-#define DB_DEFAULT_UART_RX_PIN GPIO_NUM_4
-#define DB_DEFAULT_UART_RTS_PIN GPIO_NUM_6
-#define DB_DEFAULT_UART_CTS_PIN GPIO_NUM_7
+#define DB_DEFAULT_UART_TX_PIN    GPIO_NUM_5
+#define DB_DEFAULT_UART_RX_PIN    GPIO_NUM_4
+#define DB_DEFAULT_UART_RTS_PIN   GPIO_NUM_6
+#define DB_DEFAULT_UART_CTS_PIN   GPIO_NUM_7
 #define DB_DEFAULT_UART_BAUD_RATE 115200
 #elif CONFIG_DB_OFFICIAL_BOARD_1_X_C6
-#define DB_DEFAULT_UART_TX_PIN GPIO_NUM_21
-#define DB_DEFAULT_UART_RX_PIN GPIO_NUM_2
-#define DB_DEFAULT_UART_RTS_PIN GPIO_NUM_22
-#define DB_DEFAULT_UART_CTS_PIN GPIO_NUM_23
+#define DB_DEFAULT_UART_TX_PIN    GPIO_NUM_21
+#define DB_DEFAULT_UART_RX_PIN    GPIO_NUM_2
+#define DB_DEFAULT_UART_RTS_PIN   GPIO_NUM_22
+#define DB_DEFAULT_UART_CTS_PIN   GPIO_NUM_23
 #define DB_DEFAULT_UART_BAUD_RATE 115200
 #elif CONFIG_DB_GENERIC_BOARD
 // initially set pins to 0 to allow the start of the system on all boards. User has to set the correct pins
-#define DB_DEFAULT_UART_TX_PIN GPIO_NUM_0
-#define DB_DEFAULT_UART_RX_PIN GPIO_NUM_0
-#define DB_DEFAULT_UART_RTS_PIN GPIO_NUM_0
-#define DB_DEFAULT_UART_CTS_PIN GPIO_NUM_0
+#define DB_DEFAULT_UART_TX_PIN    GPIO_NUM_0
+#define DB_DEFAULT_UART_RX_PIN    GPIO_NUM_0
+#define DB_DEFAULT_UART_RTS_PIN   GPIO_NUM_0
+#define DB_DEFAULT_UART_CTS_PIN   GPIO_NUM_0
 #define DB_DEFAULT_UART_BAUD_RATE 57600
 #else
 // someone fucked up the config - fallback to generic config
-#define DB_DEFAULT_UART_TX_PIN GPIO_NUM_0
-#define DB_DEFAULT_UART_RX_PIN GPIO_NUM_0
-#define DB_DEFAULT_UART_RTS_PIN GPIO_NUM_0
-#define DB_DEFAULT_UART_CTS_PIN GPIO_NUM_0
+#define DB_DEFAULT_UART_TX_PIN    GPIO_NUM_0
+#define DB_DEFAULT_UART_RX_PIN    GPIO_NUM_0
+#define DB_DEFAULT_UART_RTS_PIN   GPIO_NUM_0
+#define DB_DEFAULT_UART_CTS_PIN   GPIO_NUM_0
 #define DB_DEFAULT_UART_BAUD_RATE 57600
 #endif
 
 static const char *TAG = "DB_ESP32";
 
 /* DroneBridge Parameters */
-uint8_t DB_RADIO_MODE = DB_WIFI_MODE_AP;
-uint8_t DB_RADIO_MODE_DESIGNATED = DB_WIFI_MODE_AP;  // initially assign the same value as DB_RADIO_MODE
-uint8_t DB_WIFI_SSID[32] = "DroneBridge for ESP32";
-uint8_t DB_WIFI_PWD[64] = "dronebridge";
-char DEFAULT_AP_IP[IP4ADDR_STRLEN_MAX] = "192.168.2.1";
-char DB_STATIC_STA_IP[IP4ADDR_STRLEN_MAX] = "";
-char DB_STATIC_STA_IP_GW[IP4ADDR_STRLEN_MAX] = "";
+QueueHandle_t db_uart_write_queue_global;
+uint8_t DB_RADIO_MODE                             = DB_WIFI_MODE_AP;
+uint8_t DB_RADIO_MODE_DESIGNATED                  = DB_WIFI_MODE_AP; // initially assign the same value as DB_RADIO_MODE
+uint8_t DB_WIFI_SSID[32]                          = "DroneBridge for ESP32";
+uint8_t DB_WIFI_PWD[64]                           = "dronebridge";
+char DEFAULT_AP_IP[IP4ADDR_STRLEN_MAX]            = "192.168.2.1";
+char DB_STATIC_STA_IP[IP4ADDR_STRLEN_MAX]         = "";
+char DB_STATIC_STA_IP_GW[IP4ADDR_STRLEN_MAX]      = "";
 char DB_STATIC_STA_IP_NETMASK[IP4ADDR_STRLEN_MAX] = "";
-char CURRENT_CLIENT_IP[IP4ADDR_STRLEN_MAX] = "192.168.2.1";
-uint8_t DB_WIFI_CHANNEL = 6;
-uint8_t DB_SERIAL_PROTOCOL = DB_SERIAL_PROTOCOL_MAVLINK;
-uint8_t DB_DISABLE_RADIO_ARMED = false;
-uint8_t DB_UART_PIN_TX = DB_DEFAULT_UART_TX_PIN;
-uint8_t DB_UART_PIN_RX = DB_DEFAULT_UART_RX_PIN;
-uint8_t DB_UART_PIN_RTS = DB_DEFAULT_UART_RTS_PIN;
-uint8_t DB_UART_PIN_CTS = DB_DEFAULT_UART_CTS_PIN;
-uint8_t DB_UART_RTS_THRESH = 64;
-int32_t DB_UART_BAUD_RATE = DB_DEFAULT_UART_BAUD_RATE;
-uint16_t DB_TRANS_BUF_SIZE = 128;
-uint8_t DB_LTM_FRAME_NUM_BUFFER = 2;
-uint8_t DB_EN_EXT_ANT = false;
-uint8_t DB_WIFI_EN_GN = false;
+char CURRENT_CLIENT_IP[IP4ADDR_STRLEN_MAX]        = "192.168.2.1";
+uint8_t DB_WIFI_CHANNEL                           = 6;
+uint8_t DB_SERIAL_PROTOCOL                        = DB_SERIAL_PROTOCOL_MAVLINK;
+uint8_t DB_DISABLE_RADIO_ARMED                    = false;
+uint8_t DB_UART_PIN_TX                            = DB_DEFAULT_UART_TX_PIN;
+uint8_t DB_UART_PIN_RX                            = DB_DEFAULT_UART_RX_PIN;
+uint8_t DB_UART_PIN_RTS                           = DB_DEFAULT_UART_RTS_PIN;
+uint8_t DB_UART_PIN_CTS                           = DB_DEFAULT_UART_CTS_PIN;
+uint8_t DB_UART_RTS_THRESH                        = 64;
+int32_t DB_UART_BAUD_RATE                         = DB_DEFAULT_UART_BAUD_RATE;
+uint16_t DB_TRANS_BUF_SIZE                        = 128;
+uint8_t DB_LTM_FRAME_NUM_BUFFER                   = 2;
+uint8_t DB_EN_EXT_ANT                             = false;
+uint8_t DB_WIFI_EN_GN                             = false;
 
-uint8_t DB_WIFI_IS_OFF = false;  // keep track if we switched Wi-Fi off already
-db_esp_signal_quality_t db_esp_signal_quality = {.air_rssi = -127, .air_noise_floor = -1, .gnd_rssi= -127, .gnd_noise_floor = -1};
-wifi_sta_list_t wifi_sta_list = {.num = 0};
+uint8_t DB_WIFI_IS_OFF                        = false; // keep track if we switched Wi-Fi off already
+db_esp_signal_quality_t db_esp_signal_quality = {.air_rssi = -127, .air_noise_floor = -1, .gnd_rssi = -127, .gnd_noise_floor = -1};
+wifi_sta_list_t wifi_sta_list                 = {.num = 0};
 uint8_t LOCAL_MAC_ADDRESS[6];
 
 udp_conn_list_t *udp_conn_list;
@@ -183,59 +212,78 @@ static void set_client_static_ip() {
  */
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
     // Wifi access point mode events
-    if (event_id == WIFI_EVENT_AP_STACONNECTED) {
-        wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *) event_data;
-        ESP_LOGI(TAG, "WIFI_EVENT - Client connected - station:"MACSTR", AID=%d", MAC2STR(event->mac), event->aid);
-        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_ap_get_sta_list(&wifi_sta_list)); // update list of connected stations
-    } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
-        wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *) event_data;
-        ESP_LOGI(TAG, "WIFI_EVENT - Client disconnected - station:"MACSTR", AID=%d", MAC2STR(event->mac), event->aid);
-        struct db_udp_client_t db_udp_client;
-        memcpy(db_udp_client.mac, event->mac, sizeof(db_udp_client.mac));
-        remove_from_known_udp_clients(udp_conn_list, db_udp_client);
-        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_ap_get_sta_list(&wifi_sta_list)); // update list of connected stations
-    } else if (event_id == WIFI_EVENT_AP_START) {
-        ESP_LOGI(TAG, "WIFI_EVENT_AP_START (SSID: %s PASS: %s)", DB_WIFI_SSID, DB_WIFI_PWD);
-    } else if (event_id == WIFI_EVENT_AP_STOP) {
-        ESP_LOGI(TAG, "WIFI_EVENT - AP stopped!");
-    } else if (event_base == IP_EVENT && event_id == IP_EVENT_AP_STAIPASSIGNED) {
-        ip_event_ap_staipassigned_t *event = (ip_event_ap_staipassigned_t *) event_data;
-        ESP_LOGI(TAG, "IP_EVENT_AP_STAIPASSIGNED - New station IP:" IPSTR, IP2STR(&event->ip));
-        ESP_LOGI(TAG, "IP_EVENT_AP_STAIPASSIGNED - MAC: " MACSTR, MAC2STR(event->mac));
-        struct db_udp_client_t db_udp_client;
-        db_udp_client.udp_client.sin_family = PF_INET;
-        db_udp_client.udp_client.sin_port = htons(APP_PORT_PROXY_UDP);
-        db_udp_client.udp_client.sin_len = 16;
-        db_udp_client.udp_client.sin_addr.s_addr = event->ip.addr;
-        memcpy(db_udp_client.mac, event->mac, sizeof(db_udp_client.mac));
-        add_to_known_udp_clients(udp_conn_list, db_udp_client, false);
+    switch (event_id) {
+    case WIFI_EVENT_AP_STACONNECTED: {
+      wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *)event_data;
+      ESP_LOGI(TAG, "WIFI_EVENT - Client connected - station:" MACSTR ", AID=%d", MAC2STR(event->mac), event->aid);
+      ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_ap_get_sta_list(&wifi_sta_list)); // update list of connected stations
+      break;
+    }
+    case WIFI_EVENT_AP_STADISCONNECTED: {
+      wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *)event_data;
+      ESP_LOGI(TAG, "WIFI_EVENT - Client disconnected - station:" MACSTR ", AID=%d", MAC2STR(event->mac), event->aid);
+      struct db_udp_client_t db_udp_client;
+      memcpy(db_udp_client.mac, event->mac, sizeof(db_udp_client.mac));
+      remove_from_known_udp_clients(udp_conn_list, db_udp_client);
+      ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_ap_get_sta_list(&wifi_sta_list)); // update list of connected stations
+      break;
+    }
+    case WIFI_EVENT_AP_START:
+      ESP_LOGI(TAG, "WIFI_EVENT_AP_START (SSID: %s PASS: %s)", DB_WIFI_SSID, DB_WIFI_PWD);
+      break;
+    case WIFI_EVENT_AP_STOP:
+      ESP_LOGI(TAG, "WIFI_EVENT - AP stopped!");
+      break;
+    case IP_EVENT_AP_STAIPASSIGNED: {
+      ip_event_ap_staipassigned_t *event = (ip_event_ap_staipassigned_t *)event_data;
+      ESP_LOGI(TAG, "IP_EVENT_AP_STAIPASSIGNED - New station IP:" IPSTR, IP2STR(&event->ip));
+      ESP_LOGI(TAG, "IP_EVENT_AP_STAIPASSIGNED - MAC: " MACSTR, MAC2STR(event->mac));
+      struct db_udp_client_t db_udp_client;
+      db_udp_client.udp_client.sin_family      = PF_INET;
+      db_udp_client.udp_client.sin_port        = htons(APP_PORT_PROXY_UDP);
+      db_udp_client.udp_client.sin_len         = 16;
+      db_udp_client.udp_client.sin_addr.s_addr = event->ip.addr;
+      memcpy(db_udp_client.mac, event->mac, sizeof(db_udp_client.mac));
+      add_to_known_udp_clients(udp_conn_list, db_udp_client, false);
+      break;
+    }
+    default:
+      break;
     }
     // Wifi client mode events
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
-        ESP_LOGI(TAG, "WIFI_EVENT_STA_START - Wifi Started");
-        if (!DB_WIFI_IS_OFF) {  // maybe the other task did set it in the meantime
-            ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_connect());
-        } else {
-            ESP_LOGW(TAG, "Did not start Wi-Fi since autopilot told us he is armed (WIFI_EVENT_STA_START)");
-        }
-    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_CONNECTED) {
-        set_client_static_ip();
-    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        ESP_LOGI(TAG, "WIFI_EVENT_STA_DISCONNECTED - Lost connection to access point");
-        // Keep on trying
-        if (!DB_WIFI_IS_OFF) {
-            ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_connect());
-            s_retry_num++;
-            ESP_LOGI(TAG, "Retry to connect to the AP (%i)", s_retry_num);
-        } else {
-            ESP_LOGD(TAG, "WIFI_EVENT_STA_DISCONNECTED - did not try to re-connect since WiFi was commanded off");
-        }
-    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        ip_event_got_ip_t *event = (ip_event_got_ip_t *) event_data;
-        ESP_LOGI(TAG, "IP_EVENT_STA_GOT_IP:" IPSTR, IP2STR(&event->ip_info.ip));
-        sprintf(CURRENT_CLIENT_IP, IPSTR, IP2STR(&event->ip_info.ip));
-        s_retry_num = 0;
-        xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+    switch (event_id) {
+    case WIFI_EVENT_STA_START:
+      ESP_LOGI(TAG, "WIFI_EVENT_STA_START - Wifi Started");
+      if (!DB_WIFI_IS_OFF) { // maybe the other task did set it in the meantime
+        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_connect());
+      } else {
+        ESP_LOGW(TAG, "Did not start Wi-Fi since autopilot told us he is armed (WIFI_EVENT_STA_START)");
+      }
+      break;
+    case WIFI_EVENT_STA_CONNECTED:
+      set_client_static_ip();
+      break;
+    case WIFI_EVENT_STA_DISCONNECTED:
+      ESP_LOGI(TAG, "WIFI_EVENT_STA_DISCONNECTED - Lost connection to access point");
+      // Keep on trying
+      if (!DB_WIFI_IS_OFF) {
+        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_connect());
+        s_retry_num++;
+        ESP_LOGI(TAG, "Retry to connect to the AP (%i)", s_retry_num);
+      } else {
+        ESP_LOGD(TAG, "WIFI_EVENT_STA_DISCONNECTED - did not try to re-connect since WiFi was commanded off");
+      }
+      break;
+    case IP_EVENT_STA_GOT_IP: {
+      ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
+      ESP_LOGI(TAG, "IP_EVENT_STA_GOT_IP:" IPSTR, IP2STR(&event->ip_info.ip));
+      sprintf(CURRENT_CLIENT_IP, IPSTR, IP2STR(&event->ip_info.ip));
+      s_retry_num = 0;
+      xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+      break;
+    }
+    default:
+      break;
     }
 }
 
@@ -278,24 +326,31 @@ esp_err_t init_fs(void) {
     };
     esp_err_t ret = esp_vfs_spiffs_register(&conf);
 
-    if (ret != ESP_OK) {
-        if (ret == ESP_FAIL) {
-            ESP_LOGE(TAG, "Failed to mount or format filesystem");
-        } else if (ret == ESP_ERR_NOT_FOUND) {
-            ESP_LOGE(TAG, "Failed to find SPIFFS partition");
-        } else {
-            ESP_LOGE(TAG, "Failed to initialize SPIFFS (%s)", esp_err_to_name(ret));
-        }
-        return ESP_FAIL;
+    switch (ret) {
+    case ESP_OK:
+      break;
+    case ESP_FAIL:
+      ESP_LOGE(TAG, "Failed to mount or format filesystem");
+      return ESP_FAIL;
+    case ESP_ERR_NOT_FOUND:
+      ESP_LOGE(TAG, "Failed to find SPIFFS partition");
+      return ESP_FAIL;
+    default:
+      ESP_LOGE(TAG, "Failed to initialize SPIFFS (%s)", esp_err_to_name(ret));
+      return ESP_FAIL;
     }
 
     size_t total = 0, used = 0;
     ret = esp_spiffs_info(NULL, &total, &used);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to get SPIFFS partition information (%s)", esp_err_to_name(ret));
-    } else {
-        ESP_LOGI(TAG, "Filesystem init finished! Partition size: total: %d bytes, used: %d bytes (%i%%)", total, used,
-                 (used * 100) / total);
+
+    switch (ret) {
+    case ESP_OK:
+      ESP_LOGI(TAG, "Filesystem init finished! Partition size: total: %d bytes, used: %d bytes (%i%%)", total, used,
+               (used * 100) / total);
+      break;
+    default:
+      ESP_LOGE(TAG, "Failed to get SPIFFS partition information (%s)", esp_err_to_name(ret));
+      break;
     }
     return ret;
 }
@@ -327,18 +382,17 @@ void db_init_wifi_apmode(int wifi_mode) {
                                                         &ap_staipassigned_ip));
 
     wifi_config_t wifi_config = {
-            .ap = {
-                    .ssid = "DroneBridge_ESP32_Init",
-                    .ssid_len = 0,
-                    .authmode = WIFI_AUTH_WPA2_PSK,
-                    .channel = DB_WIFI_CHANNEL,
-                    .ssid_hidden = 0,
-                    .beacon_interval = 100,
-                    .max_connection = 10
-            },
+        .ap = {
+            .ssid            = "DroneBridge_ESP32_Init",
+            .ssid_len        = 0,
+            .authmode        = WIFI_AUTH_WPA2_PSK,
+            .channel         = DB_WIFI_CHANNEL,
+            .ssid_hidden     = 0,
+            .beacon_interval = 100,
+            .max_connection  = 10},
     };
-    strncpy((char *) wifi_config.ap.ssid, (char *) DB_WIFI_SSID, 32);
-    strncpy((char *) wifi_config.ap.password, (char *) DB_WIFI_PWD, 64);
+    strncpy((char *)wifi_config.ap.ssid     , (char *)DB_WIFI_SSID , 32);
+    strncpy((char *)wifi_config.ap.password , (char *)DB_WIFI_PWD  , 64);
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
     if (wifi_mode == DB_WIFI_MODE_AP_LR) {
@@ -394,13 +448,11 @@ int db_init_wifi_clientmode() {
                                                         NULL,
                                                         &instance_got_ip));
 
-
     wifi_config_t wifi_config = {
-            .sta = {
-                    .ssid = "DroneBridge_ESP32_Init",
-                    .password = "dronebridge",
-                    .threshold.authmode = WIFI_AUTH_WEP
-            },
+        .sta = {
+            .ssid               = "DroneBridge_ESP32_Init",
+            .password           = "dronebridge",
+            .threshold.authmode = WIFI_AUTH_WEP},
     };
     strncpy((char *) wifi_config.sta.ssid, (char *) DB_WIFI_SSID, 32);
     strncpy((char *) wifi_config.sta.password, (char *) DB_WIFI_PWD, 64);
@@ -432,13 +484,17 @@ int db_init_wifi_clientmode() {
     /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
      * happened. */
     bool enable_temp_ap_mode = false;
-    if (bits & WIFI_CONNECTED_BIT) {
-        ESP_LOGI(TAG, "Connected to ap SSID:%s password:%s", DB_WIFI_SSID, DB_WIFI_PWD);
-    } else if (bits & WIFI_FAIL_BIT) {
-        ESP_LOGW(TAG, "Failed to connect to SSID:%s, password:%s", DB_WIFI_SSID, DB_WIFI_PWD);
-        enable_temp_ap_mode = true;
-    } else {
-        ESP_LOGE(TAG, "UNEXPECTED WIFI EVENT");
+    switch (bits) {
+    case WIFI_CONNECTED_BIT:
+      ESP_LOGI(TAG, "Connected to ap SSID:%s password:%s", DB_WIFI_SSID, DB_WIFI_PWD);
+      break;
+    case WIFI_FAIL_BIT:
+      ESP_LOGW(TAG, "Failed to connect to SSID:%s, password:%s", DB_WIFI_SSID, DB_WIFI_PWD);
+      enable_temp_ap_mode = true;
+      break;
+    default:
+      ESP_LOGE(TAG, "UNEXPECTED WIFI EVENT");
+      break;
     }
     if (enable_temp_ap_mode) {
         ESP_LOGW(TAG, "WiFi client mode was not able to connect to the specified access point");
@@ -457,19 +513,18 @@ int db_init_wifi_clientmode() {
  * visible.
  */
 void db_init_wifi_espnow() {
-    ESP_LOGI(TAG, "Setting up Wi-Fi for ESP-NOW");
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
-    ESP_ERROR_CHECK(esp_wifi_start());
-    ESP_ERROR_CHECK(esp_wifi_set_channel(DB_WIFI_CHANNEL, WIFI_SECOND_CHAN_NONE));
-    ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_LR));
-    ESP_LOGI(TAG, "Enabled ESP-NOW WiFi Mode! LR Mode is set. This device will be invisible to non-ESP32 devices!");
-    ESP_ERROR_CHECK(esp_read_mac(LOCAL_MAC_ADDRESS, ESP_MAC_WIFI_STA));
+  ESP_LOGI       (TAG, "Setting up Wi-Fi for ESP-NOW"                                                                  );
+  ESP_ERROR_CHECK(esp_netif_init               (                                                  )                    );
+  ESP_ERROR_CHECK(esp_event_loop_create_default(                                                  )                    );
+  ESP_ERROR_CHECK(esp_wifi_init                (&(wifi_init_config_t) WIFI_INIT_CONFIG_DEFAULT()  )                    );
+  ESP_ERROR_CHECK(esp_wifi_set_storage         (WIFI_STORAGE_RAM                                  )                    );
+  ESP_ERROR_CHECK(esp_wifi_set_mode            (WIFI_MODE_STA                                     )                    );
+  ESP_ERROR_CHECK(esp_wifi_set_ps              (WIFI_PS_NONE                                      )                    );
+  ESP_ERROR_CHECK(esp_wifi_start               (                                                  )                    );
+  ESP_ERROR_CHECK(esp_wifi_set_channel         (DB_WIFI_CHANNEL, WIFI_SECOND_CHAN_NONE            )                    );
+  ESP_ERROR_CHECK(esp_wifi_set_protocol        (WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_LR )                    );
+  ESP_LOGI       (TAG, "Enabled ESP-NOW WiFi Mode! LR Mode is set. This device will be invisible to non-ESP32 devices!");
+  ESP_ERROR_CHECK(esp_read_mac(LOCAL_MAC_ADDRESS, ESP_MAC_WIFI_STA));
 }
 
 /**
@@ -479,21 +534,22 @@ void db_init_wifi_espnow() {
  * @param enable_wifi True to enable the WiFi and FALSE to disable it
  */
 void db_set_wifi_status(uint8_t enable_wifi) {
-    if (DB_DISABLE_RADIO_ARMED) {    // check if that feature is enabled by the user
-        if (enable_wifi && DB_WIFI_IS_OFF) {
-            ESP_LOGI(TAG, "Rebooting ESP32 to re-enable Wi-Fi");
-            esp_restart(); // enable Wi-Fi by restarting ESP32 - easy way to make sure all things are set up right
-        } else if (!enable_wifi && !DB_WIFI_IS_OFF) {
-            ESP_LOGI(TAG, "Disabling Wi-Fi");
-            if (esp_wifi_stop() == ESP_OK) { // disable WiFi
-                DB_WIFI_IS_OFF = true;
-            } else {
-                ESP_LOGW(TAG, "db_set_wifi_status tried to disable Wi-Fi. FAILED");
-            }
-        }
+  // check if that feature is enabled by the user
+  if (!DB_DISABLE_RADIO_ARMED) {
+    return;
+  }
+
+  if (enable_wifi && DB_WIFI_IS_OFF) {
+    ESP_LOGI(TAG, "Rebooting ESP32 to re-enable Wi-Fi");
+    esp_restart(); // enable Wi-Fi by restarting ESP32 - easy way to make sure all things are set up right
+  } else if (!enable_wifi && !DB_WIFI_IS_OFF) {
+    ESP_LOGI(TAG, "Disabling Wi-Fi");
+    if (esp_wifi_stop() == ESP_OK) { // disable WiFi
+      DB_WIFI_IS_OFF = true;
     } else {
-        // nothing to do
+      ESP_LOGW(TAG, "db_set_wifi_status tried to disable Wi-Fi. FAILED");
     }
+  }
 }
 
 /**
@@ -509,32 +565,37 @@ void db_write_settings_to_nvs() {
              DB_SERIAL_PROTOCOL, DB_TRANS_BUF_SIZE, DB_LTM_FRAME_NUM_BUFFER,
              DEFAULT_AP_IP, DB_STATIC_STA_IP, DB_STATIC_STA_IP_GW, DB_STATIC_STA_IP_NETMASK, DB_DISABLE_RADIO_ARMED);
     ESP_LOGI(TAG, "Saving to NVS %s", NVS_NAMESPACE);
+    
     nvs_handle my_handle;
-    ESP_ERROR_CHECK(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &my_handle));
-    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "esp32_mode",
-                               DB_RADIO_MODE_DESIGNATED));  // only DB_RADIO_MODE_DESIGNATED gets updated by user
-    ESP_ERROR_CHECK(nvs_set_str(my_handle, "ssid", (char *) DB_WIFI_SSID));
-    ESP_ERROR_CHECK(nvs_set_str(my_handle, "wifi_pass", (char *) DB_WIFI_PWD));
-    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "wifi_chan", DB_WIFI_CHANNEL));
-    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "wifi_en_gn", DB_WIFI_EN_GN));
-    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "ant_use_ext", DB_EN_EXT_ANT));
-    ESP_ERROR_CHECK(nvs_set_i32(my_handle, "baud", DB_UART_BAUD_RATE));
-    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "gpio_tx", DB_UART_PIN_TX));
-    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "gpio_rx", DB_UART_PIN_RX));
-    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "gpio_cts", DB_UART_PIN_CTS));
-    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "gpio_rts", DB_UART_PIN_RTS));
-    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "rts_thresh", DB_UART_RTS_THRESH));
-    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "proto", DB_SERIAL_PROTOCOL));
-    ESP_ERROR_CHECK(nvs_set_u16(my_handle, "trans_pack_size", DB_TRANS_BUF_SIZE));
-    ESP_ERROR_CHECK(nvs_set_u16(my_handle, "serial_timeout", DB_SERIAL_READ_TIMEOUT_MS));
-    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "ltm_per_packet", DB_LTM_FRAME_NUM_BUFFER));
-    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "radio_dis_onarm", DB_DISABLE_RADIO_ARMED));
-    ESP_ERROR_CHECK(nvs_set_str(my_handle, "ap_ip", DEFAULT_AP_IP));
-    ESP_ERROR_CHECK(nvs_set_str(my_handle, "ip_sta", DB_STATIC_STA_IP));
-    ESP_ERROR_CHECK(nvs_set_str(my_handle, "ip_sta_gw", DB_STATIC_STA_IP_GW));
-    ESP_ERROR_CHECK(nvs_set_str(my_handle, "ip_sta_netmsk", DB_STATIC_STA_IP_NETMASK));
+    
+    /* Open NVS and store the configurations */
+    ESP_ERROR_CHECK(nvs_open   (    NVS_NAMESPACE    , NVS_READWRITE             , &my_handle));
+    ESP_ERROR_CHECK(nvs_set_u8 (    my_handle        , "esp32_mode"              , DB_RADIO_MODE_DESIGNATED));  // only DB_RADIO_MODE_DESIGNATED gets updated by user
+    ESP_ERROR_CHECK(nvs_set_str(    my_handle        , "ssid"                    , (char *)DB_WIFI_SSID));
+    ESP_ERROR_CHECK(nvs_set_str(    my_handle        , "wifi_pass"               , (char *)DB_WIFI_PWD));
+    ESP_ERROR_CHECK(nvs_set_u8 (    my_handle        , "wifi_chan"               , DB_WIFI_CHANNEL));
+    ESP_ERROR_CHECK(nvs_set_u8 (    my_handle        , "wifi_en_gn"              , DB_WIFI_EN_GN));
+    ESP_ERROR_CHECK(nvs_set_u8 (    my_handle        , "ant_use_ext"             , DB_EN_EXT_ANT));
+    ESP_ERROR_CHECK(nvs_set_i32(    my_handle        , "baud"                    , DB_UART_BAUD_RATE));
+    ESP_ERROR_CHECK(nvs_set_u8 (    my_handle        , "gpio_tx"                 , DB_UART_PIN_TX));
+    ESP_ERROR_CHECK(nvs_set_u8 (    my_handle        , "gpio_rx"                 , DB_UART_PIN_RX));
+    ESP_ERROR_CHECK(nvs_set_u8 (    my_handle        , "gpio_cts"                , DB_UART_PIN_CTS));
+    ESP_ERROR_CHECK(nvs_set_u8 (    my_handle        , "gpio_rts"                , DB_UART_PIN_RTS));
+    ESP_ERROR_CHECK(nvs_set_u8 (    my_handle        , "rts_thresh"              , DB_UART_RTS_THRESH));
+    ESP_ERROR_CHECK(nvs_set_u8 (    my_handle        , "proto"                   , DB_SERIAL_PROTOCOL));
+    ESP_ERROR_CHECK(nvs_set_u16(    my_handle        , "trans_pack_size"         , DB_TRANS_BUF_SIZE));
+    ESP_ERROR_CHECK(nvs_set_u16(    my_handle        , "serial_timeout"          , DB_SERIAL_READ_TIMEOUT_MS));
+    ESP_ERROR_CHECK(nvs_set_u8 (    my_handle        , "ltm_per_packet"          , DB_LTM_FRAME_NUM_BUFFER));
+    ESP_ERROR_CHECK(nvs_set_u8 (    my_handle        , "radio_dis_onarm"         , DB_DISABLE_RADIO_ARMED));
+    ESP_ERROR_CHECK(nvs_set_str(    my_handle        , "ap_ip"                   , DEFAULT_AP_IP));
+    ESP_ERROR_CHECK(nvs_set_str(    my_handle        , "ip_sta"                  , DB_STATIC_STA_IP));
+    ESP_ERROR_CHECK(nvs_set_str(    my_handle        , "ip_sta_gw"               , DB_STATIC_STA_IP_GW));
+    ESP_ERROR_CHECK(nvs_set_str(    my_handle        , "ip_sta_netmsk"           , DB_STATIC_STA_IP_NETMASK));
 
+    /* Commit the changes to NVS*/
     ESP_ERROR_CHECK(nvs_commit(my_handle));
+
+    /* Close NVS */
     nvs_close(my_handle);
 }
 
@@ -562,9 +623,9 @@ void save_udp_client_to_nvm(struct db_udp_client_t *new_db_udp_client, bool clea
     }
 
     nvs_handle my_handle;
-    ESP_ERROR_CHECK(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &my_handle));
-    ESP_ERROR_CHECK(nvs_set_str(my_handle, "udp_client_ip", ip));
-    ESP_ERROR_CHECK(nvs_set_u16(my_handle, "udp_client_port", port));
+    ESP_ERROR_CHECK( nvs_open    (NVS_NAMESPACE , NVS_READWRITE     , &my_handle ));
+    ESP_ERROR_CHECK( nvs_set_str (my_handle     , "udp_client_ip"   , ip         ));
+    ESP_ERROR_CHECK( nvs_set_u16 (my_handle     , "udp_client_port" , port       ));
 
     ESP_ERROR_CHECK(nvs_commit(my_handle));
     nvs_close(my_handle);
@@ -606,27 +667,30 @@ void db_read_settings_nvs() {
         db_write_settings_to_nvs();
     } else {
         ESP_LOGI(TAG, "Reading settings from NVS");
-        db_read_str_nvs(my_handle, "ssid", (char *) DB_WIFI_SSID);
-        db_read_str_nvs(my_handle, "wifi_pass", (char *) DB_WIFI_PWD);
-        db_read_str_nvs(my_handle, "ap_ip", DEFAULT_AP_IP);
-        db_read_str_nvs(my_handle, "ip_sta", DB_STATIC_STA_IP);
-        db_read_str_nvs(my_handle, "ip_sta_gw", DB_STATIC_STA_IP_GW);
-        db_read_str_nvs(my_handle, "ip_sta_netmsk", DB_STATIC_STA_IP_NETMASK);
-        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "esp32_mode", &DB_RADIO_MODE));
-        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "wifi_chan", &DB_WIFI_CHANNEL));
-        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "wifi_en_gn", &DB_WIFI_EN_GN));
-        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "ant_use_ext", &DB_EN_EXT_ANT));
-        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_i32(my_handle, "baud", &DB_UART_BAUD_RATE));
-        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "gpio_tx", &DB_UART_PIN_TX));
-        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "gpio_rx", &DB_UART_PIN_RX));
-        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "gpio_cts", &DB_UART_PIN_CTS));
-        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "gpio_rts", &DB_UART_PIN_RTS));
-        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "rts_thresh", &DB_UART_RTS_THRESH));
-        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "proto", &DB_SERIAL_PROTOCOL));
-        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u16(my_handle, "trans_pack_size", &DB_TRANS_BUF_SIZE));
-        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u16(my_handle, "serial_timeout", &DB_SERIAL_READ_TIMEOUT_MS));
-        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "ltm_per_packet", &DB_LTM_FRAME_NUM_BUFFER));
-        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u8(my_handle, "radio_dis_onarm", &DB_DISABLE_RADIO_ARMED));
+
+        db_read_str_nvs( my_handle, "ssid"         , (char *) DB_WIFI_SSID    );
+        db_read_str_nvs( my_handle, "wifi_pass"    , (char *) DB_WIFI_PWD     );
+        db_read_str_nvs( my_handle, "ap_ip"        , DEFAULT_AP_IP            );
+        db_read_str_nvs( my_handle, "ip_sta"       , DB_STATIC_STA_IP         );
+        db_read_str_nvs( my_handle, "ip_sta_gw"    , DB_STATIC_STA_IP_GW      );
+        db_read_str_nvs( my_handle, "ip_sta_netmsk", DB_STATIC_STA_IP_NETMASK );
+        
+        ESP_ERROR_CHECK_WITHOUT_ABORT(     nvs_get_u8 ( my_handle, "esp32_mode"      ,   &DB_RADIO_MODE             ));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(     nvs_get_u8 ( my_handle, "wifi_chan"       ,   &DB_WIFI_CHANNEL           ));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(     nvs_get_u8 ( my_handle, "wifi_en_gn"      ,   &DB_WIFI_EN_GN             ));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(     nvs_get_u8 ( my_handle, "ant_use_ext"     ,   &DB_EN_EXT_ANT             ));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(     nvs_get_i32( my_handle, "baud"            ,   &DB_UART_BAUD_RATE         ));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(     nvs_get_u8 ( my_handle, "gpio_tx"         ,   &DB_UART_PIN_TX            ));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(     nvs_get_u8 ( my_handle, "gpio_rx"         ,   &DB_UART_PIN_RX            ));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(     nvs_get_u8 ( my_handle, "gpio_cts"        ,   &DB_UART_PIN_CTS           ));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(     nvs_get_u8 ( my_handle, "gpio_rts"        ,   &DB_UART_PIN_RTS           ));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(     nvs_get_u8 ( my_handle, "rts_thresh"      ,   &DB_UART_RTS_THRESH        ));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(     nvs_get_u8 ( my_handle, "proto"           ,   &DB_SERIAL_PROTOCOL        ));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(     nvs_get_u16( my_handle, "trans_pack_size" ,   &DB_TRANS_BUF_SIZE         ));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(     nvs_get_u16( my_handle, "serial_timeout"  ,   &DB_SERIAL_READ_TIMEOUT_MS ));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(     nvs_get_u8 ( my_handle, "ltm_per_packet"  ,   &DB_LTM_FRAME_NUM_BUFFER   ));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(     nvs_get_u8 ( my_handle, "radio_dis_onarm" ,   &DB_DISABLE_RADIO_ARMED    ));
+
         // get saved UDP client - this read might result in an error if no client was saved prev. by the user
         char udp_client_ip_str[INET_ADDRSTRLEN + 6];
         udp_client_ip_str[0] = '\0';
@@ -670,8 +734,8 @@ void db_read_settings_nvs() {
 void short_press_callback(void *arg, void *usr_data) {
     ESP_LOGW(TAG, "Short press detected setting wifi mode to access point with password: dronebridge");
     DB_RADIO_MODE_DESIGNATED = DB_WIFI_MODE_AP;  // do not directly change DB_RADIO_MODE since it is not safe and constantly processed by other tasks. Save settings and reboot will assign DB_RADIO_MODE_DESIGNATED to DB_RADIO_MODE.
-    strncpy((char *) DB_WIFI_SSID, "DroneBridge for ESP32", sizeof(DB_WIFI_SSID) - 1);
-    strncpy((char *) DB_WIFI_PWD, "dronebridge", sizeof(DB_WIFI_PWD) - 1);
+    strncpy( (char *)DB_WIFI_SSID , "DroneBridge for ESP32" , sizeof(DB_WIFI_SSID) - 1 );
+    strncpy( (char *)DB_WIFI_PWD  , "dronebridge"           , sizeof(DB_WIFI_PWD) - 1  );
     db_write_settings_to_nvs();
     esp_restart();
 }
@@ -682,51 +746,51 @@ void short_press_callback(void *arg, void *usr_data) {
  * @param arg
  */
 void long_press_callback(void *arg, void *usr_data) {
-    ESP_LOGW(TAG, "Reset triggered via GPIO %i. Resetting settings and rebooting", DB_RESET_PIN);
-    DB_RADIO_MODE_DESIGNATED = DB_WIFI_MODE_AP;  // do not directly change DB_RADIO_MODE since it is not safe and constantly processed by other tasks. Save settings and reboot will assign DB_RADIO_MODE_DESIGNATED to DB_RADIO_MODE.
-    strncpy((char *) DB_WIFI_SSID, "DroneBridge for ESP32", sizeof(DB_WIFI_SSID) - 1);
-    strncpy((char *) DB_WIFI_PWD, "dronebridge", sizeof(DB_WIFI_PWD) - 1);
-    strncpy(DEFAULT_AP_IP, "192.168.2.1", sizeof(DEFAULT_AP_IP) - 1);
-    memset(DB_STATIC_STA_IP, 0, strlen(DB_STATIC_STA_IP));
-    memset(DB_STATIC_STA_IP_GW, 0, strlen(DB_STATIC_STA_IP_GW));
-    memset(DB_STATIC_STA_IP_NETMASK, 0, strlen(DB_STATIC_STA_IP_NETMASK));
-    DB_WIFI_CHANNEL = 6;
-    DB_WIFI_EN_GN = 0;
-    DB_UART_PIN_TX = DB_DEFAULT_UART_TX_PIN;
-    DB_UART_PIN_RX = DB_DEFAULT_UART_RX_PIN;
-    DB_UART_PIN_CTS = DB_DEFAULT_UART_CTS_PIN;
-    DB_UART_PIN_RTS = DB_DEFAULT_UART_RTS_PIN; //
-    DB_UART_BAUD_RATE = DB_DEFAULT_UART_BAUD_RATE;
-    DB_SERIAL_PROTOCOL = DB_SERIAL_PROTOCOL_MAVLINK;
-    DB_DISABLE_RADIO_ARMED = false;
-    DB_TRANS_BUF_SIZE = 128;
-    DB_UART_RTS_THRESH = 64;
-    DB_EN_EXT_ANT = false; // on-board antenna by default
-    DB_SERIAL_READ_TIMEOUT_MS = DB_SERIAL_READ_TIMEOUT_MS_DEFAULT;
-    db_write_settings_to_nvs();
-    esp_restart();
+  ESP_LOGW(TAG, "Reset triggered via GPIO %i. Resetting settings and rebooting", DB_RESET_PIN);
+  DB_RADIO_MODE_DESIGNATED = DB_WIFI_MODE_AP; // do not directly change DB_RADIO_MODE since it is not safe and constantly processed by other tasks. Save settings and reboot will assign DB_RADIO_MODE_DESIGNATED to DB_RADIO_MODE.
+  strncpy((char *)DB_WIFI_SSID, "DroneBridge for ESP32", sizeof(DB_WIFI_SSID) - 1);
+  strncpy((char *)DB_WIFI_PWD, "dronebridge", sizeof(DB_WIFI_PWD) - 1);
+  strncpy(DEFAULT_AP_IP, "192.168.2.1", sizeof(DEFAULT_AP_IP) - 1);
+  memset(DB_STATIC_STA_IP         , 0 , strlen(DB_STATIC_STA_IP         ));
+  memset(DB_STATIC_STA_IP_GW      , 0 , strlen(DB_STATIC_STA_IP_GW      ));
+  memset(DB_STATIC_STA_IP_NETMASK , 0 , strlen(DB_STATIC_STA_IP_NETMASK ));
+  DB_WIFI_CHANNEL           = 6;
+  DB_WIFI_EN_GN             = 0;
+  DB_UART_PIN_TX            = DB_DEFAULT_UART_TX_PIN;
+  DB_UART_PIN_RX            = DB_DEFAULT_UART_RX_PIN;
+  DB_UART_PIN_CTS           = DB_DEFAULT_UART_CTS_PIN;
+  DB_UART_PIN_RTS           = DB_DEFAULT_UART_RTS_PIN;
+  DB_UART_BAUD_RATE         = DB_DEFAULT_UART_BAUD_RATE;
+  DB_SERIAL_PROTOCOL        = DB_SERIAL_PROTOCOL_MAVLINK;
+  DB_DISABLE_RADIO_ARMED    = false;
+  DB_TRANS_BUF_SIZE         = 128;
+  DB_UART_RTS_THRESH        = 64;
+  DB_EN_EXT_ANT             = false; // on-board antenna by default
+  DB_SERIAL_READ_TIMEOUT_MS = DB_SERIAL_READ_TIMEOUT_MS_DEFAULT;
+  db_write_settings_to_nvs();
+  esp_restart();
 }
 
 /**
  * Setup boot button GPIO to reset entire ESP32 settings and to force a reboot of the system
  */
 void set_reset_trigger() {
-    button_config_t gpio_btn_cfg = {
-            .type = BUTTON_TYPE_GPIO,
-            .long_press_time = CONFIG_BUTTON_LONG_PRESS_TIME_MS,
-            .short_press_time = CONFIG_BUTTON_SHORT_PRESS_TIME_MS,
-            .gpio_button_config = {
-                    .gpio_num = DB_RESET_PIN,
-                    .active_level = 0,
-            },
-    };
-    button_handle_t gpio_btn = iot_button_create(&gpio_btn_cfg);
-    if (NULL == gpio_btn) {
-        ESP_LOGE(TAG, "Creating reset button failed");
-    } else {
-        iot_button_register_cb(gpio_btn, BUTTON_SINGLE_CLICK, short_press_callback, NULL);
-        iot_button_register_cb(gpio_btn, BUTTON_LONG_PRESS_UP, long_press_callback, NULL);
-    }
+  button_config_t gpio_btn_cfg = {
+      .type               = BUTTON_TYPE_GPIO,
+      .long_press_time    = CONFIG_BUTTON_LONG_PRESS_TIME_MS,
+      .short_press_time   = CONFIG_BUTTON_SHORT_PRESS_TIME_MS,
+      .gpio_button_config = {
+          .gpio_num     = DB_RESET_PIN,
+          .active_level = 0,
+      },
+  };
+  button_handle_t gpio_btn = iot_button_create(&gpio_btn_cfg);
+  if (NULL == gpio_btn) {
+    ESP_LOGE(TAG, "Creating reset button failed");
+  } else {
+    iot_button_register_cb( gpio_btn , BUTTON_SINGLE_CLICK  , short_press_callback , NULL);
+    iot_button_register_cb( gpio_btn , BUTTON_LONG_PRESS_UP , long_press_callback  , NULL);
+  }
 }
 
 /**
@@ -742,17 +806,17 @@ void db_jtag_serial_info_print() {
                       DB_UART_PIN_CTS, DB_UART_PIN_RTS, DB_UART_RTS_THRESH, DB_SERIAL_PROTOCOL, DB_TRANS_BUF_SIZE,
                       DB_LTM_FRAME_NUM_BUFFER, DB_SERIAL_READ_TIMEOUT_MS, DB_DISABLE_RADIO_ARMED);
     write_to_serial(buffer, len);
-    len = sprintf((char *) buffer, "\tSSID: %s\n", DB_WIFI_SSID);
+    len = sprintf((char *) buffer , "\tSSID: %s\n"              , DB_WIFI_SSID             );
     write_to_serial(buffer, len);
-    len = sprintf((char *) buffer, "\tPassword: %s\n", DB_WIFI_PWD);
+    len = sprintf((char *) buffer , "\tPassword: %s\n"          , DB_WIFI_PWD              );
     write_to_serial(buffer, len);
-    len = sprintf((char *) buffer, "\tAP IP: %s\n", DEFAULT_AP_IP);
+    len = sprintf((char *) buffer , "\tAP IP: %s\n"             , DEFAULT_AP_IP            );
     write_to_serial(buffer, len);
-    len = sprintf((char *) buffer, "\tStatic IP: %s\n", DB_STATIC_STA_IP);
+    len = sprintf((char *) buffer , "\tStatic IP: %s\n"         , DB_STATIC_STA_IP         );
     write_to_serial(buffer, len);
-    len = sprintf((char *) buffer, "\tStatic IP gateway: %s\n", DB_STATIC_STA_IP_GW);
+    len = sprintf((char *) buffer , "\tStatic IP gateway: %s\n" , DB_STATIC_STA_IP_GW      );
     write_to_serial(buffer, len);
-    len = sprintf((char *) buffer, "\tStatic IP netmask: %s\n", DB_STATIC_STA_IP_NETMASK);
+    len = sprintf((char *) buffer , "\tStatic IP netmask: %s\n" , DB_STATIC_STA_IP_NETMASK );
     write_to_serial(buffer, len);
     ESP_LOGI(TAG, "Wrote to serial!");
 }
@@ -787,47 +851,70 @@ void app_main() {
     }
     ESP_ERROR_CHECK(ret);
     db_read_settings_nvs();
-    DB_RADIO_MODE_DESIGNATED = DB_RADIO_MODE; // must always match, mismatch only allowed when changed by user action and not rebooted, yet.
+    DB_RADIO_MODE_DESIGNATED = DB_RADIO_MODE;         // must always match, mismatch only allowed when changed by user action and not rebooted, yet.
     set_reset_trigger();
     db_configure_antenna();
 
     switch (DB_RADIO_MODE) {
-        case DB_WIFI_MODE_AP:
-        case DB_WIFI_MODE_AP_LR:
-          db_init_wifi_apmode(DB_RADIO_MODE);
-          break;
-      
-        case DB_WIFI_MODE_ESPNOW_AIR:
-        case DB_WIFI_MODE_ESPNOW_GND:
-          db_init_wifi_espnow();
-          db_start_espnow_module();
-          break;
-      
-        default:
-          // Wi-Fi client mode with LR mode enabled
-          if (db_init_wifi_clientmode() < 0) {
-            ESP_LOGE(TAG, "Failed to init Wifi Client Mode");
-          }
-          break;
+
+      /* Wi-Fi Access Point mode*/
+    case DB_WIFI_MODE_AP:
+    case DB_WIFI_MODE_AP_LR:
+      db_init_wifi_apmode(DB_RADIO_MODE);
+      db_uart_write_queue_global = xQueueCreate(5,sizeof(BleData_t));
+      if(db_uart_write_queue_global == NULL){
+        ESP_LOGI(TAG,"Failed to create queue, you are on your own, KABOOM!");
+        return;
+      }
+      db_init_ble();
+      break;
+
+      /* ESP-NOW Mode*/
+    case DB_WIFI_MODE_ESPNOW_AIR:
+    case DB_WIFI_MODE_ESPNOW_GND:
+      db_init_wifi_espnow();
+      db_start_espnow_module();
+      break;
+
+      /* Ble SPP Mode*/
+    case DB_BLUETOOTH_MODE_SPP:
+      break;
+
+      /* Wi-Fi Client Mode*/
+    default:
+      // Wi-Fi client mode with LR mode enabled
+      if (db_init_wifi_clientmode() < 0) {
+        ESP_LOGE(TAG, "Failed to init Wifi Client Mode");
+      }
+      break;
     }
 
-    db_ble_init();
-
-    if (DB_RADIO_MODE != DB_WIFI_MODE_ESPNOW_AIR && DB_RADIO_MODE != DB_WIFI_MODE_ESPNOW_GND) {
-        // no need to start these services - won`t be available anyway - safe the resources
-        start_mdns_service();
-        netbiosns_init();
-        netbiosns_set_name("dronebridge");
+    switch (DB_RADIO_MODE) {
+    case DB_WIFI_MODE_ESPNOW_AIR:
+    case DB_WIFI_MODE_ESPNOW_GND:
+      // no need to start these services - won`t be available anyway - save the resources
+      break;
+    default:
+      start_mdns_service();
+      netbiosns_init();
+      netbiosns_set_name("dronebridge");
+      break;
     }
+    
     ESP_ERROR_CHECK(init_fs());
     db_start_control_module();
 
-    if (DB_RADIO_MODE != DB_WIFI_MODE_ESPNOW_AIR && DB_RADIO_MODE != DB_WIFI_MODE_ESPNOW_GND) {
-        // no need to start these services - won`t be available anyway - safe the resources
-        ESP_ERROR_CHECK(start_rest_server(CONFIG_WEB_MOUNT_POINT));
-        ESP_LOGI(TAG, "Rest Server started");
-        // Disable legacy support for DroneBridge communication module - no use case for DroneBridge for ESP32
-        // communication_module();
+    switch (DB_RADIO_MODE) {
+    case DB_WIFI_MODE_ESPNOW_AIR:
+    case DB_WIFI_MODE_ESPNOW_GND:
+      // no need to start these services - won`t be available anyway - save the resources
+      break;
+    default:
+      ESP_ERROR_CHECK(start_rest_server(CONFIG_WEB_MOUNT_POINT));
+      ESP_LOGI(TAG, "Rest Server started");
+      // Disable legacy support for DroneBridge communication module - no use case for DroneBridge for ESP32
+      //   communication_module();
+      break;
     }
     ESP_LOGI(TAG, "app_main finished initial setup");
 }

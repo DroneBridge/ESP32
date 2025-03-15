@@ -2,7 +2,7 @@
  * @file db_ble.h
  * @brief DroneBridge ESP32 BLE Header file
  *
- * This file is part of CosmicBridge
+ * This file is part of DroneBridge and CosmicBridge
  *
  * @author Witty-Wizard <agarwalshashank429@gmail.com>
  * @license Apache License, Version 2.0
@@ -24,18 +24,22 @@
 #define DB_BLE_H
 
 /**************************************************************************
+ * Standard & System Headers
+ *************************************************************************/
+#include <stdint.h>
+
+/**************************************************************************
  * MACROS
  *************************************************************************/
-#define BLE_SVC_SPP_UUID16                                                     \
-  0xABF0 ///< 16-bit UUID for the SPP (Serial Port Profile) service.
-#define BLE_SVC_SPP_CHR_UUID16                                                 \
-  0xABF1 ///< 16-bit UUID for the SPP service characteristic.
-#define BLE_GAP_APPEARANCE_GENERIC_TAG                                         \
-  0x0180 ///< Generic tag appearance value for BLE GAP.
-#define BLE_GAP_URI_PREFIX_HTTPS                                               \
-  0x17 ///< URI prefix for HTTPS links in BLE advertising.
-#define BLE_GAP_LE_ROLE_PERIPHERAL                                             \
-  0x00 ///< LE role value indicating a peripheral device.
+#define BLE_SVC_SPP_UUID16             0xABF0 ///< 16-bit UUID for the SPP (Serial Port Profile) service.
+#define BLE_SVC_SPP_CHR_UUID16         0xABF1 ///< 16-bit UUID for the SPP service characteristic.
+#define BLE_GAP_APPEARANCE_GENERIC_TAG 0x0180 ///< Generic tag appearance value for BLE GAP.
+#define BLE_GAP_LE_ROLE_PERIPHERAL     0x00   ///< LE role value indicating a peripheral device.
+
+typedef struct {
+  uint8_t data[128]; // Buffer to store data
+  int length;        // Length of data
+} BleData_t;
 
 /**************************************************************************
  * Public Function Declaration
@@ -44,6 +48,6 @@
 /**
  * @brief Drone Bridge BLE initialisation function
  */
-void db_ble_init();
+void db_init_ble();
 
 #endif // DB_BLE_H
