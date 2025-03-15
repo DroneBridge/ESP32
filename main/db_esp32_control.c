@@ -865,21 +865,13 @@ void db_start_control_module() {
     break;
   default:
     xTaskCreate(
-        &control_module_ble, // Pointer to the task to be executed, esp bluetooth module
-        "control_bluetooth", // Name of the task (for debugging purposes)
-        40960,               // Stack size (in bytes) allocated for the task
-        NULL,                // Pointer to parameters passed to the task (NULL if not used)
-        5,                   // Task priority (higher values indicate higher priority)
-        NULL                 // Task handle (can be used to reference the task, NULL if not needed)
+        &control_module_udp_tcp, // Pointer to the task to be executed, esp udp/tcp module
+        "control_wifi",          // Name of the task (for debugging purposes)
+        46080,                   // Stack size (in bytes) allocated for the task
+        NULL,                    // Pointer to parameters passed to the task (NULL if not used)
+        5,                       // Task priority (higher values indicate higher priority)
+        NULL                     // Task handle (can be used to reference the task, NULL if not needed)
     );
-    // xTaskCreate(
-    //     &control_module_udp_tcp, // Pointer to the task to be executed, esp udp/tcp module
-    //     "control_wifi",          // Name of the task (for debugging purposes)
-    //     46080,                   // Stack size (in bytes) allocated for the task
-    //     NULL,                    // Pointer to parameters passed to the task (NULL if not used)
-    //     5,                       // Task priority (higher values indicate higher priority)
-    //     NULL                     // Task handle (can be used to reference the task, NULL if not needed)
-    // );
     break;
   }
 }
