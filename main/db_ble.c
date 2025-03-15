@@ -186,6 +186,37 @@ static const struct ble_gatt_svc_def new_ble_svc_gatt_defs[] = {
  * Private Function Definition
  *************************************************************************/
 
+static void db_ble_server_uart_task() {
+  MODLOG_DFLT(INFO, "BLE server UART_task started\n");
+  int rc = 0;
+  BleData_t bleData;
+  while (true) {
+    // Waiting for UART event.
+    if (xQueueReceive(db_uart_read_queue_global, &bleData, pdMS_TO_TICKS(10))) {
+      for (int i = 0; i < CONFIG_BT_NIMBLE_MAX_CONNECTIONS; i++) {
+        /* Check if client has subscribed to notifications */
+        if (conn_handle_subs[i]) {
+          struct os_mbuf *txom;
+
+          // Convert BleData_t struct data into an os_mbuf buffer
+          txom = ble_hs_mbuf_from_flat(bleData.data, bleData.length);
+          if (!txom) {
+            MODLOG_DFLT(ERROR, "Failed to allocate os_mbuf");
+            return;
+          }
+
+          // Send BLE notification
+          rc = ble_gatts_notify_custom(i, ble_spp_svc_gatt_read_val_handle, txom);
+          if (rc != 0) {
+            MODLOG_DFLT(ERROR, "Error sending BLE notification rc = %d", rc);
+          }
+        }
+      }
+    }
+  }
+  vTaskDelete(NULL);
+}
+
 static int gap_event_handler(struct ble_gap_event *event, void *arg) {
   struct ble_gap_conn_desc desc;
   int rc = 0;
@@ -320,8 +351,7 @@ static void start_advertising(void) {
 }
 
 inline static void format_addr(char *addr_str, uint8_t addr[]) {
-  sprintf(addr_str, "%02X:%02X:%02X:%02X:%02X:%02X", addr[0], addr[1], addr[2],
-          addr[3], addr[4], addr[5]);
+  sprintf(addr_str, "%02X:%02X:%02X:%02X:%02X:%02X", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
 }
 
 static int ble_svc_gatt_handler(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg) {
@@ -332,11 +362,10 @@ static int ble_svc_gatt_handler(uint16_t conn_handle, uint16_t attr_handle, stru
 
   case BLE_GATT_ACCESS_OP_WRITE_CHR:
     MODLOG_DFLT(INFO, "Data received in write event,conn_handle = %x,attr_handle = %x", conn_handle, attr_handle);
-    struct os_mbuf *om = ctxt->om; // Get the received data buffer
-    int len = OS_MBUF_PKTLEN(om);  // Get total length of received data
-    BleData_t bleData;             // Create a struct instance
-    // Ensure len does not exceed buffer size
-    bleData.length = (len < sizeof(bleData.data)) ? len : sizeof(bleData.data);
+    struct os_mbuf *om = ctxt->om;               // Get the received data buffer
+    int len            = OS_MBUF_PKTLEN(om);     // Get total length of received data
+    BleData_t bleData;                           // Create a struct instance
+    bleData.length = len % sizeof(bleData.data); // Ensure len does not exceed buffer size
 
     os_mbuf_copydata(om, 0, bleData.length, bleData.data); // Copy data to buffer
     bleData.data[bleData.length] = '\0';                   // Null-terminate for printing as a string
@@ -345,7 +374,6 @@ static int ble_svc_gatt_handler(uint16_t conn_handle, uint16_t attr_handle, stru
     if (xQueueSend(db_uart_write_queue_global, &bleData, portMAX_DELAY) != pdPASS) {
       MODLOG_DFLT(ERROR, "Failed to send BLE data to queue");
     }
-    MODLOG_DFLT(INFO, "Received Data: %s", bleData.data); // Print received data
     break;
 
   default:
@@ -534,6 +562,16 @@ void db_init_ble() {
 
   /* NimBLE host configuration initialization */
   nimble_host_config_init();
+
+  /* Start NimBLE Notify Task*/
+  xTaskCreate(
+      db_ble_server_uart_task, // Task Function
+      "uTask",                 // Task Name
+      4096,                    // Stack size
+      NULL,                    // Parameters, NULL as no parameters required
+      8,                       // Task Priority
+      NULL                     // Task reference, used to change behaviour of task from another task
+  );
 
   /* Start NimBLE host task thread and return */
   nimble_port_freertos_init(nimble_host_task);
