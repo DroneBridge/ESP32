@@ -133,8 +133,7 @@ static void on_stack_sync(void);
 /**
  * @brief GATT service register callback function
  */
-static void gatt_svr_register_cb(struct ble_gatt_register_ctxt *ctxt,
-                                 void *arg);
+static void gatt_svr_register_cb(struct ble_gatt_register_ctxt *ctxt, void *arg);
 
 /**
  * @brief Callback function to handle gap events
@@ -164,18 +163,16 @@ static const struct ble_gatt_svc_def new_ble_svc_gatt_defs[] = {
         .type = BLE_GATT_SVC_TYPE_PRIMARY,
         .uuid = BLE_UUID16_DECLARE(BLE_SVC_SPP_UUID16),
         .characteristics =
-            (struct ble_gatt_chr_def[]){
-                {
-                    /* Support SPP service */
-                    .uuid       = BLE_UUID16_DECLARE(BLE_SVC_SPP_CHR_UUID16),
-                    .access_cb  = ble_svc_gatt_handler,
-                    .val_handle = &ble_spp_svc_gatt_read_val_handle,
-                    .flags      = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE |
-                             BLE_GATT_CHR_F_NOTIFY,
-                },
-                {
-                    0, /* No more characteristics */
-                }},
+            (struct ble_gatt_chr_def[]){{
+                                            /* Support SPP service */
+                                            .uuid       = BLE_UUID16_DECLARE(BLE_SVC_SPP_CHR_UUID16),
+                                            .access_cb  = ble_svc_gatt_handler,
+                                            .val_handle = &ble_spp_svc_gatt_read_val_handle,
+                                            .flags      = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_NOTIFY,
+                                        },
+                                        {
+                                            0, /* No more characteristics */
+                                        }},
     },
     {
         0, /* No more services. */
@@ -224,8 +221,7 @@ static int gap_event_handler(struct ble_gap_event *event, void *arg) {
   switch (event->type) {
   case BLE_GAP_EVENT_CONNECT:
     /* A new connection was established or a connection attempt failed. */
-    MODLOG_DFLT(INFO, "connection %s; status=%d ",
-                event->connect.status == 0 ? "established" : "failed",
+    MODLOG_DFLT(INFO, "connection %s; status=%d ", event->connect.status == 0 ? "established" : "failed",
                 event->connect.status);
     if (event->connect.status == 0) {
       rc = ble_gap_conn_find(event->connect.conn_handle, &desc);
@@ -253,8 +249,7 @@ static int gap_event_handler(struct ble_gap_event *event, void *arg) {
 
   case BLE_GAP_EVENT_CONN_UPDATE:
     /* The central has updated the connection parameters. */
-    MODLOG_DFLT(INFO, "connection updated; status=%d ",
-                event->conn_update.status);
+    MODLOG_DFLT(INFO, "connection updated; status=%d ", event->conn_update.status);
     rc = ble_gap_conn_find(event->conn_update.conn_handle, &desc);
     assert(rc == 0);
     // print_conn_desc(&desc);
@@ -262,14 +257,12 @@ static int gap_event_handler(struct ble_gap_event *event, void *arg) {
     break;
 
   case BLE_GAP_EVENT_ADV_COMPLETE:
-    MODLOG_DFLT(INFO, "advertise complete; reason=%d",
-                event->adv_complete.reason);
+    MODLOG_DFLT(INFO, "advertise complete; reason=%d", event->adv_complete.reason);
     start_advertising();
     break;
 
   case BLE_GAP_EVENT_MTU:
-    MODLOG_DFLT(INFO, "mtu update event; conn_handle=%d cid=%d mtu=%d\n",
-                event->mtu.conn_handle, event->mtu.channel_id,
+    MODLOG_DFLT(INFO, "mtu update event; conn_handle=%d cid=%d mtu=%d\n", event->mtu.conn_handle, event->mtu.channel_id,
                 event->mtu.value);
     break;
 
@@ -277,9 +270,8 @@ static int gap_event_handler(struct ble_gap_event *event, void *arg) {
     MODLOG_DFLT(INFO,
                 "subscribe event; conn_handle=%d attr_handle=%d "
                 "reason=%d prevn=%d curn=%d previ=%d curi=%d\n",
-                event->subscribe.conn_handle, event->subscribe.attr_handle,
-                event->subscribe.reason, event->subscribe.prev_notify,
-                event->subscribe.cur_notify, event->subscribe.prev_indicate,
+                event->subscribe.conn_handle, event->subscribe.attr_handle, event->subscribe.reason,
+                event->subscribe.prev_notify, event->subscribe.cur_notify, event->subscribe.prev_indicate,
                 event->subscribe.cur_indicate);
     conn_handle_subs[event->subscribe.conn_handle] = true;
     break;
@@ -338,8 +330,8 @@ static void start_advertising(void) {
   memset(&adv_params, 0, sizeof adv_params);
   adv_params.conn_mode = BLE_GAP_CONN_MODE_UND;
   adv_params.disc_mode = BLE_GAP_DISC_MODE_GEN;
-  rc                   = ble_gap_adv_start(own_addr_type,     // Type of address that stack should use
-                                           NULL,              // Peer address for direct advertising, null for in-direct advertising
+  rc                   = ble_gap_adv_start(own_addr_type, // Type of address that stack should use
+                                           NULL, // Peer address for direct advertising, null for in-direct advertising
                                            BLE_HS_FOREVER,    // Duration of advertisement, BLE_HS_FOREVER for no expiration
                                            &adv_params,       // Additional arguments for advertismenet
                                            gap_event_handler, // Gap event handler callback
@@ -427,8 +419,7 @@ int gap_init() {
 
   /* check for if any error occured */
   if (rc != 0) {
-    ESP_LOGE(TAG, "failed to set device name to %s, error code: %d",
-             DEVICE_NAME, rc);
+    ESP_LOGE(TAG, "failed to set device name to %s, error code: %d", DEVICE_NAME, rc);
     return rc;
   }
 
@@ -463,14 +454,12 @@ static int gatt_svr_init() {
   return 0;
 }
 
-static void gatt_svr_register_cb(struct ble_gatt_register_ctxt *ctxt,
-                                 void *arg) {
+static void gatt_svr_register_cb(struct ble_gatt_register_ctxt *ctxt, void *arg) {
   char buf[BLE_UUID_STR_LEN];
 
   switch (ctxt->op) {
   case BLE_GATT_REGISTER_OP_SVC:
-    MODLOG_DFLT(DEBUG, "registered service %s with handle=%d\n",
-                ble_uuid_to_str(ctxt->svc.svc_def->uuid, buf),
+    MODLOG_DFLT(DEBUG, "registered service %s with handle=%d\n", ble_uuid_to_str(ctxt->svc.svc_def->uuid, buf),
                 ctxt->svc.handle);
     break;
 
@@ -478,13 +467,11 @@ static void gatt_svr_register_cb(struct ble_gatt_register_ctxt *ctxt,
     MODLOG_DFLT(DEBUG,
                 "registering characteristic %s with "
                 "def_handle=%d val_handle=%d\n",
-                ble_uuid_to_str(ctxt->chr.chr_def->uuid, buf),
-                ctxt->chr.def_handle, ctxt->chr.val_handle);
+                ble_uuid_to_str(ctxt->chr.chr_def->uuid, buf), ctxt->chr.def_handle, ctxt->chr.val_handle);
     break;
 
   case BLE_GATT_REGISTER_OP_DSC:
-    MODLOG_DFLT(DEBUG, "registering descriptor %s with handle=%d\n",
-                ble_uuid_to_str(ctxt->dsc.dsc_def->uuid, buf),
+    MODLOG_DFLT(DEBUG, "registering descriptor %s with handle=%d\n", ble_uuid_to_str(ctxt->dsc.dsc_def->uuid, buf),
                 ctxt->dsc.handle);
     break;
 
@@ -564,13 +551,12 @@ void db_init_ble() {
   nimble_host_config_init();
 
   /* Start NimBLE Notify Task*/
-  xTaskCreate(
-      db_ble_server_uart_task, // Task Function
-      "uTask",                 // Task Name
-      4096,                    // Stack size
-      NULL,                    // Parameters, NULL as no parameters required
-      8,                       // Task Priority
-      NULL                     // Task reference, used to change behaviour of task from another task
+  xTaskCreate(db_ble_server_uart_task, /**< Task Function */
+              "uTask",                 /**< Task Name */
+              4096,                    /**< Stack size */
+              NULL,                    /**< Parameters, NULL as no parameters required */
+              5,                       /**< Task Priority */
+              NULL                     /**< Task reference, used to change behaviour of task from another task */
   );
 
   /* Start NimBLE host task thread and return */

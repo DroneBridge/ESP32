@@ -11,6 +11,7 @@ idf_component_register(SRCS
     db_ble.c
     INCLUDE_DIRS ".")
 
+add_compile_options(-Wno-address-of-packed-member) # Supress Mavlink Warnings
 if(CONFIG_WEB_DEPLOY_SF)
     set(WEB_SRC_DIR "${CMAKE_BINARY_DIR}/frontend")
     spiffs_create_partition_image(www ${WEB_SRC_DIR} FLASH_IN_PROJECT DEPENDS frontend)

@@ -48,9 +48,37 @@ enum E_DB_SERIAL_PROTOCOL {
   DB_SERIAL_PROTOCOL_TRANSPARENT = 5  /**< Transparent serial data forwarding */
 };
 
+/***************************************************************************************************************************
+ * Public Function Declaration
+ **************************************************************************************************************************/
+
+/**
+ * For simple debugging when serial via JTAG is enabled. Printed once control module configured USB serial socket.
+ * Write settings to JTAG/USB, so we can debug issues better
+ */
 void db_jtag_serial_info_print();
+
+/**
+ * Write settings to non-volatile memory so they can be loaded on next startup. The UDP clients are saved using a
+ * separate function since the "save" operation is triggered by a separate button on the UI.
+ */
 void db_write_settings_to_nvs();
+
+/**
+ * Saves a udp client to the NVM so it can be automatically added on the next boot. No need for the user to manually add it
+ * again. Only one UDP client can be saved to the NVM.
+ * @param new_db_udp_client The client to add to NVM. Must have IP and port set.
+ * @param clear_client Set to true to remove the current client from NVM. In that case the new_db_udp_client param will be
+ * ignored.
+ */
 void save_udp_client_to_nvm(struct db_udp_client_t *new_db_udp_client, bool clear_client);
+
+/**
+ * Enables or disables (via reboot) the WiFi if the DB_DISABLE_RADIO_ARMED parameter is set. Not used during boot.
+ * Usually called when arm state change of the autopilot is detected. As internal check if the WiFi is already
+ * enabled/disabled WiFi must be inited first (done during boot).
+ * @param enable_wifi True to enable the WiFi and FALSE to disable it
+ */
 void db_set_wifi_status(uint8_t enable_wifi);
 
 #endif // DB_ESP32_MAIN_H

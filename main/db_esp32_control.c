@@ -702,8 +702,6 @@ static _Noreturn void control_module_ble() {
   uint msp_ltm_buff_pos     = 0;
   uint delay_timer_cnt      = 0;
 
-  ESP_LOGI(TAG, "Started control module (ESP-NOW)");
-
   /* Event Loop */
   while (1) {
     /* Read Uart and send data to BLE (needs to be implemented) */
