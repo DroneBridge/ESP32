@@ -57,7 +57,8 @@ static uint8_t own_addr_type;
 static uint8_t addr_val[6] = {0};
 static bool conn_handle_subs[CONFIG_BT_NIMBLE_MAX_CONNECTIONS + 1];
 static char *DEVICE_NAME = "DroneBridge";
-static uint16_t ble_spp_svc_gatt_read_val_handle;
+static uint16_t ble_spp_svc_gatt_notify_val_handle;
+static uint16_t ble_spp_svc_gatt_write_val_handle;
 
 /***************************************************************************************************************************
  * Library Function Declaration
@@ -163,20 +164,25 @@ static const struct ble_gatt_svc_def new_ble_svc_gatt_defs[] = {
         .type = BLE_GATT_SVC_TYPE_PRIMARY,
         .uuid = BLE_UUID16_DECLARE(BLE_SVC_SPP_UUID16),
         .characteristics =
-            (struct ble_gatt_chr_def[]){{
-                                            /* Support SPP service */
-                                            .uuid       = BLE_UUID16_DECLARE(BLE_SVC_SPP_CHR_UUID16),
-                                            .access_cb  = ble_svc_gatt_handler,
-                                            .val_handle = &ble_spp_svc_gatt_read_val_handle,
-                                            .flags      = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_NOTIFY,
-                                        },
-                                        {
-                                            0, /* No more characteristics */
-                                        }},
+            (struct ble_gatt_chr_def[]){
+                {
+                    /* Write-only characteristic */
+                    .uuid       = BLE_UUID16_DECLARE(BLE_SVC_SPP_CHR_WRITE_UUID16),
+                    .access_cb  = ble_svc_gatt_handler,
+                    .val_handle = &ble_spp_svc_gatt_write_val_handle,
+                    .flags      = BLE_GATT_CHR_F_NOTIFY | BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_READ,
+                },
+                {
+                    /* Notify-only characteristic */
+                    .uuid       = BLE_UUID16_DECLARE(BLE_SVC_SPP_CHR_NOTIFY_UUID16),
+                    .access_cb  = ble_svc_gatt_handler, // No direct access required, only notify
+                    .val_handle = &ble_spp_svc_gatt_notify_val_handle,
+                    .flags      = BLE_GATT_CHR_F_NOTIFY | BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_READ,
+                },
+                {0}, /* No more characteristics */
+            },
     },
-    {
-        0, /* No more services. */
-    },
+    {0}, /* No more services. */
 };
 
 /***************************************************************************************************************************
@@ -204,7 +210,7 @@ static void db_ble_server_uart_task() {
           }
 
           // Send BLE notification
-          rc = ble_gatts_notify_custom(i, ble_spp_svc_gatt_read_val_handle, txom);
+          rc = ble_gatts_notify_custom(i, ble_spp_svc_gatt_notify_val_handle, txom);
           if (rc != 0) {
             MODLOG_DFLT(ERROR, "Error sending BLE notification rc = %d", rc);
           }
