@@ -40,7 +40,7 @@
  * @brief Structure to hold BLE data.
  */
 typedef struct {
-  uint8_t data[128]; /**< Buffer to store data */
+  uint8_t data[300]; /**< Buffer to store data */
   int length;        /**< Length of the data stored in the buffer */
 } BleData_t;
 

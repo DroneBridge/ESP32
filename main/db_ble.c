@@ -185,11 +185,12 @@ static const struct ble_gatt_svc_def new_ble_svc_gatt_defs[] = {
 
 static void db_ble_server_uart_task() {
   MODLOG_DFLT(INFO, "BLE server UART_task started\n");
-  int rc = 0;
+  int delay_timer_cnt = 0;
+  int rc              = 0;
   BleData_t bleData;
   while (true) {
     // Waiting for UART event.
-    if (xQueueReceive(db_uart_read_queue_global, &bleData, pdMS_TO_TICKS(10))) {
+    if (xQueueReceive(db_uart_read_queue_global, &bleData, 0)) {
       for (int i = 0; i < CONFIG_BT_NIMBLE_MAX_CONNECTIONS; i++) {
         /* Check if client has subscribed to notifications */
         if (conn_handle_subs[i]) {
@@ -209,6 +210,14 @@ static void db_ble_server_uart_task() {
           }
         }
       }
+    }
+    if (delay_timer_cnt == 5000) {
+      /* all actions are non-blocking so allow some delay so that the IDLE task of FreeRTOS and the watchdog can run
+      read: https://esp32developer.com/programming-in-c-c/tasks/tasks-vs-co-routines for reference */
+      vTaskDelay(10 / portTICK_PERIOD_MS);
+      delay_timer_cnt = 0;
+    } else {
+      delay_timer_cnt++;
     }
   }
   vTaskDelete(NULL);
