@@ -66,9 +66,6 @@ extern uint8_t DB_MAV_SYS_ID;                             // stores the local sy
 extern uint32_t serial_total_byte_count;                  // Total bytes read from serial link (UART or USB/JTAG)
 extern int8_t num_connected_tcp_clients;                  //
 extern udp_conn_list_t *udp_conn_list;                    // List of UDP clients that the ESP32 will send to
-                                                          //
-extern QueueHandle_t db_uart_write_queue_global;          // Global queue for data to be written to UART, filled by wireless communication interface task
-extern QueueHandle_t db_uart_read_queue_global;           // Global queue for data to be written to Wireless communication interface, filled by UART
 
 // extern int WIFI_ESP_MAXIMUM_RETRY;
 

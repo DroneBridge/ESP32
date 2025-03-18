@@ -37,14 +37,6 @@
 #define BLE_GAP_APPEARANCE_GENERIC_TAG 0x0180 ///< Generic tag appearance value for BLE GAP.
 #define BLE_GAP_LE_ROLE_PERIPHERAL     0x00   ///< LE role value indicating a peripheral device.
 
-/**
- * @brief Structure to hold BLE data.
- */
-typedef struct {
-  uint8_t data[300]; /**< Buffer to store data */
-  int length;        /**< Length of the data stored in the buffer */
-} BleData_t;
-
 /***************************************************************************************************************************
  * Public Function Declaration
  **************************************************************************************************************************/

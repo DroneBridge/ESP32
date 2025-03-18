@@ -56,6 +56,7 @@
 #include "db_esp32_control.h"
 #include "db_esp_now.h"
 #include "db_protocol.h"
+#include "db_queue.h"
 #include "db_serial.h"
 
 /***************************************************************************************************************************

@@ -58,6 +58,7 @@
 #include "db_esp_now.h"
 #include "db_protocol.h"
 #include "db_serial.h"
+#include "db_queue.h"
 
 /***************************************************************************************************************************
  * Networking & Web Server Headers
@@ -122,8 +123,6 @@ static const char *TAG = "DB_ESP32";
 /***************************************************************************************************************************
  * Global variables, defined in globals.h
  **************************************************************************************************************************/
-QueueHandle_t db_uart_write_queue_global;
-QueueHandle_t db_uart_read_queue_global;
 uint8_t DB_RADIO_MODE                             = DB_WIFI_MODE_AP;
 uint8_t DB_RADIO_MODE_DESIGNATED                  = DB_WIFI_MODE_AP; // initially assign the same value as DB_RADIO_MODE
 uint8_t DB_WIFI_SSID[32]                          = "DroneBridge for ESP32";
@@ -849,16 +848,7 @@ void app_main() {
     /* Ble SPP Mode*/
   case DB_BLUETOOTH_MODE_SPP:
     db_init_wifi_apmode(DB_RADIO_MODE);
-    db_uart_write_queue_global = xQueueCreate(5, sizeof(BleData_t));
-    db_uart_read_queue_global  = xQueueCreate(5, sizeof(BleData_t));
-    if (db_uart_write_queue_global == NULL) {
-      ESP_LOGI(TAG, "Failed to create queue, you are on your own, KABOOM!");
-      return;
-    }
-    if (db_uart_read_queue_global == NULL) {
-      ESP_LOGI(TAG, "Failed to create another queue, you are definately on your own, KABOOM! KABOOM!");
-      return;
-    }
+    db_queue_init();
     db_init_ble();
     break;
 
