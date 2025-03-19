@@ -698,7 +698,7 @@ static _Noreturn void control_module_ble() {
   uint8_t msp_message_buffer[UART_BUF_SIZE];
   uint8_t serial_buffer[DB_TRANS_BUF_SIZE];
   msp_ltm_port_t db_msp_ltm_port;
-  BleData_t bleData;
+  db_ble_queue_event_t bleData;
   uint transparent_buff_pos = 0;
   uint msp_ltm_buff_pos     = 0;
   uint delay_timer_cnt      = 0;
@@ -719,11 +719,12 @@ static _Noreturn void control_module_ble() {
         // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
         // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an
         // existing packet
-        db_parse_mavlink_from_radio(NULL, NULL, bleData.data, bleData.length);
+        db_parse_mavlink_from_radio(NULL, NULL, bleData.data, bleData.data_len);
       } else {
         // no parsing with any other protocol - transparent here - just pass through
-        write_to_serial(bleData.data, bleData.length);
+        write_to_serial(bleData.data, bleData.data_len);
       }
+      free(bleData.data);
     } else {
       if (db_uart_write_queue_global == NULL)
         ESP_LOGE(TAG, "db_uart_write_queue is NULL!");
@@ -790,12 +791,13 @@ void db_send_to_all_clients(int tcp_clients[], udp_conn_list_t *n_udp_conn_list,
     break;
 
   case DB_BLUETOOTH_MODE_SPP:
-    BleData_t bleData;
-    size_t copy_len = (data_length > sizeof(bleData.data)) ? sizeof(bleData.data) : data_length;
-    memcpy(&bleData, data, copy_len);
-    bleData.length = data_length;
+    db_ble_queue_event_t bleData;
+    bleData.data     = malloc(data_length);
+    bleData.data_len = data_length;
+    memcpy(bleData.data, data, bleData.data_len);
     if (xQueueSend(db_uart_read_queue_global, &bleData, portMAX_DELAY) != pdPASS) {
       ESP_LOGE(TAG, "Failed to send BLE data to queue");
+      free(bleData.data);
     }
     break;
 

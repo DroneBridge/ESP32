@@ -210,7 +210,7 @@ static void db_ble_server_uart_task() {
   MODLOG_DFLT(INFO, "BLE server UART_task started\n");
   int delay_timer_cnt = 0;
   int rc              = 0;
-  BleData_t bleData;
+  db_ble_queue_event_t bleData;
   while (true) {
     // Waiting for UART event.
     if (xQueueReceive(db_uart_read_queue_global, &bleData, 0)) {
@@ -220,9 +220,10 @@ static void db_ble_server_uart_task() {
           struct os_mbuf *txom;
 
           // Convert BleData_t struct data into an os_mbuf buffer
-          txom = ble_hs_mbuf_from_flat(bleData.data, bleData.length);
+          txom = ble_hs_mbuf_from_flat(bleData.data, bleData.data_len);
           if (!txom) {
             MODLOG_DFLT(ERROR, "Failed to allocate os_mbuf");
+            free(bleData.data);
             return;
           }
 
@@ -233,6 +234,7 @@ static void db_ble_server_uart_task() {
           }
         }
       }
+      free(bleData.data);
     }
     if (delay_timer_cnt == 5000) {
       /* all actions are non-blocking so allow some delay so that the IDLE task of FreeRTOS and the watchdog can run
@@ -386,17 +388,28 @@ static int ble_svc_gatt_handler(uint16_t conn_handle, uint16_t attr_handle, stru
 
   case BLE_GATT_ACCESS_OP_WRITE_CHR:
     MODLOG_DFLT(INFO, "Data received in write event,conn_handle = %x,attr_handle = %x", conn_handle, attr_handle);
-    struct os_mbuf *om = ctxt->om;               // Get the received data buffer
-    int len            = OS_MBUF_PKTLEN(om);     // Get total length of received data
-    BleData_t bleData;                           // Create a struct instance
-    bleData.length = len % sizeof(bleData.data); // Ensure len does not exceed buffer size
+    struct os_mbuf *om = ctxt->om;           // Get the received data buffer
+    int len            = OS_MBUF_PKTLEN(om); // Get total length of received data
+    db_ble_queue_event_t bleData;            // Create a struct instance
+    bleData.data     = malloc(len);          // Allocate memory for the data buffer
+    bleData.data_len = len;                  // Ensure len does not exceed buffer size
 
-    os_mbuf_copydata(om, 0, bleData.length, bleData.data); // Copy data to buffer
-    bleData.data[bleData.length] = '\0';                   // Null-terminate for printing as a string
+    bleData.data = malloc(len);
+    if (bleData.data == NULL) {
+      MODLOG_DFLT(ERROR, "Failed to allocate memory for BLE data of length %d", len);
+      return BLE_ATT_ERR_UNLIKELY;
+    }
+
+    if (os_mbuf_copydata(om, 0, bleData.data_len, bleData.data) != 0) {
+      MODLOG_DFLT(ERROR, "Failed to copy data from os_mbuf");
+      free(bleData.data);
+      return BLE_ATT_ERR_UNLIKELY;
+    }
 
     // Send the received data to the FreeRTOS queue
     if (xQueueSend(db_uart_write_queue_global, &bleData, portMAX_DELAY) != pdPASS) {
       MODLOG_DFLT(ERROR, "Failed to send BLE data to queue");
+      free(bleData.data);
     }
     break;
 

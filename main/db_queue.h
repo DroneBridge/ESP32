@@ -32,9 +32,9 @@
  * @brief Structure to hold BLE data.
  **************************************************************************************************************************/
 typedef struct {
-  uint8_t data[300]; /**< Buffer to store data */
-  int length;        /**< Length of the data stored in the buffer */
-} BleData_t;
+  uint8_t data_len; /**< Length of the data. */
+  uint8_t *data;    /**< Pointer to the data. */
+} __attribute__((__packed__)) db_ble_queue_event_t;
 
 extern QueueHandle_t db_uart_write_queue_global; // Global queue for data to be written to UART, filled by wireless
                                                  // communication interface task

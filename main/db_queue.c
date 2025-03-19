@@ -44,8 +44,8 @@ QueueHandle_t db_uart_read_queue_global;
  * @return void
  **************************************************************************************************************************/
 void db_queue_init() {
-  db_uart_write_queue_global = xQueueCreate(5, sizeof(BleData_t));
-  db_uart_read_queue_global  = xQueueCreate(5, sizeof(BleData_t));
+  db_uart_write_queue_global = xQueueCreate(5, sizeof(db_ble_queue_event_t));
+  db_uart_read_queue_global  = xQueueCreate(5, sizeof(db_ble_queue_event_t));
 
   if (db_uart_write_queue_global == NULL) {
     ESP_LOGI(TAG, "Failed to create queue, you are on your own, KABOOM!");
