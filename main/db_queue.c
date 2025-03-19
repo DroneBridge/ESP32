@@ -56,16 +56,3 @@ void db_queue_init() {
     return;
   }
 }
-
-void db_queue_init() {
-  db_uart_write_queue_global = xQueueCreate(5, sizeof(BleData_t));
-  db_uart_read_queue_global  = xQueueCreate(5, sizeof(BleData_t));
-  if (db_uart_write_queue_global == NULL) {
-    ESP_LOGI(TAG, "Failed to create queue, you are on your own, KABOOM!");
-    return;
-  }
-  if (db_uart_read_queue_global == NULL) {
-    ESP_LOGI(TAG, "Failed to create another queue, you are definately on your own, KABOOM! KABOOM!");
-    return;
-  }
-}

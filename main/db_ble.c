@@ -60,6 +60,8 @@ static bool conn_handle_subs[CONFIG_BT_NIMBLE_MAX_CONNECTIONS + 1];
 static char *DEVICE_NAME = "DroneBridge";
 static uint16_t ble_spp_svc_gatt_notify_val_handle;
 static uint16_t ble_spp_svc_gatt_write_val_handle;
+static uint16_t ble_spp_svc_gatt_notify_cmd_handle;
+static uint16_t ble_spp_svc_gatt_write_cmd_handle;
 
 /***************************************************************************************************************************
  * Library Function Declaration
@@ -171,14 +173,28 @@ static const struct ble_gatt_svc_def new_ble_svc_gatt_defs[] = {
                     .uuid       = BLE_UUID16_DECLARE(BLE_SVC_SPP_CHR_WRITE_UUID16),
                     .access_cb  = ble_svc_gatt_handler,
                     .val_handle = &ble_spp_svc_gatt_write_val_handle,
-                    .flags      = BLE_GATT_CHR_F_NOTIFY | BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_READ,
+                    .flags      = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_READ,
                 },
                 {
                     /* Notify-only characteristic */
                     .uuid       = BLE_UUID16_DECLARE(BLE_SVC_SPP_CHR_NOTIFY_UUID16),
                     .access_cb  = ble_svc_gatt_handler, // No direct access required, only notify
                     .val_handle = &ble_spp_svc_gatt_notify_val_handle,
-                    .flags      = BLE_GATT_CHR_F_NOTIFY | BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_READ,
+                    .flags      = BLE_GATT_CHR_F_NOTIFY | BLE_GATT_CHR_F_READ,
+                },
+                {
+                    /* Notify-only characteristic */
+                    .uuid       = BLE_UUID16_DECLARE(BLE_SVC_SPP_CMD_WRITE_UUID16),
+                    .access_cb  = ble_svc_gatt_handler, // No direct access required, only notify
+                    .val_handle = &ble_spp_svc_gatt_write_cmd_handle,
+                    .flags      = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_READ,
+                },
+                {
+                    /* Notify-only characteristic */
+                    .uuid       = BLE_UUID16_DECLARE(BLE_SVC_SPP_CMD_NOTIFY_UUID16),
+                    .access_cb  = ble_svc_gatt_handler, // No direct access required, only notify
+                    .val_handle = &ble_spp_svc_gatt_notify_cmd_handle,
+                    .flags      = BLE_GATT_CHR_F_NOTIFY | BLE_GATT_CHR_F_READ,
                 },
                 {0}, /* No more characteristics */
             },
