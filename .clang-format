@@ -1,0 +1,6 @@
+BasedOnStyle: LLVM
+AlignConsecutiveAssignments: true
+AlignConsecutiveMacros: true
+AlignTrailingComments: true
+ReflowComments: true
+ColumnLimit: 125
