@@ -18,17 +18,24 @@
  */
 #include <string.h>
 #include <esp_log.h>
+
 #include "db_mavlink_msgs.h"
+#include "db_parameters.h"
 #include "db_serial.h"
 #include "globals.h"
 #include "main.h"
+
+#ifndef MIN
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
+#endif
+#ifndef MAX
+#define MAX(a,b) ((a) > (b) ? (a) : (b))
+#endif
 
 #define FASTMAVLINK_ROUTER_LINKS_MAX  3
 #define FASTMAVLINK_ROUTER_COMPONENTS_MAX  5
 
 #define TAG "DB_MAV_MSGS"
-
-uint16_t DB_MAV_PARAM_CNT = 15; // Number of MAVLink parameters returned by ESP32 in the PARAM message. Needed by GCS.
 
 /**
  * Based on the system architecture and configured wifi mode the ESP32 may have a different role and system id.
@@ -45,6 +52,23 @@ uint8_t db_get_mav_comp_id() {
  */
 uint8_t db_get_mav_sys_id() {
     return DB_MAV_SYS_ID;
+}
+
+/**
+ * Converts the measured (negative dBm) signal strength to a format the MAVLink RADIO STATUS packet accepts and the GCS likes.
+ * If QGroundControl is desired output format it will not convert but send the value as int8. For Mission Planner it converts int8 to uint8. The value represents the absolute(dBm): -54 dBm -> 54
+ * @param signal_strength Signal strength in dBm as reported by the ESP32
+ * @param noise_floor   Spectrum noise floor - not used for now
+ * @return Signal strength formatted for QGroundControl (0 to -127 [dBm]) or Mission Planner (0 to 100)
+ */
+int8_t db_format_rssi(int8_t signal_strength, int8_t noise_floor) {
+    if (db_param_rssi_dbm.value.db_param_u8.value) {
+        // report in [dBm]
+        return signal_strength;
+    } else {
+        // dBm from [-50 to -100] scaled to 100 to 0
+        return MIN(100, 2 * (MIN(-50, signal_strength) + 100));
+    }
 }
 
 /**
@@ -70,11 +94,11 @@ uint16_t db_create_heartbeat(uint8_t *buff, fmav_status_t *fmav_status) {
  * @param param_id The name of the parameter (ID)
  * @return Length of the mavlink message inside the buffer
  */
-uint16_t db_get_mavmsg_param(uint8_t *buff, fmav_status_t *fmav_status, uint16_t param_index, float_int_union *value, uint8_t type, char *param_id) {
+uint16_t db_get_mavmsg_param_value(uint8_t *buff, fmav_status_t *fmav_status, uint16_t param_index, float_int_union *value, uint8_t type, char *param_id) {
     fmav_param_value_t fmav_param_value = {
             .param_value = value->f,
             .param_type = type,
-            .param_count = DB_MAV_PARAM_CNT,
+            .param_count = DB_PARAM_MAV_CNT,
             .param_index = param_index};
     if (strlen(param_id)>15) {  // max size of param_id is 16 bytes
         memcpy(fmav_param_value.param_id, param_id, 16);
@@ -92,57 +116,38 @@ uint16_t db_get_mavmsg_param(uint8_t *buff, fmav_status_t *fmav_status, uint16_t
  * @param float_int IEEE 754 storage for the retrieved value
  * @param param_id  Parameter name you want the value of
  * @param param_index Index of the parameter. May be -1 if requested parameter shall be found based on param_id
- * @return MAV_TYPE of the parameter. Returns 0 if the parameter was not found
+ * @return MAV_PARAM_TYPE of the parameter. Returns 0 if the parameter was not found
  */
-MAV_TYPE db_mav_get_parameter_value(float_int_union *float_int, char *param_id, int16_t param_index) {
-    MAV_TYPE type;
-    if (strncmp(param_id, "SYS_SW_VERSION", 16) == 0 || param_index == 0) {
-        float_int->uint8 = DB_BUILD_VERSION;
-        type = MAV_PARAM_TYPE_UINT8;
-    } else if (strncmp(param_id, "SYS_ESP32_MODE", 16) == 0 || param_index == 1) {
-        float_int->uint8 = DB_RADIO_MODE;
-        type = MAV_PARAM_TYPE_UINT8;
-    } else if (strncmp(param_id, "SERIAL_PACK_SIZE", 16) == 0 || param_index == 2) {
-        float_int->uint16 = DB_TRANS_BUF_SIZE;
-        type = MAV_PARAM_TYPE_UINT16;
-    } else if (strncmp(param_id, "SERIAL_BAUD", 16) == 0 || param_index == 3) {
-        float_int->int32 = DB_UART_BAUD_RATE;
-        type = MAV_PARAM_TYPE_UINT16;
-    } else if (strncmp(param_id, "SERIAL_TX_PIN", 16) == 0 || param_index == 4) {
-        float_int->uint8 = DB_UART_PIN_TX;
-        type = MAV_PARAM_TYPE_UINT8;
-    } else if (strncmp(param_id, "SERIAL_RX_PIN", 16) == 0 || param_index == 5) {
-        float_int->uint8 = DB_UART_PIN_RX;
-        type = MAV_PARAM_TYPE_UINT8;
-    } else if (strncmp(param_id, "SERIAL_RTS_PIN", 16) == 0 || param_index == 6) {
-        float_int->uint8 = DB_UART_PIN_RTS;
-        type = MAV_PARAM_TYPE_UINT8;
-    } else if (strncmp(param_id, "SERIAL_CTS_PIN", 16) == 0 || param_index == 7) {
-        float_int->uint8 = DB_UART_PIN_CTS;
-        type = MAV_PARAM_TYPE_UINT8;
-    } else if (strncmp(param_id, "SERIAL_TEL_PROTO", 16) == 0 || param_index == 8) {
-        float_int->uint8 = DB_SERIAL_PROTOCOL;
-        type = MAV_PARAM_TYPE_UINT8;
-    } else if (strncmp(param_id, "WIFI_AP_CHANNEL", 16) == 0 || param_index == 9) {
-        float_int->uint8 = DB_WIFI_CHANNEL;
-        type = MAV_PARAM_TYPE_UINT8;
-    } else if (strncmp(param_id, "SERIAL_RTS_THRES", 16) == 0 || param_index == 10) {
-        float_int->uint8 = DB_UART_RTS_THRESH;
-        type = MAV_PARAM_TYPE_UINT8;
-    } else if (strncmp(param_id, "SERIAL_T_OUT_MS", 16) == 0 || param_index == 11) {
-        float_int->uint16 = DB_SERIAL_READ_TIMEOUT_MS;
-        type = MAV_PARAM_TYPE_UINT16;
-    } else if (strncmp(param_id, "RADIO_DIS_ON_ARM", 16) == 0 || param_index == 12) {
-        float_int->uint8 = DB_DISABLE_RADIO_ARMED;
-        type = MAV_PARAM_TYPE_UINT8;
-    } else if (strncmp(param_id, "RADIO_EN_EXT_ANT", 16) == 0 || param_index == 13) {
-        float_int->uint8 = DB_EN_EXT_ANT;
-        type = MAV_PARAM_TYPE_UINT8;
-    } else if (strncmp(param_id, "WIFI_EN_GN", 16) == 0 || param_index == 14) {
-        float_int->uint8 = DB_WIFI_EN_GN;
-        type = MAV_PARAM_TYPE_UINT8;
-    } else {
-        type = 0;
+MAV_PARAM_TYPE db_mav_get_parameter_value(float_int_union *float_int, const char *param_id, const int16_t param_index) {
+    MAV_PARAM_TYPE type = 0;
+    if (param_index >= DB_PARAM_MAV_CNT) {
+        ESP_LOGE(TAG, "Requested mavlink parameter index %i is out of range (0-%i)", param_index, DB_PARAM_MAV_CNT-1);
+        return 0;
+    }
+    for (int i = 0; i < sizeof(db_params) / sizeof(db_params[0]); i++) {
+        if (strncmp(param_id, (char *) db_params[i]->mav_t.param_name, 16) == 0 || param_index == db_params[i]->mav_t.param_index) {
+            // found the parameter to return its value
+            type = db_params[i]->mav_t.param_type;
+            switch (db_params[i]->type) {
+                case STRING:
+                    ESP_LOGE(TAG, "db_mav_get_parameter_value(): String parameter not supported.");
+                break;
+                case UINT8:
+                    float_int->uint8 = db_params[i]->value.db_param_u8.value;
+                break;
+                case UINT16:
+                    float_int->uint16 = db_params[i]->value.db_param_u16.value;
+                break;
+                case INT32:
+                    float_int->int32 = db_params[i]->value.db_param_i32.value;
+                break;
+                default:
+                    ESP_LOGE(TAG, "db_mav_get_parameter_value() -> db_parameter.type unknown!");
+                break;
+            }
+        } else {
+            // do nothing - no match
+        }
     }
     return type;
 }
@@ -150,110 +155,40 @@ MAV_TYPE db_mav_get_parameter_value(float_int_union *float_int, char *param_id, 
 /**
  * Writes the parameter received via mavlink PARAM_SET to the internal variable and triggers write to NVS.
  * For some parameters to become effective the ESP32 still needs to be rebooted!
+ * No string/blob parameters supported for now.
  *
- * @param fmav_param_set_payload
+ * @param param_set_payload
  * @return 1 in case of success and 0 in case of failure
  */
-bool db_write_mavlink_parameter(fmav_param_set_t *param_set_payload) {
+bool db_write_mavlink_parameter(const fmav_param_set_t *param_set_payload) {
     // BEWARE: ONLY WORKS WITH NUMBERS FOR NOW! - NO SUPPORT FOR STRINGS
     float_int_union float_int;  // used to convert from IEEE 754
-    float_int.f = param_set_payload->param_value;
+    float_int.f = param_set_payload->param_value;   // read parameter value into helper structure
     bool success = false;
-
-    if (strncmp(param_set_payload->param_id, "SYS_ESP32_MODE", 16) == 0) {
-        if (float_int.uint8 < DB_WIFI_MODE_ESPNOW_END) {   // check E_DB_WIFI_MODE for allowed modes
-            DB_RADIO_MODE_DESIGNATED = float_int.uint8;  // do not directly change DB_WIFI_MODE since it is not safe and constantly processed by other tasks. Save settings and reboot will assign DB_RADIO_MODE_DESIGNATED to DB_WIFI_MODE
-            success = true;
+    for (int i = 0; i < sizeof(db_params) / sizeof(db_params[0]); i++) {
+        if (strncmp(param_set_payload->param_id, (char *) db_params[i]->mav_t.param_name, 16) == 0) {
+            switch (db_params[i]->type) {
+                case STRING:
+                    ESP_LOGE(TAG, "db_write_mavlink_parameter(): String not supported");
+                    success = false;
+                    break;
+                case UINT8:
+                    success = db_param_is_valid_assign_u8(float_int.uint8, db_params[i]);
+                    break;
+                case UINT16:
+                    success = db_param_is_valid_assign_u16(float_int.uint16, db_params[i]);
+                    break;
+                case INT32:
+                    success = db_param_is_valid_assign_i32(float_int.int32, db_params[i]);
+                    break;
+                default:
+                    success = false;
+                    ESP_LOGE(TAG, "db_write_mavlink_parameter(): Unknown type");
+                    break;
+            }
         } else {
-            ESP_LOGE(TAG, "Unknown mode %i, not saving as new setting", float_int.uint8);
+            // this is not the parameter we are looking for
         }
-    } else if (strncmp(param_set_payload->param_id, "SERIAL_PACK_SIZE", 16) == 0) {
-        if (float_int.uint16 > 0 && float_int.uint16 < 1024) {
-            DB_TRANS_BUF_SIZE = float_int.uint16;
-            success = true;
-        } else {
-            ESP_LOGE(TAG, "SERIAL_PACK_SIZE must be <1024 bytes");
-        }
-    } else if (strncmp(param_set_payload->param_id, "SERIAL_T_OUT_MS", 16) == 0) {
-        if (float_int.uint16 > 0) {
-            DB_SERIAL_READ_TIMEOUT_MS = float_int.uint16;
-            success = true;
-        } else {
-            ESP_LOGE(TAG, "SERIAL_T_OUT_MS must be >0 MS");
-        }
-    } else if (strncmp(param_set_payload->param_id, "SERIAL_BAUD", 16) == 0) {
-        DB_UART_BAUD_RATE = float_int.int32;
-        success = true;
-    } else if (strncmp(param_set_payload->param_id, "SERIAL_TX_PIN", 16) == 0) {
-        if (float_int.uint8 <= SOC_GPIO_IN_RANGE_MAX) {
-            DB_UART_PIN_TX = float_int.uint8;
-            success = true;
-        } else {
-            ESP_LOGW(TAG, "GPIO number must be <=%i", SOC_GPIO_IN_RANGE_MAX);
-        }
-    } else if (strncmp(param_set_payload->param_id, "SERIAL_RX_PIN", 16) == 0) {
-        if (float_int.uint8 <= SOC_GPIO_IN_RANGE_MAX) {
-            DB_UART_PIN_RX = float_int.uint8;
-            success = true;
-        } else {
-            ESP_LOGW(TAG, "GPIO number must be <=%i", SOC_GPIO_IN_RANGE_MAX);
-        }
-    } else if (strncmp(param_set_payload->param_id, "SERIAL_RTS_PIN", 16) == 0) {
-        if (float_int.uint8 <= SOC_GPIO_IN_RANGE_MAX) {
-            DB_UART_PIN_RTS = float_int.uint8;
-            success = true;
-        } else {
-            ESP_LOGW(TAG, "GPIO number must be =<%i", SOC_GPIO_IN_RANGE_MAX);
-        }
-    } else if (strncmp(param_set_payload->param_id, "SERIAL_CTS_PIN", 16) == 0) {
-        if (float_int.uint8 <= SOC_GPIO_IN_RANGE_MAX) {
-            DB_UART_PIN_CTS = float_int.uint8;
-            success = true;
-        } else {
-            ESP_LOGW(TAG, "GPIO number must be <=%i", SOC_GPIO_IN_RANGE_MAX);
-        }
-    } else if (strncmp(param_set_payload->param_id, "SERIAL_TEL_PROTO", 16) == 0) {
-        if (float_int.uint8 == DB_SERIAL_PROTOCOL_MAVLINK
-        || float_int.uint8 == DB_SERIAL_PROTOCOL_TRANSPARENT
-        || float_int.uint8 == DB_SERIAL_PROTOCOL_MSPLTM) {
-            DB_SERIAL_PROTOCOL = float_int.uint8;
-            success = true;
-        } else {
-            ESP_LOGW(TAG, "Unknown serial protocol. Not writing setting.");
-        }
-    } else if (strncmp(param_set_payload->param_id, "WIFI_AP_CHANNEL", 16) == 0) {
-        if (float_int.uint8 >= 1 && float_int.uint8 < 14) {
-            DB_WIFI_CHANNEL = float_int.uint8;
-            success = true;
-        } else {
-            ESP_LOGW(TAG, "Wifi Channel must be between 1 and 13");
-        }
-    } else if (strncmp(param_set_payload->param_id, "SERIAL_RTS_THRES", 16) == 0) {
-        DB_UART_RTS_THRESH = float_int.uint8;
-        success = true;
-    } else if (strncmp(param_set_payload->param_id, "RADIO_DIS_ON_ARM", 16) == 0) {
-        if (float_int.uint8 == 1 || float_int.uint8 == 0) {
-            DB_DISABLE_RADIO_ARMED = float_int.uint8;
-            success = true;
-        } else {
-            ESP_LOGW(TAG, "RADIO_DIS_ON_ARM must be 1 or 0");
-        }
-    } else if (strncmp(param_set_payload->param_id, "RADIO_EN_EXT_ANT", 16) == 0) {
-        if (float_int.uint8 == 1 || float_int.uint8 == 0) {
-            DB_EN_EXT_ANT = float_int.uint8;
-            success = true;
-        } else {
-            ESP_LOGW(TAG, "RADIO_EN_EXT_ANT must be 1 or 0");
-        }
-    } else if (strncmp(param_set_payload->param_id, "WIFI_EN_GN", 16) == 0) {
-        if (float_int.uint8 == 1 || float_int.uint8 == 0) {
-            DB_WIFI_EN_GN = float_int.uint8;
-            success = true;
-        } else {
-            ESP_LOGW(TAG, "WIFI_EN_GN must be 1 or 0");
-        }
-    } else {
-        ESP_LOGE(TAG, "Unknown parameter value. Ignoring!");
     }
     return success;
 }
@@ -288,7 +223,8 @@ void db_answer_mavlink_cmd_request_message(uint16_t requested_msg_id,
                     .flight_sw_version = DB_MAJOR_VERSION,
                     .middleware_sw_version = DB_MINOR_VERSION
             };
-            len = fmav_msg_autopilot_version_encode_to_frame_buf(buff, db_get_mav_sys_id(), db_get_mav_comp_id(), &autopilot_version, status);
+            len = fmav_msg_autopilot_version_encode_to_frame_buf(buff, db_get_mav_sys_id(),
+                                                                 db_get_mav_comp_id(), &autopilot_version, status);
             db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
         }
             break;
@@ -327,8 +263,8 @@ void db_process_mavlink_command(fmav_command_long_t *the_command,
                     .result = MAV_RESULT_UNSUPPORTED,
                     .target_system = the_msg->sysid,
                     .target_component = the_msg->compid};
-            uint16_t len = fmav_msg_command_ack_encode_to_frame_buf(buff, db_get_mav_sys_id(), db_get_mav_comp_id(), &b,
-                                                                    status);
+            uint16_t len = fmav_msg_command_ack_encode_to_frame_buf(buff, db_get_mav_sys_id(),
+                                                                    db_get_mav_comp_id(), &b, status);
             ESP_LOGW(TAG, "Unsupported MavLink command request: %i - ignoring", the_command->command);
             db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
         }
@@ -363,7 +299,7 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
                     ESP_LOGD(TAG, "Got heartbeat from GCS (sysID: %i)", new_msg->sysid);
                     DB_MAV_SYS_ID = new_msg->sysid;
                     // We must be in either one of these modes: AP LR or ESP-NOW GND
-                    if (DB_RADIO_MODE == DB_WIFI_MODE_ESPNOW_GND || DB_RADIO_MODE == DB_WIFI_MODE_AP_LR) {
+                    if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_ESPNOW_GND || DB_PARAM_RADIO_MODE == DB_WIFI_MODE_AP_LR) {
                         // Send heartbeat to GCS: Every ESP32 no matter its role or mode is emitting a heartbeat
                         uint16_t length = db_create_heartbeat(buff, fmav_status);
                         ESP_LOGD(TAG, "Sending back heartbeat via serial link to GCS");
@@ -379,8 +315,8 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
                     // This means we are connected to the FC since we only parse mavlink on UART and thus only see the
                     // device we are connected to via UART
                     DB_MAV_SYS_ID = new_msg->sysid;
-                    // Check if FC is armed and the WiFi switch based on armed status is configured by the user
-                    if (DB_DISABLE_RADIO_ARMED &&
+                    // Check if FC is armed and the Wi-Fi switch based on armed status is configured by the user
+                    if (DB_PARAM_DIS_RADIO_ON_ARM &&
                     (payload.base_mode & MAV_MODE_FLAG_SAFETY_ARMED ||
                     (payload.system_status > MAV_STATE_STANDBY && payload.system_status != MAV_STATE_POWEROFF))) {
                         // autopilot indicates it is armed
@@ -390,22 +326,22 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
                         db_set_wifi_status(true);
                     }
                     // ESP32s that are connected to a flight controller via UART will send RADIO_STATUS messages to the GND
-                    if (DB_RADIO_MODE == DB_WIFI_MODE_STA || (DB_RADIO_MODE == DB_WIFI_MODE_ESPNOW_AIR)) {
+                    if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_STA || DB_PARAM_RADIO_MODE == DB_WIFI_MODE_ESPNOW_AIR) {
                         fmav_radio_status_t payload_r = {.fixed = 0, .txbuf=0,
                                 .noise = db_esp_signal_quality.gnd_noise_floor,
                                 .remnoise = db_esp_signal_quality.air_noise_floor,
-                                .remrssi = db_esp_signal_quality.air_rssi,
-                                .rssi = db_esp_signal_quality.gnd_rssi,
+                                .remrssi = db_format_rssi(db_esp_signal_quality.air_rssi, db_esp_signal_quality.air_noise_floor),
+                                .rssi = db_format_rssi(db_esp_signal_quality.gnd_rssi, db_esp_signal_quality.gnd_noise_floor),
                                 .rxerrors = db_esp_signal_quality.gnd_rx_packets_lost};
                         uint16_t len = fmav_msg_radio_status_encode_to_frame_buf(buff, db_get_mav_sys_id(),
                                                                                  db_get_mav_comp_id(), &payload_r,
                                                                                  fmav_status);
                         db_send_to_all_clients(tcp_clients, udp_conns, buff, len);
-                    } else if (DB_RADIO_MODE == DB_WIFI_MODE_AP && wifi_sta_list.num > 0) {
+                    } else if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_AP && wifi_sta_list.num > 0) {
                         // We assume ESP32 is not used in DB_WIFI_MODE_AP on the ground but only on the drone side -> We are in WiFi AP mode and connected to the drone
                         // Send each connected client a radio status packet.
                         // ToDo: Only the RSSI of the first client is considered. Easier for UDP since we have a nice list with mac addresses to use for mapping. Harder for TCP -> no MAC addresses available of connected clients
-                        fmav_radio_status_t payload_r = {.fixed = 0, .noise = 0, .remnoise = 0, .remrssi=wifi_sta_list.sta[0].rssi, .rssi=-127, .rxerrors=0, .txbuf=0};
+                        fmav_radio_status_t payload_r = {.fixed = UINT8_MAX, .noise = UINT8_MAX, .remnoise = UINT8_MAX, .remrssi=db_format_rssi(wifi_sta_list.sta[0].rssi, -88), .rssi=UINT8_MAX, .rxerrors=0, .txbuf=0};
                         uint16_t len = fmav_msg_radio_status_encode_to_frame_buf(buff, db_get_mav_sys_id(),
                                                                                  db_get_mav_comp_id(), &payload_r,
                                                                                  fmav_status);
@@ -423,68 +359,32 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
             } // do not react to heartbeats received via wireless interface - reaction to serial is sufficient
             break;
         case FASTMAVLINK_MSG_ID_PARAM_REQUEST_LIST: {
-            ESP_LOGI(TAG, "Received PARAM_REQUEST_LIST msg");
-
+            ESP_LOGI(TAG, "Received PARAM_REQUEST_LIST msg. Responding with parameters");
             float_int_union float_int;
-            float_int.uint8 = DB_BUILD_VERSION;
-            uint16_t len = db_get_mavmsg_param(buff, fmav_status, 0, &float_int, MAV_PARAM_TYPE_UINT8, "SYS_SW_VERSION");
-            db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
-
-            float_int.uint8 = DB_RADIO_MODE;
-            len = db_get_mavmsg_param(buff, fmav_status, 1, &float_int, MAV_PARAM_TYPE_UINT8, "SYS_ESP32_MODE");
-            db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
-
-            float_int.uint16 = DB_TRANS_BUF_SIZE;
-            len = db_get_mavmsg_param(buff, fmav_status, 2, &float_int, MAV_PARAM_TYPE_UINT16, "SERIAL_PACK_SIZE");
-            db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
-
-            float_int.int32 = DB_UART_BAUD_RATE;
-            len = db_get_mavmsg_param(buff, fmav_status, 3, &float_int, MAV_PARAM_TYPE_INT32, "SERIAL_BAUD");
-            db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
-
-            float_int.uint8 = DB_UART_PIN_TX;
-            len = db_get_mavmsg_param(buff, fmav_status, 4, &float_int, MAV_PARAM_TYPE_UINT8, "SERIAL_TX_PIN");
-            db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
-
-            float_int.uint8 = DB_UART_PIN_RX;
-            len = db_get_mavmsg_param(buff, fmav_status, 5, &float_int, MAV_PARAM_TYPE_UINT8, "SERIAL_RX_PIN");
-            db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
-
-            float_int.uint8 = DB_UART_PIN_RTS;
-            len = db_get_mavmsg_param(buff, fmav_status, 6, &float_int, MAV_PARAM_TYPE_UINT8, "SERIAL_RTS_PIN");
-            db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
-
-            float_int.uint8 = DB_UART_PIN_CTS;
-            len = db_get_mavmsg_param(buff, fmav_status, 7, &float_int, MAV_PARAM_TYPE_UINT8, "SERIAL_CTS_PIN");
-            db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
-
-            float_int.uint8 = DB_SERIAL_PROTOCOL;
-            len = db_get_mavmsg_param(buff, fmav_status, 8, &float_int, MAV_PARAM_TYPE_UINT8, "SERIAL_TEL_PROTO");
-            db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
-
-            float_int.uint8 = DB_WIFI_CHANNEL;
-            len = db_get_mavmsg_param(buff, fmav_status, 9, &float_int, MAV_PARAM_TYPE_UINT8, "WIFI_AP_CHANNEL");
-            db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
-
-            float_int.uint8 = DB_UART_RTS_THRESH;
-            len = db_get_mavmsg_param(buff, fmav_status, 10, &float_int, MAV_PARAM_TYPE_UINT8, "SERIAL_RTS_THRES");
-            db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
-
-            float_int.uint16 = DB_SERIAL_READ_TIMEOUT_MS;
-            len = db_get_mavmsg_param(buff, fmav_status, 11, &float_int, MAV_PARAM_TYPE_UINT16, "SERIAL_T_OUT_MS");
-            db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
-
-            float_int.uint8 = DB_DISABLE_RADIO_ARMED;
-            len = db_get_mavmsg_param(buff, fmav_status, 12, &float_int, MAV_PARAM_TYPE_UINT8, "RADIO_DIS_ON_ARM");
-            db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
-
-            float_int.uint8 = DB_EN_EXT_ANT;
-            len = db_get_mavmsg_param(buff, fmav_status, 13, &float_int, MAV_PARAM_TYPE_UINT8, "RADIO_EN_EXT_ANT");
-            db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
-
-            float_int.uint8 = DB_WIFI_EN_GN;
-            len = db_get_mavmsg_param(buff, fmav_status, 14, &float_int, MAV_PARAM_TYPE_UINT8, "WIFI_EN_GN");
-            db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
+            uint16_t len = 0;
+            for (int i = 0; i < sizeof(db_params) / sizeof(db_params[0]); i++) {
+                switch (db_params[i]->type) {
+                    case STRING:
+                        // ignoring strings. Not supported with this request
+                        continue;
+                    break;
+                    case UINT8:
+                        float_int.uint8 = db_params[i]->value.db_param_u8.value;
+                    break;
+                    case UINT16:
+                        float_int.uint16 = db_params[i]->value.db_param_u16.value;
+                    break;
+                    case INT32:
+                        float_int.int32 = db_params[i]->value.db_param_i32.value;
+                    break;
+                    default:
+                        ESP_LOGE(TAG, "db_param_write_all_params_json() -> db_parameter.type unknown!");
+                    break;
+                }
+                len = db_get_mavmsg_param_value(buff, fmav_status, db_params[i]->mav_t.param_index, &float_int,
+                                                db_params[i]->mav_t.param_type, (char *) db_params[i]->mav_t.param_name);
+                db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
+            }
         }
             break;
         case FASTMAVLINK_MSG_ID_PARAM_REQUEST_READ: {
@@ -494,7 +394,8 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
             ESP_LOGI(TAG, "GCS request reading parameter ID: %s with index %i", payload.param_id, payload.param_index);
             MAV_PARAM_TYPE type = db_mav_get_parameter_value(&float_int, payload.param_id, payload.param_index);
             if (type != 0) {
-                uint16_t len = db_get_mavmsg_param(buff, fmav_status, payload.param_index, &float_int, type, payload.param_id);
+                uint16_t len = db_get_mavmsg_param_value(buff, fmav_status, payload.param_index, &float_int, type,
+                                                         payload.param_id);
                 db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
             } else {
                 // send nothing, unknown parameter
@@ -511,13 +412,15 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
                 float_int_union float_int;
                 MAV_PARAM_TYPE type = db_mav_get_parameter_value(&float_int, parame_set_payload.param_id, -1);
                 if (type != 0) {
-                    uint16_t len = db_get_mavmsg_param(buff, fmav_status, 0, &float_int, type,
-                                                       parame_set_payload.param_id);
+                    uint16_t len = db_get_mavmsg_param_value(buff, fmav_status, 0, &float_int, type,
+                                                             parame_set_payload.param_id);
                     db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
                     db_write_settings_to_nvs();
                 } else {
-                    ESP_LOGE(TAG, "Failed to set parameter %s", parame_set_payload.param_id);
+                    ESP_LOGE(TAG, "Failed to get parameter %s - could not respond with new param", parame_set_payload.param_id);
                 }
+            } else {
+                ESP_LOGE(TAG, "db_write_mavlink_parameter() failed to set new parameter %s ", parame_set_payload.param_id);
             }
         }
             break;
@@ -563,5 +466,3 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
         }
     }
 }
-
-

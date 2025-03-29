@@ -77,8 +77,8 @@
             </div>
             <div class="row">
                 <div class="six columns" id="wifi_ssid_div">
-                    <label for="wifi_ssid">SSID</label>
-                    <input type="text" name="wifi_ssid" value="" id="wifi_ssid" maxlength="31">
+                    <label for="ssid">SSID</label>
+                    <input type="text" name="ssid" value="" id="ssid" maxlength="31">
                 </div>
                 <div class="six columns">
                     <label for="wifi_pass">Password</label>
@@ -87,8 +87,8 @@
             </div>
             <div class="row">
                 <div id="ap_channel_div" class="six columns">
-                    <label for="ap_channel">Channel</label>
-                    <select id="ap_channel" name="ap_channel" form="settings_form">
+                    <label for="wifi_chan">Channel</label>
+                    <select id="wifi_chan" name="wifi_chan" form="settings_form">
                         <option value="1">1</option>
                         <option value="2">2</option>
                         <option value="3">3</option>
@@ -113,7 +113,7 @@
                 <div class="twelve columns">
                     <div class="checkbox-wrapper-14">
                         <input id="wifi_en_gn" name="wifi_en_gn" type="checkbox" class="switch">
-                        <label class="tooltip" for="wifi_en_gn"><span class="tooltiptext">Only enable this when you need b/g/n support. When off there is only 802.11 b support in WiFi client mode which provides sufficient bandwidth and is ideal for range.</span>802.11 b/g/n support</label>
+                        <label class="tooltip" for="wifi_en_gn"><span class="tooltiptext">Only enable this when you need b/g/n/ax support. When off there is only 802.11b support in Wi-Fi client mode which provides sufficient bandwidth and is ideal for range. 802.11ax only on supported chips.</span>802.11b/g/n/ax support</label>
                     </div>
                 </div>
             </div>
@@ -133,25 +133,50 @@
                     </div>
                 </div>
             </div>
+            <div id="static_ip_config_div">
+                <details>
+                    <summary>Advanced Wi-Fi Settings</summary>
+                    <div class="row">
+                        <div class="six columns" id="ip_sta_div">
+                            <label for="ip_sta">Static IP Address</label>
+                            <input type="text" name="ip_sta" value="" id="ip_sta" maxlength="15" placeholder="optional - can be empty">
+                        </div>
+                        <div class="six columns" id="ip_sta_gw_div">
+                            <label for="ip_sta_gw">Static IP Gateway Address</label>
+                            <input type="text" name="ip_sta_gw" value="" id="ip_sta_gw" maxlength="15" placeholder="optional - can be empty">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="six columns" id="ip_sta_netmsk_div">
+                            <label for="ip_sta_netmsk">Static IP Netmask</label>
+                            <input type="text" name="ip_sta_netmsk" value="" id="ip_sta_netmsk" maxlength="15" placeholder="optional - can be empty">
+                        </div>
+                        <div class="six columns" id="wifi_hostname_div">
+                            <label for="wifi_hostname">Hostname</label>
+                            <input type="text" name="wifi_hostname" value="" maxlength="31" id="wifi_hostname" placeholder="DroneBridgeESP32">
+                        </div>
+                    </div>
+                </details>
+            </div>
             <h3 style="margin-top: 2rem">Serial</h3>
             <div class="row" id="tx_rx_div">
                 <div class="six columns">
-                    <label for="tx_pin">UART TX GPIO</label>
-                    <input type="number" name="tx_pin" value="" id="tx_pin">
+                    <label for="gpio_tx">UART TX GPIO</label>
+                    <input type="number" name="gpio_tx" value="" id="gpio_tx">
                 </div>
                 <div class="six columns">
-                    <label for="rx_pin">UART RX GPIO</label>
-                    <input type="number" name="rx_pin" value="" id="rx_pin">
+                    <label for="gpio_rx">UART RX GPIO</label>
+                    <input type="number" name="gpio_rx" value="" id="gpio_rx">
                 </div>
             </div>
             <div class="row" id="rts_cts_div">
                 <div class="six columns">
-                    <label for="rts_pin">UART RTS GPIO</label>
-                    <input type="number" name="rts_pin" value="" id="rts_pin" onchange="flow_control_check()">
+                    <label for="gpio_rts">UART RTS GPIO</label>
+                    <input type="number" name="gpio_rts" value="" id="gpio_rts" onchange="flow_control_check()">
                 </div>
                 <div class="six columns">
-                    <label for="cts_pin">UART CTS GPIO</label>
-                    <input type="number" name="cts_pin" value="" id="cts_pin" onchange="flow_control_check()">
+                    <label for="gpio_cts">UART CTS GPIO</label>
+                    <input type="number" name="gpio_cts" value="" id="gpio_cts" onchange="flow_control_check()">
                 </div>
             </div>
             <div class="row" id="rts_thresh_div">
@@ -162,8 +187,8 @@
             </div>
             <div class="row">
                 <div class="six columns">
-                    <label for="telem_proto">UART serial protocol</label>
-                    <select id="telem_proto" name="telem_proto" form="settings_form"
+                    <label for="proto">UART serial protocol</label>
+                    <select id="proto" name="proto" form="settings_form"
                             onchange="change_msp_ltm_visibility()">
                         <option value="1">MSP/LTM</option>
                         <option value="4">MAVLink</option>
@@ -198,14 +223,13 @@
             </div>
             <div id="msp_ltm_div" class="row">
                 <div class="twelve columns">
-                    <label for="ltm_pp">LTM frames per packet</label>
-                    <select id="ltm_pp" name="ltm_pp" form="settings_form">
+                    <label for="ltm_per_packet">LTM frames per packet</label>
+                    <select id="ltm_per_packet" name="ltm_per_packet" form="settings_form">
                         <option value="1">1</option>
                         <option value="2">2</option>
                         <option value="3">3</option>
                         <option value="4">4</option>
-                        <option value="6">6</option>
-                        <option value="10">10</option>
+                        <option value="5">5</option>
                     </select>
                 </div>
             </div>
@@ -227,8 +251,13 @@
                     <input type="number" id="serial_timeout" name="serial_timeout" min="1" max="65535" value="50">
                 </div>
             </div>
-            <div class="row">
-
+            <div id="rep_rssi_dbm_div" class="row">
+                <div class="twelve columns">
+                    <div class="checkbox-wrapper-14">
+                        <input id="rep_rssi_dbm" name="rep_rssi_dbm" type="checkbox" class="switch">
+                        <label for="rep_rssi_dbm">Report Rssi in [dBm] instead of 0-100</label>
+                    </div>
+                </div>
             </div>
         </div>
     </form>

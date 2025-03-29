@@ -30,7 +30,6 @@
 #include <sys/cdefs.h>
 #include <stdint-gcc.h>
 #include <driver/usb_serial_jtag.h>
-#include "fastmavlink/c_library/common/common.h"
 #include "db_serial.h"
 #include "main.h"
 #include "db_esp32_control.h"
@@ -38,11 +37,11 @@
 #include "msp_ltm_serial.h"
 #include "globals.h"
 #include "driver/uart.h"
+#include <db_parameters.h>
 
 #define FASTMAVLINK_ROUTER_LINKS_MAX  3
 #define FASTMAVLINK_ROUTER_COMPONENTS_MAX  5
 
-#include "fastmavlink/c_library/lib/fastmavlink_router.h"
 #include "db_mavlink_msgs.h"
 
 #define TAG "DB_SERIAL"
@@ -69,28 +68,28 @@ fmav_message_t msg;
 esp_err_t open_uart_serial_socket() {
     // only open serial socket/UART if PINs are not matching - matching PIN nums mean they still need to be defined by
     // the user no pre-defined pins as of this release since ESP32 boards have wildly different pin configurations
-    if (DB_UART_PIN_RX == DB_UART_PIN_TX) {
+    if (DB_PARAM_GPIO_RX == DB_PARAM_GPIO_TX) {
         ESP_LOGW(TAG, "Init UART socket aborted. TX GPIO == RX GPIO - Configure first!");
         return ESP_FAIL;
     }
-    if (DB_UART_PIN_TX > SOC_GPIO_IN_RANGE_MAX || DB_UART_PIN_RX > SOC_GPIO_IN_RANGE_MAX || DB_UART_PIN_CTS > SOC_GPIO_IN_RANGE_MAX || DB_UART_PIN_RTS > SOC_GPIO_IN_RANGE_MAX) {
+    if (DB_PARAM_GPIO_TX > SOC_GPIO_IN_RANGE_MAX || DB_PARAM_GPIO_RX > SOC_GPIO_IN_RANGE_MAX || DB_PARAM_GPIO_CTS > SOC_GPIO_IN_RANGE_MAX || DB_PARAM_GPIO_RTS > SOC_GPIO_IN_RANGE_MAX) {
         ESP_LOGW(TAG, "UART GPIO numbers out of range %i. Configure first!", SOC_GPIO_IN_RANGE_MAX);
         return ESP_FAIL;
     }
-    bool flow_control = DB_UART_PIN_CTS != DB_UART_PIN_RTS;
+    bool flow_control = DB_PARAM_GPIO_CTS != DB_PARAM_GPIO_RTS;
     ESP_LOGI(TAG, "Flow control enabled: %s", flow_control ? "true" : "false");
     uart_config_t uart_config = {
-            .baud_rate = DB_UART_BAUD_RATE,
+            .baud_rate = DB_PARAM_SERIAL_BAUD,
             .data_bits = UART_DATA_8_BITS,
             .parity    = UART_PARITY_DISABLE,
             .stop_bits = UART_STOP_BITS_1,
             .flow_ctrl = flow_control ? UART_HW_FLOWCTRL_CTS_RTS : UART_HW_FLOWCTRL_DISABLE,
-            .rx_flow_ctrl_thresh = DB_UART_RTS_THRESH,
+            .rx_flow_ctrl_thresh = DB_PARAM_SERIAL_RTS_THRESH,
     };
     ESP_ERROR_CHECK(uart_param_config(UART_NUM, &uart_config));
-    ESP_ERROR_CHECK(uart_set_pin(UART_NUM, DB_UART_PIN_TX, DB_UART_PIN_RX,
-                                 flow_control ? DB_UART_PIN_RTS : UART_PIN_NO_CHANGE,
-                                 flow_control ? DB_UART_PIN_CTS : UART_PIN_NO_CHANGE));
+    ESP_ERROR_CHECK(uart_set_pin(UART_NUM, DB_PARAM_GPIO_TX, DB_PARAM_GPIO_RX,
+                                 flow_control ? DB_PARAM_GPIO_RTS : UART_PIN_NO_CHANGE,
+                                 flow_control ? DB_PARAM_GPIO_CTS : UART_PIN_NO_CHANGE));
     return uart_driver_install(UART_NUM, 1024, 0, 10, NULL, 0);
 }
 
@@ -170,12 +169,12 @@ int db_read_serial(uint8_t *uart_read_buf, uint length) {
 }
 
 /**
- * Check armed state of LTM packet if feature DB_DISABLE_RADIO_ARMED is set and we got a status frame.
+ * Check armed state of LTM packet if feature DB_PARAM_DIS_RADIO_ON_ARM is set and we got a status frame.
  * Triggers the enabling or disabling of the Wi-Fi.
  * @param db_msp_ltm_port MSP/LTM parser struct
  */
 void db_ltm_check_arm_state_set_wifi(const msp_ltm_port_t *db_msp_ltm_port) {
-    if (DB_DISABLE_RADIO_ARMED && db_msp_ltm_port->ltm_type == LTM_TYPE_S) {
+    if (DB_PARAM_DIS_RADIO_ON_ARM && db_msp_ltm_port->ltm_type == LTM_TYPE_S) {
         if (db_msp_ltm_port->ltm_frame_buffer[2 + LTM_TYPE_S_PAYLOAD_SIZE] & LTM_ARMED_BIT_MASK) {
             // autopilot says it is armed
             db_set_wifi_status(false);  // disable Wi-Fi
@@ -212,10 +211,10 @@ void db_parse_msp_ltm(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_
                     ltm_frames_in_buffer_pnt += (db_msp_ltm_port->ltm_payload_cnt + 4);
                     ltm_frames_in_buffer++;
                     db_ltm_check_arm_state_set_wifi(db_msp_ltm_port);
-                    if (ltm_frames_in_buffer == DB_LTM_FRAME_NUM_BUFFER &&
-                        (DB_LTM_FRAME_NUM_BUFFER <= MAX_LTM_FRAMES_IN_BUFFER)) {
+                    if (ltm_frames_in_buffer == db_param_ltm_per_packet.value.db_param_u8.value &&
+                        (db_param_ltm_per_packet.value.db_param_u8.value <= MAX_LTM_FRAMES_IN_BUFFER)) {
                         db_send_to_all_clients(tcp_clients, udp_connection, ltm_frame_buffer, *serial_read_bytes);
-                        ESP_LOGD(TAG, "Sent %i LTM message(s) to telemetry port!", DB_LTM_FRAME_NUM_BUFFER);
+                        ESP_LOGD(TAG, "Sent %i LTM message(s) to telemetry port!", ltm_frames_in_buffer);
                         ltm_frames_in_buffer = 0;
                         ltm_frames_in_buffer_pnt = 0;
                         *serial_read_bytes = 0;
@@ -318,14 +317,14 @@ void db_read_serial_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, 
     static uint mav_msg_counter = 0;
     static uint8_t mav_parser_rx_buf[296];  // at least 280 bytes which is the max len for a MAVLink v2 packet
     static fmav_status_t fmav_status_serial;    // fmav parser status struct for serial parser
-    uint8_t uart_read_buf[DB_TRANS_BUF_SIZE];
+    uint8_t uart_read_buf[DB_PARAM_SERIAL_PACK_SIZE];
     // timeout variables
     static TickType_t last_tick = 0;    // time when we received something from the serial interface for the last time
     static TickType_t current_tick = 0;
     current_tick = xTaskGetTickCount(); // get current time
 
     // Read bytes from serial link (UART or USB/JTAG interface)
-    int bytes_read = db_read_serial(uart_read_buf, DB_TRANS_BUF_SIZE);
+    int bytes_read = db_read_serial(uart_read_buf, DB_PARAM_SERIAL_PACK_SIZE);
 
     if (bytes_read == 0) {
         // did not read anything this cycle -> check serial read timeout
@@ -357,20 +356,20 @@ void db_read_serial_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, 
                      result.frame_len);
             mav_msg_counter++;
             // Check if the new message will fit in the buffer
-            if (*serial_buff_pos == 0 && result.frame_len > DB_TRANS_BUF_SIZE) {
-                // frame_len is bigger than DB_TRANS_BUF_SIZE -> Split into multiple messages since
+            if (*serial_buff_pos == 0 && result.frame_len > DB_PARAM_SERIAL_PACK_SIZE) {
+                // frame_len is bigger than DB_PARAM_SERIAL_PACK_SIZE -> Split into multiple messages since
                 // e.g. ESP-NOW can only handle DB_ESPNOW_PAYLOAD_MAXSIZE bytes which is less than MAVLink max msg length
                 uint16_t sent_bytes = 0;
                 uint16_t next_chunk_len = 0;
                 do {
                     next_chunk_len = result.frame_len - sent_bytes;
-                    if (next_chunk_len > DB_TRANS_BUF_SIZE) {
-                        next_chunk_len = DB_TRANS_BUF_SIZE;
+                    if (next_chunk_len > DB_PARAM_SERIAL_PACK_SIZE) {
+                        next_chunk_len = DB_PARAM_SERIAL_PACK_SIZE;
                     } else {}
                     db_send_to_all_clients(tcp_clients, udp_conns, &mav_parser_rx_buf[sent_bytes], next_chunk_len);
                     sent_bytes += next_chunk_len;
                 } while (sent_bytes < result.frame_len);
-            } else if (*serial_buff_pos + result.frame_len > DB_TRANS_BUF_SIZE) {
+            } else if (*serial_buff_pos + result.frame_len > DB_PARAM_SERIAL_PACK_SIZE) {
                 // New message won't fit into the buffer, send buffer first
                 db_send_to_all_clients(tcp_clients, udp_conns, serial_buffer, *serial_buff_pos);
                 *serial_buff_pos = 0;
@@ -423,7 +422,7 @@ void db_read_serial_parse_transparent(int tcp_clients[], udp_conn_list_t *udp_co
     static TickType_t current_tick = 0;
     current_tick = xTaskGetTickCount(); // get current time
     // read from UART directly into TCP & UDP send buffer
-    if ((read = db_read_serial(&serial_buffer[*serial_read_bytes], (DB_TRANS_BUF_SIZE - *serial_read_bytes))) > 0) {
+    if ((read = db_read_serial(&serial_buffer[*serial_read_bytes], (DB_PARAM_SERIAL_PACK_SIZE - *serial_read_bytes))) > 0) {
         serial_total_byte_count += read;    // increase total bytes read via UART
         *serial_read_bytes += read; // set new buffer position
         serial_read_timeout_reached = false;    // reset serial read timeout
@@ -438,7 +437,7 @@ void db_read_serial_parse_transparent(int tcp_clients[], udp_conn_list_t *udp_co
         }
     }
     // send serial data over the air interface
-    if (*serial_read_bytes >= DB_TRANS_BUF_SIZE || (serial_read_timeout_reached && *serial_read_bytes > 0)) {
+    if (*serial_read_bytes >= DB_PARAM_SERIAL_PACK_SIZE || (serial_read_timeout_reached && *serial_read_bytes > 0)) {
         db_send_to_all_clients(tcp_clients, udp_connection, serial_buffer, *serial_read_bytes);
         *serial_read_bytes = 0; // reset buffer position
         serial_read_timeout_reached = false;    // reset serial read timeout

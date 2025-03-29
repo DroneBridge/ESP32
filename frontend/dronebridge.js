@@ -10,7 +10,7 @@ let esp_chip_model = 0;		// according to get_esp_chip_model_str()
 function change_radio_dis_arm_visibility() {
 	// we only support this feature when MAVLink or LTM are set AND when a standard Wi-Fi mode is enabled
 	let radio_dis_onarm_div = document.getElementById("radio_dis_onarm_div")
-	if (document.getElementById("esp32_mode").value > "2" || document.getElementById("telem_proto").value === "5") {
+	if (document.getElementById("esp32_mode").value > "2" || document.getElementById("proto").value === "5") {
 		radio_dis_onarm_div.style.display = "none";
 	} else {
 		radio_dis_onarm_div.style.display = "block";
@@ -23,14 +23,17 @@ function change_ap_ip_visibility(){
 	let disclamer_div = document.getElementById("esp-lr-ap-disclaimer");
 	let wifi_ssid_div = document.getElementById("wifi_ssid_div");
 	let wifi_en_gn_div = document.getElementById("wifi_en_gn_div");
+	let static_ip_config_div = document.getElementById("static_ip_config_div");
 	if (document.getElementById("esp32_mode").value === "2") {
 		ap_ip_div.style.display = "none";
 		ap_channel_div.style.display = "none";
 		wifi_en_gn_div.style.display = "block";
+		static_ip_config_div.style.display = "block";
 	} else {
 		ap_ip_div.style.display = "block";
 		ap_channel_div.style.display = "block";
 		wifi_en_gn_div.style.display = "none";
+		static_ip_config_div.style.display = "none";
 	}
 	if (document.getElementById("esp32_mode").value > "2") {
 		disclamer_div.style.display = "block";
@@ -49,13 +52,20 @@ function change_ap_ip_visibility(){
 function change_msp_ltm_visibility(){
 	let msp_ltm_div = document.getElementById("msp_ltm_div");
 	let trans_pack_size_div = document.getElementById("trans_pack_size_div");
-	let telem_proto = document.getElementById("telem_proto");
+	let rep_rssi_dbm_div = document.getElementById("rep_rssi_dbm_div");
+	let telem_proto = document.getElementById("proto");
 	if (telem_proto.value === "1") {
 		msp_ltm_div.style.display = "block";
 		trans_pack_size_div.style.display = "none";
+
 	} else {
 		msp_ltm_div.style.display = "none";
 		trans_pack_size_div.style.display = "block";
+	}
+	if (telem_proto.value === "4") {
+		rep_rssi_dbm_div.style.display = "block";
+	} else {
+		rep_rssi_dbm_div.style.display = "none";
 	}
 	change_radio_dis_arm_visibility();
 }
@@ -79,9 +89,9 @@ function change_uart_visibility() {
 }
 
 function flow_control_check() {
-	let rts_pin = document.getElementById("rts_pin");
-	let cts_pin = document.getElementById("cts_pin");
-	if (isNaN(rts_pin.value) || isNaN(cts_pin.value) || cts_pin.value === '' || rts_pin.value === '' || rts_pin.value === cts_pin.value) {
+	let gpio_rts = document.getElementById("gpio_rts");
+	let gpio_cts = document.getElementById("gpio_cts");
+	if (isNaN(gpio_rts.value) || isNaN(gpio_cts.value) || gpio_cts.value === '' || gpio_rts.value === '' || gpio_rts.value === gpio_cts.value) {
 		show_toast("UART flow control disabled.")
 	} else {
 		show_toast("UART flow control enabled. Make sure RTS & CTS pins are connected!");
@@ -288,14 +298,14 @@ function get_stats() {
 		if ('esp_rssi' in json_data) {
 			let rssi = parseInt(json_data["esp_rssi"])
 			if (!isNaN(rssi) && rssi < 0) {
-				document.getElementById("current_client_ip").innerHTML = "IP Address: " + json_data["current_client_ip"] + "<br />RSSI: " + rssi + "dBm"
+				document.getElementById("current_client_ip").innerHTML = "IP Address: " + json_data["current_client_ip"] + "<br />Signal Strength: " + rssi + "dBm"
 			} else if (!isNaN(rssi)) {
 				document.getElementById("current_client_ip").innerHTML = "IP Address: " + json_data["current_client_ip"]
 			}
 		} else if ('connected_sta' in json_data) {
 			let a = ""
 			json_data["connected_sta"].forEach((item) => {
-				a = a + "Client: " + item.sta_mac + " RSSI: " + item.sta_rssi + "dBm<br />"
+				a = a + "Client: " + item.sta_mac + " Signal Strength: " + item.sta_rssi + "dBm<br />"
 			});
 			document.getElementById("current_client_ip").innerHTML = a
 		}
@@ -347,8 +357,8 @@ function add_new_udp_client() {
 
 	if (ip != null && port != null && ippattern.test(ip)) {
 		let myjson = {
-			ip: ip,
-			port: port,
+			udp_client_ip: ip,
+			udp_client_port: port,
 			save: save_to_nvm
 		};
 		send_json("api/settings/clients/udp", JSON.stringify(myjson)).then(send_response => {

@@ -140,9 +140,8 @@
 
 
 // Allows to ignore compiler warning "-Waddress-of-packed-member"
-/*
 #define FASTMAVLINK_IGNORE_WADDRESSOFPACKEDMEMBER
-*/
+
 
 
 // Allows to use a faster lookup table based crc calculation.
