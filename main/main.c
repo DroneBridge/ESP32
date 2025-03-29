@@ -464,12 +464,14 @@ void db_write_settings_to_nvs() {
     ESP_LOGI(TAG, "Trying to save parameters:");
     uint8_t param_str_buffer[512];
     db_param_print_values_to_buffer(param_str_buffer);
+    ESP_LOGI(TAG, "%s", param_str_buffer);
     ESP_LOGI(TAG, "Saving to NVS %s", NVS_NAMESPACE);
     nvs_handle_t my_handle;
     ESP_ERROR_CHECK(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &my_handle));
     db_param_write_all_params_nvs(&my_handle);
     ESP_ERROR_CHECK(nvs_commit(my_handle));
     nvs_close(my_handle);
+    ESP_LOGI(TAG, "Finished saving operation.");
 }
 
 /**

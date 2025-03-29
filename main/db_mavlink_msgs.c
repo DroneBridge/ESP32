@@ -94,7 +94,7 @@ uint16_t db_create_heartbeat(uint8_t *buff, fmav_status_t *fmav_status) {
  * @param param_id The name of the parameter (ID)
  * @return Length of the mavlink message inside the buffer
  */
-uint16_t db_get_mavmsg_param(uint8_t *buff, fmav_status_t *fmav_status, uint16_t param_index, float_int_union *value, uint8_t type, char *param_id) {
+uint16_t db_get_mavmsg_param_value(uint8_t *buff, fmav_status_t *fmav_status, uint16_t param_index, float_int_union *value, uint8_t type, char *param_id) {
     fmav_param_value_t fmav_param_value = {
             .param_value = value->f,
             .param_type = type,
@@ -120,8 +120,13 @@ uint16_t db_get_mavmsg_param(uint8_t *buff, fmav_status_t *fmav_status, uint16_t
  */
 MAV_PARAM_TYPE db_mav_get_parameter_value(float_int_union *float_int, const char *param_id, const int16_t param_index) {
     MAV_PARAM_TYPE type = 0;
+    if (param_index >= DB_PARAM_MAV_CNT) {
+        ESP_LOGE(TAG, "Requested mavlink parameter index %i is out of range (0-%i)", param_index, DB_PARAM_MAV_CNT-1);
+        return 0;
+    }
     for (int i = 0; i < sizeof(db_params) / sizeof(db_params[0]); i++) {
         if (strncmp(param_id, (char *) db_params[i]->mav_t.param_name, 16) == 0 || param_index == db_params[i]->mav_t.param_index) {
+            // found the parameter to return its value
             type = db_params[i]->mav_t.param_type;
             switch (db_params[i]->type) {
                 case STRING:
@@ -376,8 +381,8 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
                         ESP_LOGE(TAG, "db_param_write_all_params_json() -> db_parameter.type unknown!");
                     break;
                 }
-                len = db_get_mavmsg_param(buff, fmav_status, db_params[i]->mav_t.param_index, &float_int,
-                                          db_params[i]->mav_t.param_type, (char *) db_params[i]->mav_t.param_name);
+                len = db_get_mavmsg_param_value(buff, fmav_status, db_params[i]->mav_t.param_index, &float_int,
+                                                db_params[i]->mav_t.param_type, (char *) db_params[i]->mav_t.param_name);
                 db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
             }
         }
@@ -389,7 +394,8 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
             ESP_LOGI(TAG, "GCS request reading parameter ID: %s with index %i", payload.param_id, payload.param_index);
             MAV_PARAM_TYPE type = db_mav_get_parameter_value(&float_int, payload.param_id, payload.param_index);
             if (type != 0) {
-                uint16_t len = db_get_mavmsg_param(buff, fmav_status, payload.param_index, &float_int, type, payload.param_id);
+                uint16_t len = db_get_mavmsg_param_value(buff, fmav_status, payload.param_index, &float_int, type,
+                                                         payload.param_id);
                 db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
             } else {
                 // send nothing, unknown parameter
@@ -406,13 +412,15 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
                 float_int_union float_int;
                 MAV_PARAM_TYPE type = db_mav_get_parameter_value(&float_int, parame_set_payload.param_id, -1);
                 if (type != 0) {
-                    uint16_t len = db_get_mavmsg_param(buff, fmav_status, 0, &float_int, type,
-                                                       parame_set_payload.param_id);
+                    uint16_t len = db_get_mavmsg_param_value(buff, fmav_status, 0, &float_int, type,
+                                                             parame_set_payload.param_id);
                     db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
                     db_write_settings_to_nvs();
                 } else {
-                    ESP_LOGE(TAG, "Failed to set parameter %s", parame_set_payload.param_id);
+                    ESP_LOGE(TAG, "Failed to get parameter %s - could not respond with new param", parame_set_payload.param_id);
                 }
+            } else {
+                ESP_LOGE(TAG, "db_write_mavlink_parameter() failed to set new parameter %s ", parame_set_payload.param_id);
             }
         }
             break;

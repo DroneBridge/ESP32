@@ -33,12 +33,12 @@
 #define DB_PATCH_VERSION 0
 #define DB_MATURITY_VERSION "RC2"
 
-#define DB_PARAM_TOTAL_NUM          27  // total number of db parameters
-#define DB_PARAM_MAV_CNT            19 // Number of MAVLink parameters returned by ESP32 in the PARAM message. Needed by GCS.
+#define DB_PARAM_TOTAL_NUM          25  // total number of db parameters
+#define DB_PARAM_MAV_CNT            17  // Number of MAVLink parameters returned by ESP32 in the PARAM message. Needed by GCS.
 
-#define DB_PARAM_NAME_MAXLEN        16
-#define DB_PARAM_MAX_MAV_PARAM_NAME_LEN 16
-#define DB_PARAM_VALUE_MAXLEN       64
+#define DB_PARAM_NAME_MAXLEN        16      // max len of a parameter/key stored in the ESP32 NVM
+#define DB_PARAM_MAX_MAV_PARAM_NAME_LEN 16  // max len of the field used to store the mav param name (max len 16 by def.)
+#define DB_PARAM_VALUE_MAXLEN       64      // max len of a value stored for a key in the ESP32 NVM (string len)
 #define MAX_LTM_FRAMES_IN_BUFFER    5
 
 
@@ -89,7 +89,7 @@
 #define DB_PARAM_GPIO_RTS db_param_gpio_rts.value.db_param_u8.value
 #define DB_PARAM_GPIO_CTS db_param_gpio_cts.value.db_param_u8.value
 #define DB_PARAM_SERIAL_RTS_THRESH db_param_gpio_rts_thresh.value.db_param_u8.value
-#define DB_PARAM_EN_EXT_ANT db_param_en_ext_ant.value.db_param_u8.value
+#define DB_PARAM_EN_EXT_ANT db_param_radio_ant_ext.value.db_param_u8.value
 
 enum E_DB_WIFI_MODE {
     DB_WIFI_MODE_AP = 1,            // Wi-Fi access point mode with 802.11b mode enabled
@@ -146,7 +146,7 @@ typedef struct db_parameter_s {
     enum db_param_type_t type;
     struct {    // no string support for mavlink
       uint8_t param_name[DB_PARAM_MAX_MAV_PARAM_NAME_LEN];
-      int8_t param_index;           // strings will be ignored for mavlink set to -1 for strings
+      uint16_t param_index;         // strings will be ignored for mavlink set to -1 for strings
       MAV_PARAM_TYPE param_type;    // set to MAV_PARAM_TYPE_ENUM_END for strings
     } mav_t;
     union {
@@ -168,11 +168,10 @@ extern db_parameter_t db_param_wifi_sta_gw;
 extern db_parameter_t db_param_wifi_sta_netmask;
 extern db_parameter_t db_param_udp_client_ip;
 extern db_parameter_t db_param_wifi_hostname;
-extern db_parameter_t db_param_sw_version;
 extern db_parameter_t db_param_radio_mode;
 extern db_parameter_t db_param_channel;
 extern db_parameter_t db_param_wifi_en_gn;
-extern db_parameter_t db_param_wifi_ant_ext;
+extern db_parameter_t db_param_radio_ant_ext;
 extern db_parameter_t db_param_baud;
 extern db_parameter_t db_param_gpio_tx;
 extern db_parameter_t db_param_gpio_rx;
@@ -185,7 +184,6 @@ extern db_parameter_t db_param_serial_read_timeout;
 extern db_parameter_t db_param_ltm_per_packet;
 extern db_parameter_t db_param_dis_radio_armed;
 extern db_parameter_t db_param_udp_client_port;
-extern db_parameter_t db_param_en_ext_ant;
 extern db_parameter_t db_param_rssi_dbm;
 
 void db_param_init_parameters();

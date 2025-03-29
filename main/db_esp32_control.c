@@ -571,7 +571,7 @@ void handle_internal_telemetry(int tel_sock, uint8_t *udp_buffer, socklen_t *soc
 
 /**
  * Thread that manages all incoming and outgoing TCP, UDP and serial (UART) connections.
- * Called when Wi-Fi modes are selected
+ * Executed when Wi-Fi modes are set - ESP-NOW has its own thread
  */
 _Noreturn void control_module_udp_tcp() {
     ESP_LOGI(TAG, "Starting control module (Wi-Fi)");

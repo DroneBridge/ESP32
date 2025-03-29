@@ -51,27 +51,6 @@ db_parameter_t db_param_ssid, db_param_pass, db_param_wifi_ap_ip, db_param_wifi_
 /* ---------- From here with increasing param_index all parameters that are also available via MAVLink ---------- */
 
 /**
- * For reporting build version via MAVLink. Does not change.
- */
-db_parameter_t db_param_sw_version = {
-        .db_name = "sw_version",
-        .type = UINT8,
-        .mav_t = {
-                .param_name = "SYS_SW_VERSION",
-                .param_index = 0,
-                .param_type = MAV_PARAM_TYPE_UINT8,
-        },
-        .value = {
-                .db_param_u8 = {
-                        .value = DB_BUILD_VERSION,
-                        .default_value = DB_BUILD_VERSION,
-                        .min = DB_BUILD_VERSION,
-                        .max = DB_BUILD_VERSION,
-                }
-        }
-};
-
-/**
  * never change this value while the ESP32 is running, will likely lead to a crash.
  * Assign it during startup when received from storage. Can therefore only be changed via reboot and DB_WIFI_MODE_DESIGNATED
  */
@@ -80,7 +59,7 @@ db_parameter_t db_param_radio_mode = {
         .type = UINT8,
         .mav_t = {
                 .param_name = "SYS_ESP32_MODE",
-                .param_index = 1,
+                .param_index = 0,
                 .param_type = MAV_PARAM_TYPE_UINT8,
         },
         .value = {
@@ -101,7 +80,7 @@ db_parameter_t db_param_channel = {
         .type = UINT8,
         .mav_t = {
                 .param_name = "WIFI_AP_CHANNEL",
-                .param_index = 2,
+                .param_index = 1,
                 .param_type = MAV_PARAM_TYPE_UINT8,
         },
         .value = {
@@ -124,7 +103,7 @@ db_parameter_t db_param_wifi_en_gn = {
         .type = UINT8,
         .mav_t = {
                 .param_name = "WIFI_EN_GN",
-                .param_index = 3,
+                .param_index = 2,
                 .param_type = MAV_PARAM_TYPE_UINT8,
         },
         .value = {
@@ -139,13 +118,14 @@ db_parameter_t db_param_wifi_en_gn = {
 
 /**
  * Set to 1 to use external antenna. Set to 0 to enable onboard antenna - board must have antenna switch
+ * Official ESP32C6 board supports this option.
  */
-db_parameter_t db_param_wifi_ant_ext = {
+db_parameter_t db_param_radio_ant_ext = {
         .db_name = "ant_use_ext",
         .type = UINT8,
         .mav_t = {
                 .param_name = "RADIO_EN_EXT_ANT",
-                .param_index = 4,
+                .param_index = 3,
                 .param_type = MAV_PARAM_TYPE_UINT8,
         },
         .value = {
@@ -165,8 +145,8 @@ db_parameter_t db_param_baud = {
         .db_name = "baud",
         .type = INT32,
         .mav_t = {
-                .param_name = "RADIO_EN_EXT_ANT",
-                .param_index = 5,
+                .param_name = "SERIAL_BAUD",
+                .param_index = 4,
                 .param_type = MAV_PARAM_TYPE_INT32,
         },
         .value = {
@@ -187,7 +167,7 @@ db_parameter_t db_param_gpio_tx = {
         .type = UINT8,
         .mav_t = {
                 .param_name = "SERIAL_TX_PIN",
-                .param_index = 6,
+                .param_index = 5,
                 .param_type = MAV_PARAM_TYPE_UINT8,
         },
         .value = {
@@ -208,7 +188,7 @@ db_parameter_t db_param_gpio_rx = {
         .type = UINT8,
         .mav_t = {
                 .param_name = "SERIAL_RX_PIN",
-                .param_index = 7,
+                .param_index = 6,
                 .param_type = MAV_PARAM_TYPE_UINT8,
         },
         .value = {
@@ -229,7 +209,7 @@ db_parameter_t db_param_gpio_rts = {
         .type = UINT8,
         .mav_t = {
                 .param_name = "SERIAL_RTS_PIN",
-                .param_index = 8,
+                .param_index = 7,
                 .param_type = MAV_PARAM_TYPE_UINT8,
         },
         .value = {
@@ -250,7 +230,7 @@ db_parameter_t db_param_gpio_cts = {
         .type = UINT8,
         .mav_t = {
                 .param_name = "SERIAL_CTS_PIN",
-                .param_index = 9,
+                .param_index = 8,
                 .param_type = MAV_PARAM_TYPE_UINT8,
         },
         .value = {
@@ -271,7 +251,7 @@ db_parameter_t db_param_gpio_rts_thresh = {
         .type = UINT8,
         .mav_t = {
                 .param_name = "SERIAL_RTS_THRES",
-                .param_index = 10,
+                .param_index = 9,
                 .param_type = MAV_PARAM_TYPE_UINT8,
         },
         .value = {
@@ -292,7 +272,7 @@ db_parameter_t db_param_proto = {
         .type = UINT8,
         .mav_t = {
                 .param_name = "SERIAL_TEL_PROTO",
-                .param_index = 11,
+                .param_index = 10,
                 .param_type = MAV_PARAM_TYPE_UINT8,
         },
         .value = {
@@ -313,7 +293,7 @@ db_parameter_t db_param_serial_pack_size = {
         .type = UINT16,
         .mav_t = {
                 .param_name = "SERIAL_PACK_SIZE",
-                .param_index = 12,
+                .param_index = 11,
                 .param_type = MAV_PARAM_TYPE_UINT16,
         },
         .value = {
@@ -335,7 +315,7 @@ db_parameter_t db_param_serial_read_timeout = {
         .type = UINT16,
         .mav_t = {
                 .param_name = "SERIAL_T_OUT_MS",
-                .param_index = 13,
+                .param_index = 12,
                 .param_type = MAV_PARAM_TYPE_UINT16,
         },
         .value = {
@@ -356,7 +336,7 @@ db_parameter_t db_param_ltm_per_packet = {
         .type = UINT8,
         .mav_t = {
                 .param_name = "SERIAL_LTM_PACK",
-                .param_index = 14,
+                .param_index = 13,
                 .param_type = MAV_PARAM_TYPE_UINT8,
         },
         .value = {
@@ -377,7 +357,7 @@ db_parameter_t db_param_dis_radio_armed = {
         .type = UINT8,
         .mav_t = {
                 .param_name = "RADIO_DIS_ON_ARM",
-                .param_index = 15,
+                .param_index = 14,
                 .param_type = MAV_PARAM_TYPE_UINT8,
         },
         .value = {
@@ -398,7 +378,7 @@ db_parameter_t db_param_udp_client_port = {
         .type = UINT16,
         .mav_t = {
                 .param_name = "WIFI_UDP_CPORT",
-                .param_index = 16,
+                .param_index = 15,
                 .param_type = MAV_PARAM_TYPE_UINT16,
         },
         .value = {
@@ -407,27 +387,6 @@ db_parameter_t db_param_udp_client_port = {
                         .default_value = 0,
                         .min = 0,
                         .max = UINT16_MAX,
-                }
-        }
-};
-
-/**
- *  Enable the use of the external antenna of the official DB for ESP32 C6 board
- */
-db_parameter_t db_param_en_ext_ant = {
-        .db_name = "ant_use_ext",
-        .type = UINT8,
-        .mav_t = {
-                .param_name = "RADIO_EN_EXT_ANT",
-                .param_index = 17,
-                .param_type = MAV_PARAM_TYPE_UINT8,
-        },
-        .value = {
-                .db_param_u8 = {
-                        .value = false,
-                        .default_value = false,
-                        .min = false,
-                        .max = true,
                 }
         }
 };
@@ -442,7 +401,7 @@ db_parameter_t db_param_rssi_dbm = {
         .type = UINT8,
         .mav_t = {
                 .param_name = "RADIO_RSSI_DBM",
-                .param_index = 18,
+                .param_index = 16,
                 .param_type = MAV_PARAM_TYPE_UINT8,
         },
         .value = {
@@ -541,10 +500,9 @@ void db_param_init_parameters() {
             &db_param_udp_client_ip,
             &db_param_wifi_hostname,
             &db_param_radio_mode,
-            &db_param_sw_version,
             &db_param_channel,
             &db_param_wifi_en_gn,
-            &db_param_wifi_ant_ext,
+            &db_param_radio_ant_ext,
             &db_param_baud,
             &db_param_gpio_tx,
             &db_param_gpio_rx,
@@ -557,7 +515,6 @@ void db_param_init_parameters() {
             &db_param_ltm_per_packet,
             &db_param_dis_radio_armed,
             &db_param_udp_client_port,
-            &db_param_en_ext_ant,
             &db_param_rssi_dbm
     };
     memcpy(db_params, db_params_l, sizeof(db_params_l));
