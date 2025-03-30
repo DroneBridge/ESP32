@@ -43,6 +43,7 @@
 #include "iot_button.h"
 #include "db_serial.h"
 #include "globals.h"
+#include "db_ble.h"
 
 #define NVS_NAMESPACE "settings"
 
@@ -632,45 +633,61 @@ void db_configure_antenna() {
  * Main entry point.
  */
 void app_main() {
-    db_param_init_parameters();
-    udp_conn_list = udp_client_list_create();   // http server functions and db_read_settings_nvs expect the list to exist
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(ret);
-    db_read_settings_nvs();
-    DB_RADIO_MODE_DESIGNATED = DB_PARAM_RADIO_MODE; // must always match, mismatch only allowed when changed by user action and not rebooted, yet.
-    set_reset_trigger();
-    db_configure_antenna();
-    if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_AP || DB_PARAM_RADIO_MODE == DB_WIFI_MODE_AP_LR) {
-        db_init_wifi_apmode(DB_PARAM_RADIO_MODE);
-    } else if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_ESPNOW_AIR || DB_PARAM_RADIO_MODE == DB_WIFI_MODE_ESPNOW_GND) {
-        db_init_wifi_espnow();
-        db_start_espnow_module();
-    } else {
-        // Wi-Fi client mode with LR mode enabled
-        if (db_init_wifi_clientmode() < 0) {
-            ESP_LOGE(TAG, "Failed to init Wifi Client Mode");
-        }
-    }
+  db_param_init_parameters();
+  udp_conn_list = udp_client_list_create(); // http server functions and db_read_settings_nvs expect the list to exist
+  esp_err_t ret = nvs_flash_init();
+  if (ret == ESP_ERR_NVS_NO_FREE_PAGES) {
+    ESP_ERROR_CHECK(nvs_flash_erase());
+    ret = nvs_flash_init();
+  }
+  ESP_ERROR_CHECK(ret);
+  db_read_settings_nvs();
+  DB_RADIO_MODE_DESIGNATED =
+      DB_PARAM_RADIO_MODE; // must always match, mismatch only allowed when changed by user action and not rebooted, yet.
+  set_reset_trigger();
+  db_configure_antenna();
 
-    if (DB_PARAM_RADIO_MODE != DB_WIFI_MODE_ESPNOW_AIR && DB_PARAM_RADIO_MODE != DB_WIFI_MODE_ESPNOW_GND) {
-        // no need to start these services - won`t be available anyway - safe the resources
-        start_mdns_service();
-        netbiosns_init();
-        netbiosns_set_name("dronebridge");
-    }
-    ESP_ERROR_CHECK(init_fs());
-    db_start_control_module();
+  switch (DB_PARAM_RADIO_MODE) {
+  case DB_WIFI_MODE_AP:
+  case DB_WIFI_MODE_AP_LR:
+    db_init_wifi_apmode(DB_PARAM_RADIO_MODE);
+    break;
 
-    if (DB_PARAM_RADIO_MODE != DB_WIFI_MODE_ESPNOW_AIR && DB_PARAM_RADIO_MODE != DB_WIFI_MODE_ESPNOW_GND) {
-        // no need to start these services - won`t be available anyway - safe the resources
-        ESP_ERROR_CHECK(start_rest_server(CONFIG_WEB_MOUNT_POINT));
-        ESP_LOGI(TAG, "Rest Server started");
-        // Disable legacy support for DroneBridge communication module - no use case for DroneBridge for ESP32
-        // communication_module();
+  case DB_WIFI_MODE_ESPNOW_AIR:
+  case DB_WIFI_MODE_ESPNOW_GND:
+    db_init_wifi_espnow();
+    db_start_espnow_module();
+    break;
+
+  case DB_BLUETOOTH_MODE_SPP:
+    db_init_wifi_apmode(DB_PARAM_RADIO_MODE);
+    db_queue_ble_init();
+    db_init_ble();
+    break;
+
+  default:
+    // Wi-Fi client mode with LR mode enabled
+    if (db_init_wifi_clientmode() < 0) {
+      ESP_LOGE(TAG, "Failed to init Wifi Client Mode");
     }
-    ESP_LOGI(TAG, "app_main finished initial setup");
+    break;
+  }
+
+  if (DB_PARAM_RADIO_MODE != DB_WIFI_MODE_ESPNOW_AIR && DB_PARAM_RADIO_MODE != DB_WIFI_MODE_ESPNOW_GND) {
+    // no need to start these services - won`t be available anyway - safe the resources
+    start_mdns_service();
+    netbiosns_init();
+    netbiosns_set_name("dronebridge");
+  }
+  ESP_ERROR_CHECK(init_fs());
+  db_start_control_module();
+
+  if (DB_PARAM_RADIO_MODE != DB_WIFI_MODE_ESPNOW_AIR && DB_PARAM_RADIO_MODE != DB_WIFI_MODE_ESPNOW_GND) {
+    // no need to start these services - won`t be available anyway - safe the resources
+    ESP_ERROR_CHECK(start_rest_server(CONFIG_WEB_MOUNT_POINT));
+    ESP_LOGI(TAG, "Rest Server started");
+    // Disable legacy support for DroneBridge communication module - no use case for DroneBridge for ESP32
+    // communication_module();
+  }
+  ESP_LOGI(TAG, "app_main finished initial setup");
 }

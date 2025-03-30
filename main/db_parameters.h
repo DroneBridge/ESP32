@@ -92,12 +92,13 @@
 #define DB_PARAM_EN_EXT_ANT db_param_radio_ant_ext.value.db_param_u8.value
 
 enum E_DB_WIFI_MODE {
-    DB_WIFI_MODE_AP = 1,            // Wi-Fi access point mode with 802.11b mode enabled
-    DB_WIFI_MODE_STA = 2,           // Wi-Fi client mode with 802.11b and LR mode enabled
-    DB_WIFI_MODE_AP_LR = 3,         // ESP32 WiFi LR Mode 802.11b
-    DB_WIFI_MODE_ESPNOW_AIR = 4,    // ESP-NOW Mode for broadcasting device
-    DB_WIFI_MODE_ESPNOW_GND = 5,    // ESP-NOW Mode for GND station
-    DB_WIFI_MODE_END = 6,    // End of enum
+  DB_WIFI_MODE_AP         = 1, // Wi-Fi access point mode with 802.11b mode enabled
+  DB_WIFI_MODE_STA        = 2, // Wi-Fi client mode with 802.11b and LR mode enabled
+  DB_WIFI_MODE_AP_LR      = 3, // ESP32 WiFi LR Mode 802.11b
+  DB_WIFI_MODE_ESPNOW_AIR = 4, // ESP-NOW Mode for broadcasting device
+  DB_WIFI_MODE_ESPNOW_GND = 5, // ESP-NOW Mode for GND station
+  DB_WIFI_MODE_END        = 6, // End of enum
+  DB_BLUETOOTH_MODE_SPP   = 7, // Bluetooth SPP mode
 };
 
 enum E_DB_SERIAL_PROTOCOL {
