@@ -274,7 +274,8 @@ void db_init_wifi_apmode(int wifi_mode) {
 
     wifi_config_t wifi_config = {
             .ap = {
-                    .ssid = "DroneBridge_ESP32_Init",
+                    .ssid = "DroneBridge ESP32 Init Error",
+                    .password = "dronebridge",
                     .ssid_len = 0,
                     .authmode = WIFI_AUTH_WPA2_PSK,
                     .channel = db_param_channel.value.db_param_u8.value,
@@ -285,8 +286,19 @@ void db_init_wifi_apmode(int wifi_mode) {
     };
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstringop-truncation"
-    strncpy((char *) wifi_config.ap.ssid, DB_PARAM_WIFI_SSID, 32);
-    strncpy((char *) wifi_config.ap.password, DB_PARAM_PASS, 64);
+    // Set Wi-Fi SSID and password from the stored parameters
+    if (strlen(DB_PARAM_WIFI_SSID) >= db_param_ssid.value.db_param_str.min_len) {
+        strncpy((char *) wifi_config.ap.ssid, DB_PARAM_WIFI_SSID, db_param_ssid.value.db_param_str.max_len);
+    } else {
+        // something is wrong - switch to default value
+        strncpy((char *) wifi_config.ap.ssid, (char *) db_param_ssid.value.db_param_str.default_value, db_param_ssid.value.db_param_str.max_len);
+    }
+    if (strlen(DB_PARAM_PASS) >= db_param_pass.value.db_param_str.min_len) {
+        strncpy((char *) wifi_config.ap.password, DB_PARAM_PASS, db_param_pass.value.db_param_str.max_len);
+    } else {
+        // something is wrong - switch to default value
+        strncpy((char *) wifi_config.ap.password, (char *) db_param_pass.value.db_param_str.default_value, db_param_pass.value.db_param_str.max_len);
+    }
 #pragma GCC diagnostic pop
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
@@ -357,8 +369,19 @@ int db_init_wifi_clientmode() {
     };
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstringop-truncation"
-    strncpy((char *) wifi_config.sta.ssid, (char *) DB_PARAM_WIFI_SSID, sizeof(wifi_config.sta.ssid));
-    strncpy((char *) wifi_config.sta.password, (char *) DB_PARAM_PASS, 64);
+    // Set Wi-Fi SSID and password from the stored parameters
+    if (strlen(DB_PARAM_WIFI_SSID) >= db_param_ssid.value.db_param_str.min_len) {
+        strncpy((char *) wifi_config.ap.ssid, DB_PARAM_WIFI_SSID, db_param_ssid.value.db_param_str.max_len);
+    } else {
+        // something is wrong - switch to default value
+        strncpy((char *) wifi_config.ap.ssid, (char *) db_param_ssid.value.db_param_str.default_value, db_param_ssid.value.db_param_str.max_len);
+    }
+    if (strlen(DB_PARAM_PASS) >= db_param_pass.value.db_param_str.min_len) {
+        strncpy((char *) wifi_config.ap.password, DB_PARAM_PASS, db_param_pass.value.db_param_str.max_len);
+    } else {
+        // something is wrong - switch to default value
+        strncpy((char *) wifi_config.ap.password, (char *) db_param_pass.value.db_param_str.default_value, db_param_pass.value.db_param_str.max_len);
+    }
 #pragma GCC diagnostic pop
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
@@ -642,38 +665,38 @@ void app_main() {
   }
   ESP_ERROR_CHECK(ret);
   db_read_settings_nvs();
-  DB_RADIO_MODE_DESIGNATED =
-      DB_PARAM_RADIO_MODE; // must always match, mismatch only allowed when changed by user action and not rebooted, yet.
+  DB_RADIO_MODE_DESIGNATED = DB_PARAM_RADIO_MODE; // must always match, mismatch only allowed when changed by user action and not rebooted, yet.
   set_reset_trigger();
   db_configure_antenna();
 
   switch (DB_PARAM_RADIO_MODE) {
-  case DB_WIFI_MODE_AP:
-  case DB_WIFI_MODE_AP_LR:
-    db_init_wifi_apmode(DB_PARAM_RADIO_MODE);
-    break;
+      case DB_WIFI_MODE_AP:
+      case DB_WIFI_MODE_AP_LR:
+        db_init_wifi_apmode(DB_PARAM_RADIO_MODE);
+        break;
 
-  case DB_WIFI_MODE_ESPNOW_AIR:
-  case DB_WIFI_MODE_ESPNOW_GND:
-    db_init_wifi_espnow();
-    db_start_espnow_module();
-    break;
+      case DB_WIFI_MODE_ESPNOW_AIR:
+      case DB_WIFI_MODE_ESPNOW_GND:
+        db_init_wifi_espnow();
+        db_start_espnow_module();
+        break;
 
-  case DB_BLUETOOTH_MODE_SPP:
-    db_init_wifi_apmode(DB_PARAM_RADIO_MODE);
-    db_queue_ble_init();
-    db_init_ble();
-    break;
+      case DB_BLUETOOTH_MODE:
+        // db_init_wifi_apmode(DB_PARAM_RADIO_MODE);
+        db_queue_ble_init();
+        db_init_ble();
+        break;
 
-  default:
-    // Wi-Fi client mode with LR mode enabled
-    if (db_init_wifi_clientmode() < 0) {
-      ESP_LOGE(TAG, "Failed to init Wifi Client Mode");
-    }
-    break;
+      default:
+        // Wi-Fi client mode with LR mode enabled
+        if (db_init_wifi_clientmode() < 0) {
+          ESP_LOGE(TAG, "Failed to init Wifi Client Mode");
+        }
+        break;
   }
 
-  if (DB_PARAM_RADIO_MODE != DB_WIFI_MODE_ESPNOW_AIR && DB_PARAM_RADIO_MODE != DB_WIFI_MODE_ESPNOW_GND) {
+  if (DB_PARAM_RADIO_MODE != DB_WIFI_MODE_ESPNOW_AIR && DB_PARAM_RADIO_MODE != DB_WIFI_MODE_ESPNOW_GND &&
+  DB_PARAM_RADIO_MODE != DB_WIFI_MODE_AP_LR && DB_PARAM_RADIO_MODE != DB_BLUETOOTH_MODE) {
     // no need to start these services - won`t be available anyway - safe the resources
     start_mdns_service();
     netbiosns_init();
@@ -682,7 +705,8 @@ void app_main() {
   ESP_ERROR_CHECK(init_fs());
   db_start_control_module();
 
-  if (DB_PARAM_RADIO_MODE != DB_WIFI_MODE_ESPNOW_AIR && DB_PARAM_RADIO_MODE != DB_WIFI_MODE_ESPNOW_GND) {
+  if (DB_PARAM_RADIO_MODE != DB_WIFI_MODE_ESPNOW_AIR && DB_PARAM_RADIO_MODE != DB_WIFI_MODE_ESPNOW_GND &&
+  DB_PARAM_RADIO_MODE != DB_WIFI_MODE_AP_LR && DB_PARAM_RADIO_MODE != DB_BLUETOOTH_MODE) {
     // no need to start these services - won`t be available anyway - safe the resources
     ESP_ERROR_CHECK(start_rest_server(CONFIG_WEB_MOUNT_POINT));
     ESP_LOGI(TAG, "Rest Server started");
