@@ -97,8 +97,8 @@ enum E_DB_WIFI_MODE {
   DB_WIFI_MODE_AP_LR      = 3, // ESP32 WiFi LR Mode 802.11b
   DB_WIFI_MODE_ESPNOW_AIR = 4, // ESP-NOW Mode for broadcasting device
   DB_WIFI_MODE_ESPNOW_GND = 5, // ESP-NOW Mode for GND station
-  DB_WIFI_MODE_END        = 6, // End of enum
-  DB_BLUETOOTH_MODE_SPP   = 7, // Bluetooth SPP mode
+  DB_BLUETOOTH_MODE       = 6, // Bluetooth BLE mode
+  DB_WIFI_MODE_END        = 7, // End of enum
 };
 
 enum E_DB_SERIAL_PROTOCOL {
@@ -195,7 +195,12 @@ void db_param_read_all_params_nvs(const nvs_handle_t *nvs_handle);
 void db_param_write_all_params_nvs(const nvs_handle_t *nvs_handle);
 void db_param_read_all_params_json(const cJSON *root_obj);
 void db_param_write_all_params_json(cJSON *root_obj);
-bool db_param_is_valid_assign_str(const char *new_string_value, db_parameter_t *target_param);
+
+bool db_param_is_valid_str(char *new_string_value, db_parameter_t *target_param);
+bool db_param_is_valid_u8(uint8_t new_u8_value, db_parameter_t *target_param);
+bool db_param_is_valid_u16(uint16_t new_u16_value, db_parameter_t *target_param);
+bool db_param_is_valid_i32(int32_t new_i32_value, db_parameter_t *target_param);
+bool db_param_is_valid_assign_str(char *new_string_value, db_parameter_t *target_param);
 bool db_param_is_valid_assign_u8(uint8_t new_u8_value, db_parameter_t *target_param);
 bool db_param_is_valid_assign_u16(uint16_t new_u16_value, db_parameter_t *target_param);
 bool db_param_is_valid_assign_i32(int32_t new_i32_value, db_parameter_t *target_param);
