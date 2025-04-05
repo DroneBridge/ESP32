@@ -244,43 +244,43 @@ void db_send_to_all_espnow(uint8_t data[], const uint16_t *data_length) {
  */
 void db_send_to_all_clients(int tcp_clients[], udp_conn_list_t *n_udp_conn_list, uint8_t data[], uint16_t data_length) {
   switch (DB_PARAM_RADIO_MODE) {
-  case DB_WIFI_MODE_ESPNOW_AIR:
-  case DB_WIFI_MODE_ESPNOW_GND:
-    // ESP-NOW mode
-    if (data_length > DB_ESPNOW_PAYLOAD_MAXSIZE) {
-      // Data not properly sized, split into multiple packets
-      uint16_t sent_bytes     = 0;
-      uint16_t next_chunk_len = 0;
-      do {
-        next_chunk_len = data_length - sent_bytes;
-        if (next_chunk_len > DB_ESPNOW_PAYLOAD_MAXSIZE) {
-          next_chunk_len = DB_ESPNOW_PAYLOAD_MAXSIZE;
+      case DB_WIFI_MODE_ESPNOW_AIR:
+      case DB_WIFI_MODE_ESPNOW_GND:
+        // ESP-NOW mode
+        if (data_length > DB_ESPNOW_PAYLOAD_MAXSIZE) {
+          // Data not properly sized, split into multiple packets
+          uint16_t sent_bytes     = 0;
+          uint16_t next_chunk_len = 0;
+          do {
+            next_chunk_len = data_length - sent_bytes;
+            if (next_chunk_len > DB_ESPNOW_PAYLOAD_MAXSIZE) {
+              next_chunk_len = DB_ESPNOW_PAYLOAD_MAXSIZE;
+            }
+            db_send_to_all_espnow(&data[sent_bytes], &next_chunk_len);
+            sent_bytes += next_chunk_len;
+          } while (sent_bytes < data_length);
+        } else {
+          // Packet is properly sized - send to ESP-NOW outbound queue
+          db_send_to_all_espnow(data, &data_length);
         }
-        db_send_to_all_espnow(&data[sent_bytes], &next_chunk_len);
-        sent_bytes += next_chunk_len;
-      } while (sent_bytes < data_length);
-    } else {
-      // Packet is properly sized - send to ESP-NOW outbound queue
-      db_send_to_all_espnow(data, &data_length);
-    }
-    break;
+        break;
 
-  case DB_BLUETOOTH_MODE_SPP:
-    db_ble_queue_event_t bleData;
-    bleData.data     = malloc(data_length);
-    bleData.data_len = data_length;
-    memcpy(bleData.data, data, bleData.data_len);
-    if (xQueueSend(db_uart_read_queue_ble, &bleData, portMAX_DELAY) != pdPASS) {
-      ESP_LOGE(TAG, "Failed to send BLE data to queue");
-      free(bleData.data);
-    }
-    break;
+      case DB_BLUETOOTH_MODE:
+        db_ble_queue_event_t bleData;
+        bleData.data     = malloc(data_length);
+        bleData.data_len = data_length;
+        memcpy(bleData.data, data, bleData.data_len);
+        if (xQueueSend(db_uart_read_queue_ble, &bleData, portMAX_DELAY) != pdPASS) {
+          ESP_LOGE(TAG, "Failed to send BLE data to queue");
+          free(bleData.data);
+        }
+        break;
 
-  default:
-    // Other modes (TCP/UDP)
-    db_send_to_all_tcp_clients(tcp_clients, data, data_length);
-    db_send_to_all_udp_clients(n_udp_conn_list, data, data_length);
-    break;
+      default:
+        // Other modes (WiFi Modes using TCP/UDP)
+        db_send_to_all_tcp_clients(tcp_clients, data, data_length);
+        db_send_to_all_udp_clients(n_udp_conn_list, data, data_length);
+        break;
   }
 }
 
@@ -773,7 +773,7 @@ static _Noreturn void control_module_ble() {
   
     /* Event Loop */
     while (1) {
-      /* Read Uart and send data to BLE (needs to be implemented) */
+      /* Read UART and send data to BLE */
       read_process_serial_link(NULL,                  // NULL, not using TCP
                                &transparent_buff_pos, // transparent buffer position
                                &msp_ltm_buff_pos,     // msp buffer position
@@ -831,7 +831,7 @@ void db_start_control_module() {
     );
     break;
 
-  case DB_BLUETOOTH_MODE_SPP:
+  case DB_BLUETOOTH_MODE:
     xTaskCreate(&control_module_ble, /**< Task function for Bluetooth SPP communication */
                 "control_bluetooth", /**< Task name (for debugging) */
                 40960,               /**< Stack size (in bytes) */
