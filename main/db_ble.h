@@ -54,10 +54,10 @@ typedef struct {
  * Queue Handles
  **************************************************************************************************************************/
 
-extern QueueHandle_t db_uart_write_queue_ble; /** Global queue for data to be written to UART, filled by wireless
+extern QueueHandle_t db_uart_write_queue_ble; /** Queue for data to be written to UART, filled by wireless
                                                  communication interface task */
 extern QueueHandle_t
-    db_uart_read_queue_ble; /** Global queue for data to be written to Wireless communication interface, filled by UART */
+    db_uart_read_queue_ble; /** Queue for data to be written to wireless communication interface - used by BLE, filled by UART */
 
 /***************************************************************************************************************************
  * Public Function Declaration

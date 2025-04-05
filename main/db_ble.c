@@ -187,7 +187,7 @@ static const struct ble_gatt_svc_def new_ble_svc_gatt_defs[] = {
                     .flags      = BLE_GATT_CHR_F_NOTIFY | BLE_GATT_CHR_F_READ,
                 },
                 {
-                    /* Notify-only characteristic */
+                    /* Write-only characteristic */
                     .uuid       = BLE_UUID16_DECLARE(BLE_SVC_SPP_CMD_WRITE_UUID16),
                     .access_cb  = ble_svc_gatt_handler, // No direct access required, only notify
                     .val_handle = &ble_spp_svc_gatt_write_cmd_handle,
@@ -391,14 +391,13 @@ static int ble_svc_gatt_handler(uint16_t conn_handle, uint16_t attr_handle, stru
     break;
 
   case BLE_GATT_ACCESS_OP_WRITE_CHR:
-    MODLOG_DFLT(INFO, "Data received in write event,conn_handle = %x,attr_handle = %x", conn_handle, attr_handle);
+    MODLOG_DFLT(DEBUG, "Data received in write event,conn_handle = %x,attr_handle = %x", conn_handle, attr_handle);
     struct os_mbuf *om = ctxt->om;           // Get the received data buffer
     int len            = OS_MBUF_PKTLEN(om); // Get total length of received data
     db_ble_queue_event_t bleData;            // Create a struct instance
     bleData.data     = malloc(len);          // Allocate memory for the data buffer
     bleData.data_len = len;                  // Ensure len does not exceed buffer size
 
-    bleData.data = malloc(len);
     if (bleData.data == NULL) {
       MODLOG_DFLT(ERROR, "Failed to allocate memory for BLE data of length %d", len);
       return BLE_ATT_ERR_UNLIKELY;
