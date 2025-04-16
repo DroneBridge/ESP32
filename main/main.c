@@ -512,32 +512,42 @@ void save_udp_client_to_nvm(struct db_udp_client_t *new_db_udp_client, bool clea
 void db_read_settings_nvs() {
     nvs_handle my_handle;
     if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &my_handle) != ESP_OK) {
-        ESP_LOGI(TAG, "NVS namespace not found. Erasing flash, init NVS ...");
+        ESP_LOGI(TAG, "NVS namespace not found. Using default values, setting up NVS...");
         nvs_close(my_handle);
         ESP_ERROR_CHECK(nvs_flash_erase());
         ESP_ERROR_CHECK(nvs_flash_init());
+        
+        // Set all parameters to their default values when flash is empty
+        db_param_reset_all();
+        
+        // Now save these defaults to NVS
         db_write_settings_to_nvs();
+        
+        // Print parameters to console for logging
+        uint8_t param_str_buffer[512] = {0};
+        db_param_print_values_to_buffer(param_str_buffer);
+        ESP_LOGI(TAG, "Initialized with default values:\n%s", (char *)param_str_buffer);
     } else {
         ESP_LOGI(TAG, "Reading settings from NVS");
         db_param_read_all_params_nvs(&my_handle);
         nvs_close(my_handle);
 
         // print parameters to console for logging
-        uint8_t param_str_buffer[512];
+        uint8_t param_str_buffer[512] = {0};
         db_param_print_values_to_buffer(param_str_buffer);
         ESP_LOGI(TAG, "\n%s", (char *) param_str_buffer);
 
         // Check if we have a saved UDP client from the last session. Add it to the known udp clients if there is one.
         if (strlen((char *) db_param_udp_client_ip.value.db_param_str.value) > 0 &&
-            db_param_udp_client_port.value.db_param_u8.value != 0) {
+            db_param_udp_client_port.value.db_param_u16.value != 0) {
             // there was a saved UDP client in the NVM from last session - add it to the udp clients list
             ESP_LOGI(TAG, "Adding %s:%i to known UDP clients.",
-                (char *) db_param_udp_client_ip.value.db_param_str.value, db_param_udp_client_port.value.db_param_u8.value);
+                (char *) db_param_udp_client_ip.value.db_param_str.value, db_param_udp_client_port.value.db_param_u16.value);
             struct sockaddr_in new_sockaddr;
             memset(&new_sockaddr, 0, sizeof(new_sockaddr));
             new_sockaddr.sin_family = AF_INET;
             inet_pton(AF_INET, (char *) db_param_udp_client_ip.value.db_param_str.value, &new_sockaddr.sin_addr);
-            new_sockaddr.sin_port = htons(db_param_udp_client_port.value.db_param_u8.value);
+            new_sockaddr.sin_port = htons(db_param_udp_client_port.value.db_param_u16.value);
             struct db_udp_client_t new_udp_client = {
                     .udp_client = new_sockaddr,
                     .mac = {0, 0, 0, 0, 0, 0}   // dummy MAC
