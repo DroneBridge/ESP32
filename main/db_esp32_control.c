@@ -37,10 +37,10 @@
 #include "db_protocol.h"
 #include "tcp_server.h"
 #include "db_esp32_control.h"
+#ifdef CONFIG_BT_ENABLED
 #include "db_ble.h"
-
+#endif
 #include <db_parameters.h>
-
 #include "main.h"
 #include "db_serial.h"
 #include "db_esp_now.h"
@@ -70,7 +70,7 @@ int db_open_serial_udp_socket() {
         ESP_LOGE(TAG, "Unable to create socket for serial communication: errno %d", errno);
         return -1;
     }
-    int broadcastEnable=1;
+    int broadcastEnable = 1;
     int err = setsockopt(udp_socket, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
     if (err < 0) {
         ESP_LOGE(TAG, "Socket unable to set udp socket to accept broadcast messages: errno %d", errno);
@@ -85,6 +85,7 @@ int db_open_serial_udp_socket() {
 }
 
 #ifdef CONFIG_DB_SKYBRUSH_SUPPORT
+
 /**
  * Opens non-blocking UDP socket used for WiFi to UART communication using WiFi UDP broadcast packets e.g. by Skybrush.
  * @return returns socket file descriptor
@@ -104,7 +105,7 @@ int db_open_serial_udp_broadcast_socket() {
         ESP_LOGE(TAG, "Unable to create socket for Skybrush communication: errno %d", errno);
         return -1;
     }
-    int broadcastEnable=1;
+    int broadcastEnable = 1;
     int err = setsockopt(udp_socket, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
     if (err < 0) {
         ESP_LOGE(TAG, "Socket unable to set Skybrush udp socket to accept broadcast messages: errno %d", errno);
@@ -117,6 +118,7 @@ int db_open_serial_udp_broadcast_socket() {
     ESP_LOGI(TAG, "Opened UDP broadcast enabled socket on port %i", UDP_BROADCAST_PORT_SKYBRUSH);
     return udp_socket;
 }
+
 #endif
 
 /**
@@ -243,45 +245,47 @@ void db_send_to_all_espnow(uint8_t data[], const uint16_t *data_length) {
  * @param data_length Length of payload to send
  */
 void db_send_to_all_clients(int tcp_clients[], udp_conn_list_t *n_udp_conn_list, uint8_t data[], uint16_t data_length) {
-  switch (DB_PARAM_RADIO_MODE) {
-      case DB_WIFI_MODE_ESPNOW_AIR:
-      case DB_WIFI_MODE_ESPNOW_GND:
-        // ESP-NOW mode
-        if (data_length > DB_ESPNOW_PAYLOAD_MAXSIZE) {
-          // Data not properly sized, split into multiple packets
-          uint16_t sent_bytes     = 0;
-          uint16_t next_chunk_len = 0;
-          do {
-            next_chunk_len = data_length - sent_bytes;
-            if (next_chunk_len > DB_ESPNOW_PAYLOAD_MAXSIZE) {
-              next_chunk_len = DB_ESPNOW_PAYLOAD_MAXSIZE;
+    switch (DB_PARAM_RADIO_MODE) {
+        case DB_WIFI_MODE_ESPNOW_AIR:
+        case DB_WIFI_MODE_ESPNOW_GND:
+            // ESP-NOW mode
+            if (data_length > DB_ESPNOW_PAYLOAD_MAXSIZE) {
+                // Data not properly sized, split into multiple packets
+                uint16_t sent_bytes = 0;
+                uint16_t next_chunk_len = 0;
+                do {
+                    next_chunk_len = data_length - sent_bytes;
+                    if (next_chunk_len > DB_ESPNOW_PAYLOAD_MAXSIZE) {
+                        next_chunk_len = DB_ESPNOW_PAYLOAD_MAXSIZE;
+                    }
+                    db_send_to_all_espnow(&data[sent_bytes], &next_chunk_len);
+                    sent_bytes += next_chunk_len;
+                } while (sent_bytes < data_length);
+            } else {
+                // Packet is properly sized - send to ESP-NOW outbound queue
+                db_send_to_all_espnow(data, &data_length);
             }
-            db_send_to_all_espnow(&data[sent_bytes], &next_chunk_len);
-            sent_bytes += next_chunk_len;
-          } while (sent_bytes < data_length);
-        } else {
-          // Packet is properly sized - send to ESP-NOW outbound queue
-          db_send_to_all_espnow(data, &data_length);
-        }
-        break;
+            break;
 
-      case DB_BLUETOOTH_MODE:
-        db_ble_queue_event_t bleData;
-        bleData.data     = malloc(data_length);
-        bleData.data_len = data_length;
-        memcpy(bleData.data, data, bleData.data_len);
-        if (xQueueSend(db_uart_read_queue_ble, &bleData, portMAX_DELAY) != pdPASS) {
-          ESP_LOGE(TAG, "Failed to send BLE data to queue");
-          free(bleData.data);
-        }
-        break;
+        case DB_BLUETOOTH_MODE:
+#ifdef CONFIG_BLE_ENABLED
+            db_ble_queue_event_t bleData;
+            bleData.data = malloc(data_length);
+            bleData.data_len = data_length;
+            memcpy(bleData.data, data, bleData.data_len);
+            if (xQueueSend(db_uart_read_queue_ble, &bleData, portMAX_DELAY) != pdPASS) {
+                ESP_LOGE(TAG, "Failed to send BLE data to queue");
+                free(bleData.data);
+            }
+#endif
+            break;
 
-      default:
-        // Other modes (WiFi Modes using TCP/UDP)
-        db_send_to_all_tcp_clients(tcp_clients, data, data_length);
-        db_send_to_all_udp_clients(n_udp_conn_list, data, data_length);
-        break;
-  }
+        default:
+            // Other modes (WiFi Modes using TCP/UDP)
+            db_send_to_all_tcp_clients(tcp_clients, data, data_length);
+            db_send_to_all_udp_clients(n_udp_conn_list, data, data_length);
+            break;
+    }
 }
 
 /**
@@ -347,7 +351,8 @@ void udp_client_list_destroy(udp_conn_list_t *n_udp_conn_list) {
  *                    It will then be saved to NVM and added to the udp_conn_list_t on startup. Only one client can be saved to NVM.
  * @return 1 if added - 0 if not
  */
-bool add_to_known_udp_clients(udp_conn_list_t *n_udp_conn_list, struct db_udp_client_t new_db_udp_client, bool save_to_nvm) {
+bool
+add_to_known_udp_clients(udp_conn_list_t *n_udp_conn_list, struct db_udp_client_t new_db_udp_client, bool save_to_nvm) {
     if (n_udp_conn_list == NULL) { // Check if the list is NULL
         return false; // Do nothing
     }
@@ -364,7 +369,7 @@ bool add_to_known_udp_clients(udp_conn_list_t *n_udp_conn_list, struct db_udp_cl
     n_udp_conn_list->db_udp_clients[n_udp_conn_list->size] = new_db_udp_client; // Copy the element data to the end of the array
     n_udp_conn_list->size++; // Increment the size of the list
     // some logging
-    char ip_port_string[INET_ADDRSTRLEN+10];
+    char ip_port_string[INET_ADDRSTRLEN + 10];
     char ip_string[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &(new_db_udp_client.udp_client.sin_addr), ip_string, INET_ADDRSTRLEN);
     sprintf(ip_port_string, "%s:%d", ip_string, htons (new_db_udp_client.udp_client.sin_port));
@@ -393,7 +398,8 @@ bool remove_from_known_udp_clients(udp_conn_list_t *n_udp_conn_list, struct db_u
     }
     for (int i = 0; i < n_udp_conn_list->size; i++) { // Loop through the array
         if (memcmp(n_udp_conn_list->db_udp_clients[i].mac, new_db_udp_client.mac,
-                   sizeof(n_udp_conn_list->db_udp_clients[i].mac)) == 0) { // Compare the current array element with the element
+                   sizeof(n_udp_conn_list->db_udp_clients[i].mac)) ==
+            0) { // Compare the current array element with the element
             // Found a match
             for (int j = i; j < n_udp_conn_list->size - 1; j++) { // Loop from the current index to the end of the array
                 n_udp_conn_list->db_udp_clients[j] = n_udp_conn_list->db_udp_clients[j +
@@ -419,7 +425,8 @@ bool remove_from_known_udp_clients(udp_conn_list_t *n_udp_conn_list, struct db_u
  * @param serial_buffer Destination-buffer for the serial data
  * @param db_msp_ltm_port Pointer to structure containing MSP/LTM parser information
  */
-void read_process_serial_link(int *tcp_clients, uint *transparent_buff_pos, uint *msp_ltm_buff_pos, uint8_t *msp_message_buffer,
+void read_process_serial_link(int *tcp_clients, uint *transparent_buff_pos, uint *msp_ltm_buff_pos,
+                              uint8_t *msp_message_buffer,
                               uint8_t *serial_buffer, msp_ltm_port_t *db_msp_ltm_port) {
     switch (DB_PARAM_SERIAL_PROTO) {
         case 0:
@@ -442,7 +449,7 @@ void read_process_serial_link(int *tcp_clients, uint *transparent_buff_pos, uint
  * Thread that manages all incoming and outgoing ESP-NOW and serial (UART) connections.
  * Called only when ESP-NOW mode is selected
  */
-_Noreturn void control_module_esp_now(){
+_Noreturn void control_module_esp_now() {
     ESP_LOGI(TAG, "Starting control module (ESP-NOW)");
     esp_err_t serial_socket = ESP_FAIL;
     // open serial socket for comms with FC or GCS
@@ -452,7 +459,7 @@ _Noreturn void control_module_esp_now(){
         vTaskDelete(NULL);
     } else {
 #ifdef CONFIG_DB_SERIAL_OPTION_JTAG
-    db_jtag_serial_info_print();
+        db_jtag_serial_info_print();
 #endif
     }
 
@@ -505,7 +512,7 @@ _Noreturn void control_module_esp_now(){
  */
 void db_send_internal_telemetry_to_stations(int tel_sock, wifi_sta_list_t *sta_list, udp_conn_list_t *udp_conns) {
     if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_AP_LR && udp_conns->size > 0 && sta_list->num > 0) {
-        char addr_buf[32] = { 0 };
+        char addr_buf[32] = {0};
         struct addrinfo hints = {
                 .ai_flags = AI_PASSIVE,
                 .ai_socktype = SOCK_DGRAM,
@@ -514,7 +521,7 @@ void db_send_internal_telemetry_to_stations(int tel_sock, wifi_sta_list_t *sta_l
 
         // Send an IPv4 multicast packet
         hints.ai_family = AF_INET; // For an IPv4 socket
-        int err = getaddrinfo(MULTICAST_IPV4_ADDR,NULL, &hints, &res);
+        int err = getaddrinfo(MULTICAST_IPV4_ADDR, NULL, &hints, &res);
         if (err < 0) {
             ESP_LOGE(TAG, "getaddrinfo() failed for IPV4 destination address. error: %d", err);
             return;
@@ -523,8 +530,8 @@ void db_send_internal_telemetry_to_stations(int tel_sock, wifi_sta_list_t *sta_l
             ESP_LOGE(TAG, "getaddrinfo() did not return any addresses");
             return;
         }
-        ((struct sockaddr_in *)res->ai_addr)->sin_port = htons(DB_ESP32_INTERNAL_TELEMETRY_PORT);
-        inet_ntoa_r(((struct sockaddr_in *)res->ai_addr)->sin_addr, addr_buf, sizeof(addr_buf)-1);
+        ((struct sockaddr_in *) res->ai_addr)->sin_port = htons(DB_ESP32_INTERNAL_TELEMETRY_PORT);
+        inet_ntoa_r(((struct sockaddr_in *) res->ai_addr)->sin_addr, addr_buf, sizeof(addr_buf) - 1);
         static uint8_t buffer[1280] = {0};
         uint16_t buffer_pos = 1;    // we start at 1 since we want to put the count in position 0
         uint8_t already_sent = 0;
@@ -568,11 +575,11 @@ void handle_internal_telemetry(int tel_sock, uint8_t *udp_buffer, socklen_t *soc
                                        (struct sockaddr *) udp_client, sock_len);
         if (recv_length > 0) {
             ESP_LOGD(TAG, "Got internal telem. frame containing %i entries", udp_buffer[0]);
-            for (int i = 1; i < (udp_buffer[0]*7); i += 7) {
+            for (int i = 1; i < (udp_buffer[0] * 7); i += 7) {
                 if (memcmp(LOCAL_MAC_ADDRESS, &udp_buffer[i], ESP_NOW_ETH_ALEN) == 0) {
                     // found us in the list (this local ESP32 AIR unit) -> update internal telemetry buffer,
                     // so it gets sent with next Mavlink RADIO STATUS in case MAVLink radio status is enabled
-                    db_esp_signal_quality.gnd_rssi = (int8_t) udp_buffer[i+6];
+                    db_esp_signal_quality.gnd_rssi = (int8_t) udp_buffer[i + 6];
                     ESP_LOGD(TAG, "AP receives our packets with RSSI: %i", db_esp_signal_quality.gnd_rssi);
                     break;
                 } else {
@@ -697,7 +704,7 @@ _Noreturn void control_module_udp_tcp() {
             // This is special support for Skybrush. Skybrush sends some UDP broadcast msgs to 14555 in addition to regular msgs to 14550
             // We only read and directly forward here. No parsing and no adding to known UDP clients
             recv_length = recvfrom(udp_broadcast_skybrush_socket, udp_buffer, UDP_BUF_SIZE, 0,
-                                           (struct sockaddr *) &new_db_udp_client.udp_client, &udp_socklen);
+                                   (struct sockaddr *) &new_db_udp_client.udp_client, &udp_socklen);
             if (recv_length > 0) {
                 // no parsing - transparent here
                 write_to_serial(udp_buffer, recv_length);
@@ -708,7 +715,8 @@ _Noreturn void control_module_udp_tcp() {
 #endif
 
         if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_STA) {
-            handle_internal_telemetry(db_internal_telem_udp_sock, udp_buffer, &udp_socklen, &new_db_udp_client.udp_client);
+            handle_internal_telemetry(db_internal_telem_udp_sock, udp_buffer, &udp_socklen,
+                                      &new_db_udp_client.udp_client);
         } else {
             // internal telemetry only received when in STA mode. Coming from the ESP32 AP. Nothing to do here
         }
@@ -729,8 +737,10 @@ _Noreturn void control_module_udp_tcp() {
                 if (esp_wifi_sta_get_rssi((int *) &db_esp_signal_quality.air_rssi) != ESP_OK) {
                     db_esp_signal_quality.air_rssi = -127;
                 } else {/* all good */}
-            } else if (!DB_WIFI_IS_OFF && (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_AP || DB_PARAM_RADIO_MODE == DB_WIFI_MODE_AP_LR)) {
-                ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_ap_get_sta_list(&wifi_sta_list)); // update list of connected stations
+            } else if (!DB_WIFI_IS_OFF &&
+                       (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_AP || DB_PARAM_RADIO_MODE == DB_WIFI_MODE_AP_LR)) {
+                ESP_ERROR_CHECK_WITHOUT_ABORT(
+                        esp_wifi_ap_get_sta_list(&wifi_sta_list)); // update list of connected stations
                 db_send_internal_telemetry_to_stations(db_internal_telem_udp_sock, &wifi_sta_list, udp_conn_list);
             } else {
                 // no way of getting RSSI here. Do nothing
@@ -745,72 +755,76 @@ _Noreturn void control_module_udp_tcp() {
     vTaskDelete(NULL);
 }
 
+#ifdef CONFIG_BT_ENABLED
+
 static _Noreturn void control_module_ble() {
     ESP_LOGI(TAG, "Starting control module (Bluetooth)");
-  
+
     /* Initialize error code as failed, because UART is not initialized*/
     esp_err_t serial_socket = ESP_FAIL;
-  
+
     /* open serial socket for comms with FC or GCS */
     serial_socket = open_serial_socket();
     if (serial_socket == ESP_FAIL) {
-      ESP_LOGE(TAG, "UART socket not opened. Aborting start of control module.");
-      vTaskDelete(NULL);
+        ESP_LOGE(TAG, "UART socket not opened. Aborting start of control module.");
+        vTaskDelete(NULL);
     }
-  #ifdef CONFIG_DB_SERIAL_OPTION_JTAG
+#ifdef CONFIG_DB_SERIAL_OPTION_JTAG
     else {
       db_jtag_serial_info_print();
     }
-  #endif
-  
+#endif
+
     uint8_t msp_message_buffer[UART_BUF_SIZE];
     uint8_t serial_buffer[DB_PARAM_SERIAL_PACK_SIZE];
     msp_ltm_port_t db_msp_ltm_port;
     db_ble_queue_event_t bleData;
     uint transparent_buff_pos = 0;
-    uint msp_ltm_buff_pos     = 0;
-    uint delay_timer_cnt      = 0;
-  
+    uint msp_ltm_buff_pos = 0;
+    uint delay_timer_cnt = 0;
+
     /* Event Loop */
     while (1) {
-      /* Read UART and send data to BLE */
-      read_process_serial_link(NULL,                  // NULL, not using TCP
-                               &transparent_buff_pos, // transparent buffer position
-                               &msp_ltm_buff_pos,     // msp buffer position
-                               msp_message_buffer,    // msp buffer
-                               serial_buffer,         // serial buffer
-                               &db_msp_ltm_port       // msp port
-      );
-  
-      if (db_uart_write_queue_ble != NULL && xQueueReceive(db_uart_write_queue_ble, &bleData, 0) == pdTRUE) {
-        if (DB_PARAM_SERIAL_PROTO == DB_SERIAL_PROTOCOL_MAVLINK) {
-          // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
-          // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an
-          // existing packet
-          db_parse_mavlink_from_radio(NULL, NULL, bleData.data, bleData.data_len);
+        /* Read UART and send data to BLE */
+        read_process_serial_link(NULL,                  // NULL, not using TCP
+                                 &transparent_buff_pos, // transparent buffer position
+                                 &msp_ltm_buff_pos,     // msp buffer position
+                                 msp_message_buffer,    // msp buffer
+                                 serial_buffer,         // serial buffer
+                                 &db_msp_ltm_port       // msp port
+        );
+
+        if (db_uart_write_queue_ble != NULL && xQueueReceive(db_uart_write_queue_ble, &bleData, 0) == pdTRUE) {
+            if (DB_PARAM_SERIAL_PROTO == DB_SERIAL_PROTOCOL_MAVLINK) {
+                // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
+                // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an
+                // existing packet
+                db_parse_mavlink_from_radio(NULL, NULL, bleData.data, bleData.data_len);
+            } else {
+                // no parsing with any other protocol - transparent here - just pass through
+                write_to_serial(bleData.data, bleData.data_len);
+            }
+            free(bleData.data);
         } else {
-          // no parsing with any other protocol - transparent here - just pass through
-          write_to_serial(bleData.data, bleData.data_len);
+            if (db_uart_write_queue_ble == NULL)
+                ESP_LOGE(TAG, "db_uart_write_queue is NULL!");
+            // no new data available to be sent via serial link do nothing
         }
-        free(bleData.data);
-      } else {
-        if (db_uart_write_queue_ble == NULL)
-          ESP_LOGE(TAG, "db_uart_write_queue is NULL!");
-        // no new data available to be sent via serial link do nothing
-      }
-  
-      /**Yield to the scheduler if delay_timer_cnt reaches 5000,allowing other
-       * tasks to execute and preventing starvation.
-       */
-      if (delay_timer_cnt == 5000) {
-        vTaskDelay(10 / portTICK_PERIOD_MS);
-        delay_timer_cnt = 0;
-      } else {
-        delay_timer_cnt++;
-      }
+
+        /**Yield to the scheduler if delay_timer_cnt reaches 5000,allowing other
+         * tasks to execute and preventing starvation.
+         */
+        if (delay_timer_cnt == 5000) {
+            vTaskDelay(10 / portTICK_PERIOD_MS);
+            delay_timer_cnt = 0;
+        } else {
+            delay_timer_cnt++;
+        }
     }
     vTaskDelete(NULL);
-  }
+}
+
+#endif
 
 /**
  * @brief DroneBridge control module implementation for a ESP32 device. Bidirectional link between FC and ground. Can
@@ -819,36 +833,40 @@ static _Noreturn void control_module_ble() {
  * MAVLink is passed through (fully transparent). Can be used with any protocol.
  */
 void db_start_control_module() {
-  switch (DB_PARAM_RADIO_MODE) {
-  case DB_WIFI_MODE_ESPNOW_GND:
-  case DB_WIFI_MODE_ESPNOW_AIR:
-    xTaskCreate(&control_module_esp_now, /**< Task function for ESP-NOW communication */
-                "control_espnow",        /**< Task name (for debugging) */
-                40960,                   /**< Stack size (in bytes) */
-                NULL,                    /**< Task parameters (unused) */
-                5,                       /**< Task priority */
-                NULL                     /**< Task handle (unused) */
-    );
-    break;
+    switch (DB_PARAM_RADIO_MODE) {
+        case DB_WIFI_MODE_ESPNOW_GND:
+        case DB_WIFI_MODE_ESPNOW_AIR:
+            xTaskCreate(&control_module_esp_now, /**< Task function for ESP-NOW communication */
+                        "control_espnow",           /**< Task name (for debugging) */
+                        40960,                  /**< Stack size (in bytes) */
+                        NULL,                   /**< Task parameters (unused) */
+                        5,                         /**< Task priority */
+                        NULL                   /**< Task handle (unused) */
+            );
+            break;
 
-  case DB_BLUETOOTH_MODE:
-    xTaskCreate(&control_module_ble, /**< Task function for Bluetooth SPP communication */
-                "control_bluetooth", /**< Task name (for debugging) */
-                40960,               /**< Stack size (in bytes) */
-                NULL,                /**< Task parameters (unused) */
-                5,                   /**< Task priority */
-                NULL                 /**< Task handle (unused) */
-    );
-    break;
+        case DB_BLUETOOTH_MODE:
+#ifdef CONFIG_BT_ENABLED
+            xTaskCreate(&control_module_ble,   /**< Task function for Bluetooth BLE communication */
+                        "control_bluetooth",      /**< Task name (for debugging) */
+                        40960,                /**< Stack size (in bytes) */
+                        NULL,                 /**< Task parameters (unused) */
+                        5,                       /**< Task priority */
+                        NULL                 /**< Task handle (unused) */
+            );
+#else
+            ESP_LOGE(TAG, "Bluetooth is not enabled. Aborting start of control module.");
+#endif
+            break;
 
-  default:
-    xTaskCreate(&control_module_udp_tcp, /**< Task function for UDP/TCP communication */
-                "control_wifi",          /**< Task name (for debugging) */
-                46080,                   /**< Stack size (in bytes) */
-                NULL,                    /**< Task parameters (unused) */
-                5,                       /**< Task priority */
-                NULL                     /**< Task handle (unused) */
-    );
-    break;
-  }
+        default:
+            xTaskCreate(&control_module_udp_tcp,  /**< Task function for UDP/TCP communication */
+                        "control_wifi",              /**< Task name (for debugging) */
+                        46080,                   /**< Stack size (in bytes) */
+                        NULL,                    /**< Task parameters (unused) */
+                        5,                          /**< Task priority */
+                        NULL                    /**< Task handle (unused) */
+            );
+            break;
+    }
 }

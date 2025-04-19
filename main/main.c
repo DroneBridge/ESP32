@@ -43,7 +43,9 @@
 #include "iot_button.h"
 #include "db_serial.h"
 #include "globals.h"
+#ifdef CONFIG_BT_ENABLED
 #include "db_ble.h"
+#endif
 
 #define NVS_NAMESPACE "settings"
 
@@ -682,9 +684,16 @@ void app_main() {
         break;
 
       case DB_BLUETOOTH_MODE:
+#ifdef CONFIG_BT_ENABLED
         // db_init_wifi_apmode(DB_PARAM_RADIO_MODE);
         db_queue_ble_init();
         db_init_ble();
+#else
+        DB_RADIO_MODE_DESIGNATED = DB_WIFI_MODE_AP;
+        DB_PARAM_RADIO_MODE = DB_WIFI_MODE_AP;
+        ESP_LOGE(TAG, "Bluetooth is not enabled with this build. Please enable it in menuconfig and re-compile. Switching to AP mode.");
+        db_init_wifi_apmode(DB_WIFI_MODE_AP);
+#endif
         break;
 
       default:
