@@ -458,10 +458,10 @@ bool db_led_strip_process_debug_vect(const fmav_message_t* msg) {
             }
         }
         
-        // Extract RGB values
-        uint8_t red = (uint8_t)debug_vect.x;
-        uint8_t green = (uint8_t)debug_vect.y;
-        uint8_t blue = (uint8_t)debug_vect.z;
+        // Extract RGB values - convert from normalized floats (0.0-1.0) to raw (0-255)
+        uint8_t red = (uint8_t)(debug_vect.x * 255.0f);
+        uint8_t green = (uint8_t)(debug_vect.y * 255.0f);
+        uint8_t blue = (uint8_t)(debug_vect.z * 255.0f);
         
         // Check if it's for a specific LED
         if ((is_rgbw && strlen(debug_vect.name) > 4) || 
