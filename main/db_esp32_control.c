@@ -245,6 +245,7 @@ void db_send_to_all_espnow(uint8_t data[], const uint16_t *data_length) {
  * @param data_length Length of payload to send
  */
 void db_send_to_all_clients(int tcp_clients[], udp_conn_list_t *n_udp_conn_list, uint8_t data[], uint16_t data_length) {
+    db_ble_queue_event_t bleData;
     switch (DB_PARAM_RADIO_MODE) {
         case DB_WIFI_MODE_ESPNOW_AIR:
         case DB_WIFI_MODE_ESPNOW_GND:
@@ -268,8 +269,7 @@ void db_send_to_all_clients(int tcp_clients[], udp_conn_list_t *n_udp_conn_list,
             break;
 
         case DB_BLUETOOTH_MODE:
-#ifdef CONFIG_BLE_ENABLED
-            db_ble_queue_event_t bleData;
+#ifdef CONFIG_BT_ENABLED
             bleData.data = malloc(data_length);
             bleData.data_len = data_length;
             memcpy(bleData.data, data, bleData.data_len);
