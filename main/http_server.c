@@ -32,6 +32,7 @@
 #include "globals.h"
 #include "main.h"
 #include "db_serial.h"
+#include "db_led_strip.h" // Include LED strip header
 
 #define TAG "DB_HTTP_REST"
 #define REST_CHECK(a, str, goto_tag, ...)                                              \
@@ -406,6 +407,26 @@ static esp_err_t settings_get_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
+/**
+ * @brief Handler for triggering the LED strip test sequence
+ */
+static esp_err_t led_test_get_handler(httpd_req_t *req) {
+    // First send a response to the client immediately
+    httpd_resp_sendstr(req, "{\"status\": \"success\", \"msg\": \"LED test sequence started.\"}");
+    
+    // Then run the LED test in a separate task using the task-safe function
+    xTaskCreate(
+        db_led_strip_test_task,              // Function that implements the task
+        "led_test_task",                    // Text name for the task
+        2048,                               // Stack size in bytes
+        NULL,                               // Parameter passed into the task
+        5,                                  // Priority of the task
+        NULL                                // Task handle
+    );
+    
+    return ESP_OK;
+}
+
 esp_err_t start_rest_server(const char *base_path) {
     REST_CHECK(base_path, "wrong base path", err);
     rest_server_context_t *rest_context = calloc(1, sizeof(rest_server_context_t));
@@ -415,7 +436,7 @@ esp_err_t start_rest_server(const char *base_path) {
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.uri_match_fn = httpd_uri_match_wildcard;
-    config.max_uri_handlers = 9;
+    config.max_uri_handlers = 10; // Increased max handlers
 
     ESP_LOGI(TAG, "Starting HTTP Server");
     REST_CHECK(httpd_start(&server, &config) == ESP_OK, "Start server failed", err_start);
@@ -481,6 +502,15 @@ esp_err_t start_rest_server(const char *base_path) {
             .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &settings_clients_clear_udp_get_uri);
+
+    /* URI handler for triggering LED test */
+    httpd_uri_t led_test_get_uri = {
+            .uri = "/api/led/test",
+            .method = HTTP_GET,
+            .handler = led_test_get_handler,
+            .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &led_test_get_uri);
 
     /* URI handler for getting web server files */
     httpd_uri_t common_get_uri = {

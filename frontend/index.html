@@ -259,6 +259,56 @@
                     </div>
                 </div>
             </div>
+
+            <!-- LED Strip Configuration -->
+            <h3 style="margin-top: 2rem">LED Strip</h3>
+            <div class="row">
+                <div class="twelve columns">
+                    <div class="checkbox-wrapper-14">
+                        <input id="led_enable" name="led_enable" type="checkbox" class="switch" onchange="change_led_config_visibility()">
+                        <label for="led_enable">Enable LED Strip</label>
+                    </div>
+                </div>
+            </div>
+            <div id="led_config_div" style="display: none;">
+                <div class="row">
+                    <div class="six columns">
+                        <label for="led_gpio">LED Data GPIO</label>
+                        <input type="number" name="led_gpio" value="" id="led_gpio" min="0">
+                    </div>
+                    <div class="six columns">
+                        <label for="led_count">Number of LEDs</label>
+                        <input type="number" name="led_count" value="" id="led_count" min="1">
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="six columns">
+                        <label for="led_type">LED Type</label>
+                        <select id="led_type" name="led_type" form="settings_form">
+                            <option value="0">WS2812 (GRB)</option>
+                            <option value="1">WS2811/WS2815 (RGB)</option>
+                            <option value="2">WS2814 (RGBW)</option>
+                            <option value="3">WS2814A (WRGB)</option>
+                        </select>
+                    </div>
+                    <div class="six columns">
+                        <button id="led_test_button" type="button" style="margin-top: 2.5rem;" onclick="test_led_strip()">Test LED Strip</button>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="twelve columns note">
+                        <h4>MAVLink Control:</h4>
+                        <p>LEDs can be controlled via MAVLink DEBUG_VECT messages.</p>
+                        <ul>
+                            <li>Set <code>name</code> to "rgb" to control all LEDs.</li>
+                            <li>Set <code>name</code> to "rgbX" (e.g., "rgb0", "rgb5") to control a specific LED (index X).</li>
+                            <li><code>x</code>, <code>y</code>, <code>z</code> fields correspond to Red, Green, Blue values (0-255).</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <!-- End LED Strip Configuration -->
+
         </div>
     </form>
     <div class="row">
@@ -285,6 +335,7 @@
     setTimeout(change_msp_ltm_visibility, 500)
     setTimeout(change_ap_ip_visibility, 500)
     setTimeout(change_uart_visibility, 500)
+    setTimeout(change_led_config_visibility, 500) // Add call for LED visibility
 </script>
 </body>
 </html>

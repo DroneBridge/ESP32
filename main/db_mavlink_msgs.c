@@ -24,6 +24,7 @@
 #include "db_serial.h"
 #include "globals.h"
 #include "main.h"
+#include "db_led_strip.h" // Add include for LED strip header
 
 #ifndef MIN
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
@@ -458,9 +459,26 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
                      data_stream_pay.req_stream_id, data_stream_pay.req_message_rate, data_stream_pay.start_stop);
         }
             break;
+        case FASTMAVLINK_MSG_ID_DEBUG_VECT: {
+            // Run-time guard: skip if user disabled LED strip via UI
+            if (!db_param_led_enable.value.db_param_u8.value) {
+                ESP_LOGD(TAG, "LED strip disabled, skipping DEBUG_VECT message");
+                break;
+            }
+            ESP_LOGI(TAG, "Received DEBUG_VECT message for LED strip control");
+            // Decode and log message content
+            fmav_debug_vect_t debug_vect;
+            fmav_msg_debug_vect_decode(&debug_vect, new_msg);
+            ESP_LOGI(TAG, "DEBUG_VECT name: '%s', x: %.2f, y: %.2f, z: %.2f, time_usec: %llu",
+                     debug_vect.name, debug_vect.x, debug_vect.y, debug_vect.z, debug_vect.time_usec);
+            // Handle LED strip update
+            bool handled = db_led_strip_process_debug_vect(new_msg);
+            ESP_LOGI(TAG, "LED strip processing %s", handled ? "succeeded" : "failed");
+        }
+            break;
         default: {
             if (new_msg->target_sysid == db_get_mav_sys_id() && new_msg->target_compid == db_get_mav_comp_id()) {
-                ESP_LOGW(TAG, "Received unknown MAVLink message ID: %u - ignoring", new_msg->msgid);
+                ESP_LOGI(TAG, "Received unknown MAVLink message ID: %u - ignoring", new_msg->msgid);
             }
             break;
         }

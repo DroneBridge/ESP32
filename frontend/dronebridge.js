@@ -88,6 +88,16 @@ function change_uart_visibility() {
 	}
 }
 
+function change_led_config_visibility() {
+    let led_config_div = document.getElementById("led_config_div");
+    let led_enable_checkbox = document.getElementById("led_enable");
+    if (led_enable_checkbox.checked) {
+        led_config_div.style.display = "block";
+    } else {
+        led_config_div.style.display = "none";
+    }
+}
+
 function flow_control_check() {
 	let gpio_rts = document.getElementById("gpio_rts");
 	let gpio_cts = document.getElementById("gpio_cts");
@@ -145,7 +155,7 @@ async function get_json(api_path) {
 
 	const timeout = setTimeout(() => {
 		controller.abort()
-	}, 1000)
+	}, 2000) // Increased timeout to 2000ms
 	const response = await fetch(req_url, {
 		signal: controller.signal
 	});
@@ -440,4 +450,22 @@ function save_settings() {
 	} else {
 		console.log("Form was not filled out correctly.")
 	}
+}
+
+/**
+ * Sends a request to the ESP32 to test the LED strip.
+ */
+function test_led_strip() {
+    if (!document.getElementById("led_enable").checked) {
+        show_toast("LED strip is not enabled in settings.", "#ffcc00");
+        return;
+    }
+    get_json("api/led/test").then(response => {
+        console.log(response);
+        conn_status = 1;
+        show_toast(response["msg"]);
+    }).catch(error => {
+        conn_status = 0;
+        show_toast("Error starting LED test: " + error.message, "#ff0000");
+    });
 }
