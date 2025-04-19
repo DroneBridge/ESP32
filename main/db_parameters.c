@@ -545,10 +545,13 @@ db_parameter_t db_param_init_str_param(char *db_name, char *mav_param_name, cons
     db_str_param.value.db_param_str.default_value = (uint8_t *) strdup(default_value);
     db_str_param.value.db_param_str.value = malloc(max_val_len);
     if (db_str_param.value.db_param_str.value == NULL) {
-        ESP_LOGE(TAG, "Error allocating %i bytes for string parameter %s", max_val_len, db_name);
+        ESP_LOGE(TAG, "Error allocating %i bytes for string parameter %s value", max_val_len, db_name);
     } else {
-        // all good
-        db_str_param.value.db_param_str.value[0] = '\0';
+        // Initialize with the default value directly
+        strncpy((char *)db_str_param.value.db_param_str.value, default_value, max_val_len);
+        // Ensure null termination, especially if default_value is >= max_val_len
+        db_str_param.value.db_param_str.value[max_val_len - 1] = '\0';
+        ESP_LOGD(TAG, "Initialized value for %s with default '%s'", db_name, (char*)db_str_param.value.db_param_str.value);
     }
     return db_str_param;
 }
@@ -617,9 +620,12 @@ void db_param_init_parameters() {
 void db_param_set_to_default(db_parameter_t *db_parameter) {
     switch (db_parameter->type) {
         case STRING:
+            ESP_LOGI(TAG, "Setting default for STRING param: %s", (char *)db_parameter->db_name);
             strncpy((char *) db_parameter->value.db_param_str.value,
                     (char *) db_parameter->value.db_param_str.default_value,
-                    DB_PARAM_VALUE_MAXLEN);
+                    db_parameter->value.db_param_str.max_len);
+            db_parameter->value.db_param_str.value[db_parameter->value.db_param_str.max_len - 1] = '\0';
+            ESP_LOGI(TAG, "Default set for %s, new value: '%s'", (char *)db_parameter->db_name, (char *)db_parameter->value.db_param_str.value);
             break;
         case UINT8:
             db_parameter->value.db_param_u8.value = db_parameter->value.db_param_u8.default_value;
@@ -707,29 +713,80 @@ void db_read_str_nvs(nvs_handle_t my_handle, char *key, char *dst) {
  * @param nvs_handle Opened Namespace of the NVM partition. This is the handle.
  */
 void db_param_read_all_params_nvs(const nvs_handle_t *nvs_handle) {
+    esp_err_t err;
     for (int i = 0; i < sizeof(db_params) / sizeof(db_params[0]); i++) {
         switch (db_params[i]->type) {
-            case STRING:
-                db_read_str_nvs(*nvs_handle, (char *) db_params[i]->db_name,
-                                (char *) db_params[i]->value.db_param_str.value);
+            case STRING: {
+                size_t required_size = 0;
+                // First call to get size
+                err = nvs_get_str(*nvs_handle, (char *) db_params[i]->db_name, NULL, &required_size);
+                if (err == ESP_OK) {
+                    if (required_size > db_params[i]->value.db_param_str.max_len) {
+                         ESP_LOGW(TAG, "NVS string for %s too long (%d > %d), using default.",
+                                  (char *) db_params[i]->db_name, required_size, db_params[i]->value.db_param_str.max_len);
+                         db_param_set_to_default(db_params[i]); // Use default if stored value too big
+                    } else if (required_size == 0) {
+                        // Handle case where key exists but string is empty (e.g., saved empty password)
+                        ESP_LOGI(TAG, "NVS string for %s is empty, using default.", (char *) db_params[i]->db_name);
+                        db_param_set_to_default(db_params[i]);
+                    } else {
+                        // Read the actual value
+                        err = nvs_get_str(*nvs_handle, (char *) db_params[i]->db_name, (char *)db_params[i]->value.db_param_str.value, &required_size);
+                        if (err != ESP_OK) {
+                            ESP_LOGE(TAG, "Error (%s) reading string %s from NVS! Using default.", esp_err_to_name(err), (char *) db_params[i]->db_name);
+                            db_param_set_to_default(db_params[i]);
+                        } else {
+                             ESP_LOGD(TAG, "Read %s from NVS: '%s'", (char *) db_params[i]->db_name, (char *)db_params[i]->value.db_param_str.value);
+                        }
+                    }
+                } else if (err == ESP_ERR_NVS_NOT_FOUND) {
+                    // *** THIS IS THE CRITICAL PART ***
+                    ESP_LOGI(TAG, "Parameter %s not found in NVS, using default.", (char *) db_params[i]->db_name);
+                    db_param_set_to_default(db_params[i]); // Apply the default value
+                } else {
+                    ESP_LOGE(TAG, "Error (%s) checking NVS for %s! Using default.", esp_err_to_name(err), (char *) db_params[i]->db_name);
+                    db_param_set_to_default(db_params[i]); // Also use default on other errors
+                }
                 break;
-            case UINT8:
-                ESP_ERROR_CHECK_WITHOUT_ABORT(
-                        nvs_get_u8(*nvs_handle, (char *) db_params[i]->db_name,
-                                   &db_params[i]->value.db_param_u8.value));
+            }
+            case UINT8: {
+                err = nvs_get_u8(*nvs_handle, (char *) db_params[i]->db_name, &db_params[i]->value.db_param_u8.value);
+                if (err != ESP_OK) {
+                    if (err == ESP_ERR_NVS_NOT_FOUND) {
+                        ESP_LOGI(TAG, "Parameter %s not found in NVS, using default.", (char *) db_params[i]->db_name);
+                    } else {
+                        ESP_LOGE(TAG, "Error (%s) reading uint8 %s from NVS! Using default.", esp_err_to_name(err), (char *) db_params[i]->db_name);
+                    }
+                    db_param_set_to_default(db_params[i]);
+                }
                 break;
-            case UINT16:
-                ESP_ERROR_CHECK_WITHOUT_ABORT(
-                        nvs_get_u16(*nvs_handle, (char *) db_params[i]->db_name,
-                                    &db_params[i]->value.db_param_u16.value));
+            }
+            case UINT16: {
+                err = nvs_get_u16(*nvs_handle, (char *) db_params[i]->db_name, &db_params[i]->value.db_param_u16.value);
+                if (err != ESP_OK) {
+                    if (err == ESP_ERR_NVS_NOT_FOUND) {
+                        ESP_LOGI(TAG, "Parameter %s not found in NVS, using default.", (char *) db_params[i]->db_name);
+                    } else {
+                        ESP_LOGE(TAG, "Error (%s) reading uint16 %s from NVS! Using default.", esp_err_to_name(err), (char *) db_params[i]->db_name);
+                    }
+                    db_param_set_to_default(db_params[i]);
+                }
                 break;
-            case INT32:
-                ESP_ERROR_CHECK_WITHOUT_ABORT(
-                        nvs_get_i32(*nvs_handle, (char *) db_params[i]->db_name,
-                                    &db_params[i]->value.db_param_i32.value));
+            }
+            case INT32: {
+                err = nvs_get_i32(*nvs_handle, (char *) db_params[i]->db_name, &db_params[i]->value.db_param_i32.value);
+                if (err != ESP_OK) {
+                    if (err == ESP_ERR_NVS_NOT_FOUND) {
+                        ESP_LOGI(TAG, "Parameter %s not found in NVS, using default.", (char *) db_params[i]->db_name);
+                    } else {
+                        ESP_LOGE(TAG, "Error (%s) reading int32 %s from NVS! Using default.", esp_err_to_name(err), (char *) db_params[i]->db_name);
+                    }
+                    db_param_set_to_default(db_params[i]);
+                }
                 break;
+            }
             default:
-                ESP_LOGE(TAG, "db_param_read_all_params_to_nvs() -> db_parameter.type unknown!");
+                ESP_LOGE(TAG, "db_param_read_all_params_nvs() -> db_parameter.type unknown!");
                 break;
         }
     }

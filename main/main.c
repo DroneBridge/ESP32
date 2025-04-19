@@ -31,7 +31,6 @@
 #include "esp_log.h"
 #include "esp_event.h"
 #include "db_esp32_control.h"
-#include "http_server.h"
 #include "db_protocol.h"
 #include "esp_vfs_semihost.h"
 #include "esp_spiffs.h"
@@ -289,6 +288,9 @@ void db_init_wifi_apmode(int wifi_mode) {
     strncpy((char *) wifi_config.ap.password, DB_PARAM_PASS, 64);
 #pragma GCC diagnostic pop
 
+    // Ensure null termination if strncpy filled the buffer
+    wifi_config.ap.password[sizeof(wifi_config.ap.password) - 1] = '\0';
+
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
     if (wifi_mode == DB_WIFI_MODE_AP_LR) {
         ESP_LOGI(TAG, "Enabling LR Mode on access point. This device will be invisible to non-ESP32 devices!");
@@ -296,6 +298,14 @@ void db_init_wifi_apmode(int wifi_mode) {
     } else {
         ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B));
     }
+
+    // Confirmation Just Before Wi-Fi Init:
+    const char *pw_to_use = (const char *)wifi_config.ap.password; // Use the password already copied to the config struct
+    ESP_LOGW(TAG, "Attempting to set Wi-Fi config. SSID: '%s', Password: '%s' (len: %zu)",
+             (char *)wifi_config.ap.ssid, // SSID already copied
+             pw_to_use,
+             strlen(pw_to_use));
+
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
     wifi_country_t wifi_country = {.cc = "US", .schan = 1, .nchan = 13, .policy = WIFI_COUNTRY_POLICY_MANUAL};
     ESP_ERROR_CHECK(esp_wifi_set_country(&wifi_country));
@@ -360,6 +370,8 @@ int db_init_wifi_clientmode() {
     strncpy((char *) wifi_config.sta.ssid, (char *) DB_PARAM_WIFI_SSID, sizeof(wifi_config.sta.ssid));
     strncpy((char *) wifi_config.sta.password, (char *) DB_PARAM_PASS, 64);
 #pragma GCC diagnostic pop
+    // Ensure null termination if strncpy filled the buffer
+    wifi_config.sta.password[sizeof(wifi_config.sta.password) - 1] = '\0';
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     if (DB_PARAM_WIFI_EN_GN) {
@@ -500,8 +512,9 @@ void save_udp_client_to_nvm(struct db_udp_client_t *new_db_udp_client, bool clea
 
     nvs_handle my_handle;
     ESP_ERROR_CHECK(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &my_handle));
-    ESP_ERROR_CHECK(nvs_set_str(my_handle, (char *) db_param_udp_client_ip.db_name, ip));
-    ESP_ERROR_CHECK(nvs_set_u16(my_handle, (char *) db_param_udp_client_port.db_name, port));
+    // hardcoded for reliability
+    ESP_ERROR_CHECK(nvs_set_str(my_handle, "udp_client_ip", ip));
+    ESP_ERROR_CHECK(nvs_set_u16(my_handle, "udp_client_port", port));
 
     ESP_ERROR_CHECK(nvs_commit(my_handle));
     nvs_close(my_handle);
