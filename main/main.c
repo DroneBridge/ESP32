@@ -288,6 +288,9 @@ void db_init_wifi_apmode(int wifi_mode) {
     strncpy((char *) wifi_config.ap.password, DB_PARAM_PASS, 64);
 #pragma GCC diagnostic pop
 
+    // Ensure null termination if strncpy filled the buffer
+    wifi_config.ap.password[sizeof(wifi_config.ap.password) - 1] = '\0';
+
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
     if (wifi_mode == DB_WIFI_MODE_AP_LR) {
         ESP_LOGI(TAG, "Enabling LR Mode on access point. This device will be invisible to non-ESP32 devices!");
@@ -295,6 +298,14 @@ void db_init_wifi_apmode(int wifi_mode) {
     } else {
         ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B));
     }
+
+    // Confirmation Just Before Wi-Fi Init:
+    const char *pw_to_use = (const char *)wifi_config.ap.password; // Use the password already copied to the config struct
+    ESP_LOGW(TAG, "Attempting to set Wi-Fi config. SSID: '%s', Password: '%s' (len: %zu)",
+             (char *)wifi_config.ap.ssid, // SSID already copied
+             pw_to_use,
+             strlen(pw_to_use));
+
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
     wifi_country_t wifi_country = {.cc = "US", .schan = 1, .nchan = 13, .policy = WIFI_COUNTRY_POLICY_MANUAL};
     ESP_ERROR_CHECK(esp_wifi_set_country(&wifi_country));
