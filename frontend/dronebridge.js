@@ -17,34 +17,54 @@ function change_radio_dis_arm_visibility() {
 	}
 }
 
-function change_ap_ip_visibility(){
-	let ap_ip_div = document.getElementById("ap_ip_div");
-	let ap_channel_div = document.getElementById("ap_channel_div");
-	let disclamer_div = document.getElementById("esp-lr-ap-disclaimer");
-	let wifi_ssid_div = document.getElementById("wifi_ssid_div");
-	let wifi_en_gn_div = document.getElementById("wifi_en_gn_div");
-	let static_ip_config_div = document.getElementById("static_ip_config_div");
-	if (document.getElementById("esp32_mode").value === "2") {
-		ap_ip_div.style.display = "none";
-		ap_channel_div.style.display = "none";
-		wifi_en_gn_div.style.display = "block";
-		static_ip_config_div.style.display = "block";
+function change_ap_ip_visibility() {
+	const esp32Mode = document.getElementById("esp32_mode").value;
+	const elements = {
+		ap_ip_div: document.getElementById("ap_ip_div"),
+		ap_channel_div: document.getElementById("ap_channel_div"),
+		lr_disclaimer_div: document.getElementById("esp-lr-ap-disclaimer"),
+		ble_disclaimer_div: document.getElementById("ble_disclaimer_div"),
+		wifi_ssid_div: document.getElementById("wifi_ssid_div"),
+		wifi_en_gn_div: document.getElementById("wifi_en_gn_div"),
+		static_ip_config_div: document.getElementById("static_ip_config_div"),
+		pass_div: document.getElementById("pass_div"),
+	};
+
+	if (esp32Mode === "2") {
+		elements.ap_ip_div.style.display = "none";
+		elements.ap_channel_div.style.display = "none";
+		elements.wifi_en_gn_div.style.display = "block";
+		elements.static_ip_config_div.style.display = "block";
 	} else {
-		ap_ip_div.style.display = "block";
-		ap_channel_div.style.display = "block";
-		wifi_en_gn_div.style.display = "none";
-		static_ip_config_div.style.display = "none";
+		elements.ap_ip_div.style.display = "block";
+		elements.ap_channel_div.style.display = "block";
+		elements.wifi_en_gn_div.style.display = "none";
+		elements.static_ip_config_div.style.display = "none";
 	}
-	if (document.getElementById("esp32_mode").value > "2") {
-		disclamer_div.style.display = "block";
+
+	if (esp32Mode === "6") {
+		elements.ble_disclaimer_div.style.display = "block";
+		elements.wifi_ssid_div.style.display = "none";
+		elements.ap_channel_div.style.display = "none";
+		elements.pass_div.style.display = "none";
+		elements.ap_ip_div.style.display = "none";
 	} else {
-		disclamer_div.style.display = "none";
+		elements.ble_disclaimer_div.style.display = "none";
+		elements.wifi_ssid_div.style.display = "block";
+		elements.pass_div.style.display = "block";
 	}
-	if (document.getElementById("esp32_mode").value > "3") {
-		ap_ip_div.style.display = "none";
-		wifi_ssid_div.style.visibility = 'hidden';
+
+	if (esp32Mode > "2" && esp32Mode < "6") {
+		elements.lr_disclaimer_div.style.display = "block";
 	} else {
-		wifi_ssid_div.style.visibility = "visible";
+		elements.lr_disclaimer_div.style.display = "none";
+	}
+
+	if (esp32Mode > "3" && esp32Mode < "6") {
+		elements.ap_ip_div.style.display = "none";
+		elements.wifi_ssid_div.style.visibility = "hidden";
+	} else {
+		elements.wifi_ssid_div.style.visibility = "visible";
 	}
 	change_radio_dis_arm_visibility();
 }

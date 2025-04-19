@@ -461,8 +461,8 @@ db_parameter_t db_param_init_str_param(char *db_name, char *mav_param_name, cons
     if (db_str_param.value.db_param_str.value == NULL) {
         ESP_LOGE(TAG, "Error allocating %i bytes for string parameter %s", max_val_len, db_name);
     } else {
-        // all good
-        db_str_param.value.db_param_str.value[0] = '\0';
+        // all good - init value to default value
+        strncpy((char *) db_str_param.value.db_param_str.value, (char *) db_str_param.value.db_param_str.default_value, max_val_len);
     }
     return db_str_param;
 }
@@ -614,6 +614,7 @@ void db_read_str_nvs(nvs_handle_t my_handle, char *key, char *dst) {
 /**
  * Updates all parameters with their values from the NVM.
  * Parameters must be part of db_params array
+ * Checks validity of read parameter and if not valid assigns default value to it.
  * @param nvs_handle Opened Namespace of the NVM partition. This is the handle.
  */
 void db_param_read_all_params_nvs(const nvs_handle_t *nvs_handle) {
@@ -622,21 +623,47 @@ void db_param_read_all_params_nvs(const nvs_handle_t *nvs_handle) {
             case STRING:
                 db_read_str_nvs(*nvs_handle, (char *) db_params[i]->db_name,
                                 (char *) db_params[i]->value.db_param_str.value);
+                if (!db_param_is_valid_str((char *) db_params[i]->value.db_param_str.value, db_params[i])) {
+                    // read parameter is not valid - overwrite NVS value with default value
+                    strncpy((char *) db_params[i]->value.db_param_str.value,
+                            (char *) db_params[i]->value.db_param_str.default_value,
+                            db_params[i]->value.db_param_str.max_len);
+                    ESP_LOGW(TAG, "Read invalid parameter %s from NVS, setting to default value %s",
+                             db_params[i]->db_name, db_params[i]->value.db_param_str.default_value);
+                }
                 break;
             case UINT8:
                 ESP_ERROR_CHECK_WITHOUT_ABORT(
                         nvs_get_u8(*nvs_handle, (char *) db_params[i]->db_name,
                                    &db_params[i]->value.db_param_u8.value));
+                if (!db_param_is_valid_u8(db_params[i]->value.db_param_u8.value, db_params[i])) {
+                    // read parameter is not valid - overwrite NVS value with default value
+                    db_params[i]->value.db_param_u8.value = db_params[i]->value.db_param_u8.default_value;
+                    ESP_LOGW(TAG, "Read invalid parameter %s from NVS, setting to default value %i",
+                             db_params[i]->db_name, db_params[i]->value.db_param_u8.default_value);
+                }
                 break;
             case UINT16:
                 ESP_ERROR_CHECK_WITHOUT_ABORT(
                         nvs_get_u16(*nvs_handle, (char *) db_params[i]->db_name,
                                     &db_params[i]->value.db_param_u16.value));
+                if (!db_param_is_valid_u16(db_params[i]->value.db_param_u16.value, db_params[i])) {
+                    // read parameter is not valid - overwrite NVS value with default value
+                    db_params[i]->value.db_param_u16.value = db_params[i]->value.db_param_u16.default_value;
+                    ESP_LOGW(TAG, "Read invalid parameter %s from NVS, setting to default value %i",
+                             db_params[i]->db_name, db_params[i]->value.db_param_u16.default_value);
+                }
                 break;
             case INT32:
                 ESP_ERROR_CHECK_WITHOUT_ABORT(
                         nvs_get_i32(*nvs_handle, (char *) db_params[i]->db_name,
                                     &db_params[i]->value.db_param_i32.value));
+                if (!db_param_is_valid_i32(db_params[i]->value.db_param_i32.value, db_params[i])) {
+                    // read parameter is not valid - overwrite NVS value with default value
+                    db_params[i]->value.db_param_i32.value = db_params[i]->value.db_param_i32.default_value;
+                    ESP_LOGW(TAG, "Read invalid parameter %s from NVS, setting to default value %li",
+                             db_params[i]->db_name, db_params[i]->value.db_param_i32.default_value);
+                }
                 break;
             default:
                 ESP_LOGE(TAG, "db_param_read_all_params_to_nvs() -> db_parameter.type unknown!");
@@ -764,37 +791,94 @@ void db_param_write_all_params_json(cJSON *root_obj) {
 }
 
 /**
+ * Checks if the supplied IPv4 string is representing a valid IPv4 address.
+ * @param ipaddress IPv4 string
+ * @return true if valid IPv4 string was supplied
+ */
+bool is_valid_ip4(const char *ipaddress) {
+    struct sockaddr_in sa;
+    const int result = inet_pton(AF_INET, ipaddress, &(sa.sin_addr));
+    return result != 0;
+}
+
+/**
  * Checks if string is valid for assignment to the target_param.
- * If valid assigns the new value to the parameter
+ * @param new_string_value The string to be set as value
+ * @param target_param The target parameter
+ * @return true if valid or false if not
+ */
+bool db_param_is_valid_str(char *new_string_value, db_parameter_t *target_param) {
+    // ToDo: Add IPv4 check for strings via custom validation function in db_parameter_t
+    if (new_string_value != NULL &&
+        strlen(new_string_value) <= target_param->value.db_param_str.max_len &&
+        strlen(new_string_value) >= target_param->value.db_param_str.min_len) {
+        return true;
+    } else { return false; }
+};
+
+/**
+ * Checks if uint8 is valid for assignment to the target_param.
+ * @param new_u8_value The u8 to be set as value
+ * @param target_param The target parameter
+ * @return true if valid or false if not
+ */
+bool db_param_is_valid_u8(const uint8_t new_u8_value, db_parameter_t *target_param) {
+    if (new_u8_value <= target_param->value.db_param_u8.max && new_u8_value >= target_param->value.db_param_u8.min) {
+        return true;
+    } else { return false; }
+}
+
+/**
+ * Checks if uint16 is valid for assignment to the target_param.
+ * @param new_u16_value The u16 to be set as value
+ * @param target_param The target parameter
+ * @return true if valid or false if not
+ */
+bool db_param_is_valid_u16(const uint16_t new_u16_value, db_parameter_t *target_param) {
+    if (new_u16_value <= target_param->value.db_param_u16.max && new_u16_value >= target_param->value.db_param_u16.min) {
+        return true;
+    } else { return false; }
+}
+
+/**
+ * Checks if int32 is valid for assignment to the target_param.
+ * @param new_i32_value The i32 to be set as value
+ * @param target_param The target parameter
+ * @return true if valid or false if not
+ */
+bool db_param_is_valid_i32(const int32_t new_i32_value, db_parameter_t *target_param) {
+    if (new_i32_value <= target_param->value.db_param_i32.max && new_i32_value >= target_param->value.db_param_i32.min) {
+        return true;
+    } else { return false; }
+}
+
+/**
+ * Checks if string is valid for assignment to the target_param. If valid assigns the new value to the parameter
  * @param new_string_value The new string to be checked and assigned
  * @param target_param The internal db parameter to be assigned with the new value
  * @return true when valid and assigned - else false
  */
-bool db_param_is_valid_assign_str(const char *new_string_value, db_parameter_t *target_param) {
-    // ToDo: Add IPv4 check for strings via custom validation function in db_parameter_t
-    if (new_string_value != NULL &&
-        strlen(new_string_value) <= target_param->value.db_param_str.max_len &&
-        strlen(new_string_value) >= target_param->value.db_param_str.min_len)
-    {
+bool db_param_is_valid_assign_str(char *new_string_value, db_parameter_t *target_param) {
+    if (db_param_is_valid_str(new_string_value, target_param)) {
         strncpy((char *) target_param->value.db_param_str.value, new_string_value, DB_PARAM_VALUE_MAXLEN);
         return true;
+    } else {
+        // new value is not valid - do not assign
+        ESP_LOGE(TAG, "db_param_is_valid_assign_str(): Invalid string length (%i-%i) or NULL for param %s",
+                 target_param->value.db_param_str.min_len, target_param->value.db_param_str.max_len,
+                 (char *) target_param->db_name);
+        return false;
     }
-    // new value is not valid
-    ESP_LOGE(TAG, "db_param_is_valid_assign_str(): Invalid string length (%i-%i) or NULL for param %s",
-             target_param->value.db_param_str.min_len, target_param->value.db_param_str.max_len,
-             (char *) target_param->db_name);
-    return false;
 }
 
 /**
- * Checks if u8 is valid for assignment to the target_param.
- * If valid assigns the new value to the parameter
+ * Checks if u8 is valid for assignment to the target_param. If valid assigns the new value to the parameter
  * @param new_u8_value The new u8 to be checked and assigned
  * @param target_param The internal db parameter to be assigned with the new value
  * @return true when valid and assigned - else false
  */
 bool db_param_is_valid_assign_u8(const uint8_t new_u8_value, db_parameter_t *target_param) {
-    if (new_u8_value <= target_param->value.db_param_u8.max && new_u8_value >= target_param->value.db_param_u8.min) {
+    if (db_param_is_valid_u8(new_u8_value, target_param)) {
         if (strcmp((char *) target_param->db_name, (char *) db_param_radio_mode.db_name) == 0) {
             // Special case check: Do not directly change DB_WIFI_MODE since it is not safe and constantly
             // processed by other tasks. Save settings and reboot will assign DB_RADIO_MODE_DESIGNATED to DB_WIFI_MODE
@@ -813,15 +897,13 @@ bool db_param_is_valid_assign_u8(const uint8_t new_u8_value, db_parameter_t *tar
 }
 
 /**
- * Checks if u16 is valid for assignment to the target_param.
- * If valid assigns the new value to the parameter
+ * Checks if u16 is valid for assignment to the target_param. If valid assigns the new value to the parameter
  * @param new_u16_value The new u16 to be checked and assigned
  * @param target_param The internal db parameter to be assigned with the new value
  * @return true when valid and assigned - else false
  */
 bool db_param_is_valid_assign_u16(const uint16_t new_u16_value, db_parameter_t *target_param) {
-    if (new_u16_value <= target_param->value.db_param_u16.max &&
-        new_u16_value >= target_param->value.db_param_u16.min) {
+    if (db_param_is_valid_u16(new_u16_value, target_param)) {
         target_param->value.db_param_u16.value = new_u16_value; // accept value and assign
         return true;
     }
@@ -834,15 +916,13 @@ bool db_param_is_valid_assign_u16(const uint16_t new_u16_value, db_parameter_t *
 }
 
 /**
- * Checks if i32 is valid for assignment to the target_param.
- * If valid assigns the new value to the parameter
+ * Checks if i32 is valid for assignment to the target_param. If valid assigns the new value to the parameter
  * @param new_i32_value The new i32 to be checked and assigned
  * @param target_param The internal db parameter to be assigned with the new value
  * @return true when valid and assigned - else false
  */
 bool db_param_is_valid_assign_i32(const int32_t new_i32_value, db_parameter_t *target_param) {
-    if (new_i32_value <= target_param->value.db_param_i32.max &&
-        new_i32_value >= target_param->value.db_param_i32.min) {
+    if (db_param_is_valid_i32(new_i32_value, target_param)) {
         target_param->value.db_param_i32.value = new_i32_value; // accept value and assign
         return true;
     }
@@ -852,15 +932,4 @@ bool db_param_is_valid_assign_i32(const int32_t new_i32_value, db_parameter_t *t
             new_i32_value, target_param->value.db_param_i32.max, target_param->value.db_param_i32.min,
             (char *) target_param->db_name);
     return false;
-}
-
-/**
- * Checks if the supplied IPv4 string is representing a valid IPv4 address.
- * @param ipaddress IPv4 string
- * @return true if valid IPv4 string was supplied
- */
-bool is_valid_ip4(const char *ipaddress) {
-    struct sockaddr_in sa;
-    const int result = inet_pton(AF_INET, ipaddress, &(sa.sin_addr));
-    return result != 0;
 }
