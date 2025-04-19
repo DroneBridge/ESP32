@@ -33,8 +33,8 @@
 #define DB_PATCH_VERSION 0
 #define DB_MATURITY_VERSION "RC2"
 
-#define DB_PARAM_TOTAL_NUM          25  // total number of db parameters
-#define DB_PARAM_MAV_CNT            17  // Number of MAVLink parameters returned by ESP32 in the PARAM message. Needed by GCS.
+#define DB_PARAM_TOTAL_NUM          29  // total number of db parameters
+#define DB_PARAM_MAV_CNT            21  // Number of MAVLink parameters returned by ESP32 in the PARAM message. Needed by GCS.
 
 #define DB_PARAM_NAME_MAXLEN        16      // max len of a parameter/key stored in the ESP32 NVM
 #define DB_PARAM_MAX_MAV_PARAM_NAME_LEN 16  // max len of the field used to store the mav param name (max len 16 by def.)
@@ -90,6 +90,10 @@
 #define DB_PARAM_GPIO_CTS db_param_gpio_cts.value.db_param_u8.value
 #define DB_PARAM_SERIAL_RTS_THRESH db_param_gpio_rts_thresh.value.db_param_u8.value
 #define DB_PARAM_EN_EXT_ANT db_param_radio_ant_ext.value.db_param_u8.value
+#define DB_PARAM_LED_ENABLE db_param_led_enable.value.db_param_u8.value
+#define DB_PARAM_LED_GPIO db_param_led_gpio.value.db_param_u8.value
+#define DB_PARAM_LED_COUNT db_param_led_count.value.db_param_u16.value
+#define DB_PARAM_LED_TYPE db_param_led_type.value.db_param_u8.value
 
 enum E_DB_WIFI_MODE {
     DB_WIFI_MODE_AP = 1,            // Wi-Fi access point mode with 802.11b mode enabled
@@ -104,6 +108,14 @@ enum E_DB_SERIAL_PROTOCOL {
     DB_SERIAL_PROTOCOL_MSPLTM = 1,
     DB_SERIAL_PROTOCOL_MAVLINK = 4,
     DB_SERIAL_PROTOCOL_TRANSPARENT = 5
+};
+
+enum E_DB_LED_STRIP_TYPE {
+    DB_LED_STRIP_TYPE_WS2812 = 0,
+    DB_LED_STRIP_TYPE_WS2811 = 1,
+    DB_LED_STRIP_TYPE_WS2814 = 2,
+    DB_LED_STRIP_TYPE_WS2814A = 3,
+    DB_LED_STRIP_TYPE_END = 4
 };
 
 typedef struct db_parameter_str_s {
@@ -185,6 +197,12 @@ extern db_parameter_t db_param_ltm_per_packet;
 extern db_parameter_t db_param_dis_radio_armed;
 extern db_parameter_t db_param_udp_client_port;
 extern db_parameter_t db_param_rssi_dbm;
+
+// LED Strip Parameters
+extern db_parameter_t db_param_led_enable;
+extern db_parameter_t db_param_led_gpio;
+extern db_parameter_t db_param_led_count;
+extern db_parameter_t db_param_led_type;
 
 void db_param_init_parameters();
 void db_param_set_to_default(db_parameter_t *db_parameter);

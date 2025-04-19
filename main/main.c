@@ -43,6 +43,7 @@
 #include "iot_button.h"
 #include "db_serial.h"
 #include "globals.h"
+#include "db_led_strip.h" // Add include for LED strip header
 
 #define NVS_NAMESPACE "settings"
 
@@ -654,6 +655,31 @@ void app_main() {
     DB_RADIO_MODE_DESIGNATED = DB_PARAM_RADIO_MODE; // must always match, mismatch only allowed when changed by user action and not rebooted, yet.
     set_reset_trigger();
     db_configure_antenna();
+
+    // Initialize LED strip if enabled via parameters
+    if (DB_PARAM_LED_ENABLE) {
+        led_strip_type_t led_type;
+        switch (DB_PARAM_LED_TYPE) {
+            case DB_LED_STRIP_TYPE_WS2811:
+                led_type = LED_STRIP_WS2811;
+                break;
+            case DB_LED_STRIP_TYPE_WS2814:
+                led_type = LED_STRIP_WS2814;
+                break;
+            case DB_LED_STRIP_TYPE_WS2814A:
+                led_type = LED_STRIP_WS2814A;
+                break;
+            case DB_LED_STRIP_TYPE_WS2812:
+            default:
+                led_type = LED_STRIP_WS2812;
+                break;
+        }
+        esp_err_t led_init_ret = db_led_strip_init(DB_PARAM_LED_GPIO, DB_PARAM_LED_COUNT, led_type);
+        if (led_init_ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to initialize LED strip using parameters: %s", esp_err_to_name(led_init_ret));
+        }
+    }
+
     if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_AP || DB_PARAM_RADIO_MODE == DB_WIFI_MODE_AP_LR) {
         db_init_wifi_apmode(DB_PARAM_RADIO_MODE);
     } else if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_ESPNOW_AIR || DB_PARAM_RADIO_MODE == DB_WIFI_MODE_ESPNOW_GND) {

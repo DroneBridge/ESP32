@@ -414,6 +414,92 @@ db_parameter_t db_param_rssi_dbm = {
         }
 };
 
+/* ---------- LED Strip Parameters ---------- */
+
+/**
+ * Enable/disable LED strip support
+ */
+db_parameter_t db_param_led_enable = {
+        .db_name = "led_enable",
+        .type = UINT8,
+        .mav_t = {
+                .param_name = "LED_ENABLE",
+                .param_index = 17,
+                .param_type = MAV_PARAM_TYPE_UINT8,
+        },
+        .value = {
+                .db_param_u8 = {
+                        .value = false,
+                        .default_value = false,
+                        .min = false,
+                        .max = true,
+                }
+        }
+};
+
+/**
+ * GPIO pin for the LED strip data line
+ */
+db_parameter_t db_param_led_gpio = {
+        .db_name = "led_gpio",
+        .type = UINT8,
+        .mav_t = {
+                .param_name = "LED_GPIO",
+                .param_index = 18,
+                .param_type = MAV_PARAM_TYPE_UINT8,
+        },
+        .value = {
+                .db_param_u8 = {
+                        .value = 2, 
+                        .default_value = 2,
+                        .min = 0,
+                        .max = SOC_GPIO_IN_RANGE_MAX,
+                }
+        }
+};
+
+/**
+ * Number of LEDs in the strip
+ */
+db_parameter_t db_param_led_count = {
+        .db_name = "led_count",
+        .type = UINT16,
+        .mav_t = {
+                .param_name = "LED_COUNT",
+                .param_index = 19,
+                .param_type = MAV_PARAM_TYPE_UINT16,
+        },
+        .value = {
+                .db_param_u16 = {
+                        .value = 1,
+                        .default_value = 1,
+                        .min = 1,
+                        .max = 1024, // Arbitrary limit, adjust if needed
+                }
+        }
+};
+
+/**
+ * Type of LED strip connected (WS2812, WS2811, etc.)
+ */
+db_parameter_t db_param_led_type = {
+        .db_name = "led_type",
+        .type = UINT8,
+        .mav_t = {
+                .param_name = "LED_TYPE",
+                .param_index = 20,
+                .param_type = MAV_PARAM_TYPE_UINT8,
+        },
+        .value = {
+                .db_param_u8 = {
+                        .value = DB_LED_STRIP_TYPE_WS2812,
+                        .default_value = DB_LED_STRIP_TYPE_WS2812,
+                        .min = DB_LED_STRIP_TYPE_WS2812,
+                        .max = DB_LED_STRIP_TYPE_END - 1,
+                }
+        }
+};
+
 /**
  * Array containing all references to the DB parameters assigned with db_param_init_parameters()
  */
@@ -515,7 +601,11 @@ void db_param_init_parameters() {
             &db_param_ltm_per_packet,
             &db_param_dis_radio_armed,
             &db_param_udp_client_port,
-            &db_param_rssi_dbm
+            &db_param_rssi_dbm,
+            &db_param_led_enable,
+            &db_param_led_gpio,
+            &db_param_led_count,
+            &db_param_led_type
     };
     memcpy(db_params, db_params_l, sizeof(db_params_l));
 }
