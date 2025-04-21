@@ -66,7 +66,7 @@ extern QueueHandle_t
 /***************************************************************************************************************************
  * @brief Drone Bridge BLE initialisation function
  **************************************************************************************************************************/
-void db_init_ble();
+void db_ble_init();
 
 /***************************************************************************************************************************
  * @brief Initializes the global UART read and write queues.
@@ -80,6 +80,17 @@ void db_init_ble();
  *
  * @return void
  **************************************************************************************************************************/
-void db_queue_ble_init();
+void db_ble_queue_init();
+
+/**
+ * Reads RSSI from BLE connected device
+ * @param rssi the var to store the rssi
+ */
+void db_ble_request_rssi(int8_t *rssi);
+
+/*
+ * Shut down BLE stack
+ */
+void db_ble_deinit();
 
 #endif // DB_BLE_H

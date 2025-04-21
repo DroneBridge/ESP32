@@ -8,9 +8,9 @@ let last_timestamp_byte_count = 0;
 let esp_chip_model = 0;		// according to get_esp_chip_model_str()
 
 function change_radio_dis_arm_visibility() {
-	// we only support this feature when MAVLink or LTM are set AND when a standard Wi-Fi mode is enabled
+	// we only support this feature when MAVLink or LTM are set AND when a standard Wi-Fi mode or BLE is enabled
 	let radio_dis_onarm_div = document.getElementById("radio_dis_onarm_div")
-	if (document.getElementById("esp32_mode").value > "2" || document.getElementById("proto").value === "5") {
+	if ((document.getElementById("esp32_mode").value > "2" &&  document.getElementById("esp32_mode").value < "6") || document.getElementById("proto").value === "5") {
 		radio_dis_onarm_div.style.display = "none";
 	} else {
 		radio_dis_onarm_div.style.display = "block";

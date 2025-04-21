@@ -18,6 +18,10 @@
 #
 #   requires: pip install bleak
 
+# DESCRIPTION
+# Creates a bridge between a DroneBridge BLE device and a local GCS listening on UDP 127.0.0.1:14551
+# --- START THE GCS AND OPEN UDP 14550 BEFORE RUNNING THIS SCRIPT ----
+
 import asyncio
 import logging
 import socket
@@ -41,7 +45,6 @@ UDP_LISTEN_IP = "127.0.0.1" # Listen on all interfaces
 UDP_LISTEN_PORT = 14551 # Choose a free port
 
 # UUIDs for the ESP-IDF SPP Server example (Service 0xABF0)
-# Found in esp-idf/examples/bluetooth/nimble/ble_spp/spp_server/main/gatts_table.c
 SPP_SERVICE_UUID = "0000abf0-0000-1000-8000-00805f9b34fb"
 # Characteristic for sending data TO the ESP32 (Python Writes, ESP Receives - UUID 0xABF1)
 # Corresponds to UUID_CHR_SPP_DATA_RECEIVE in ESP code (has WRITE property)
@@ -178,12 +181,12 @@ async def main():
                 )
             except OSError as e:
                 logger.error(f"Failed to bind UDP listener to {UDP_LISTEN_IP}:{UDP_LISTEN_PORT}: {e}. "
-                             f"Port might be in use. Retrying in 10 seconds...")
-                await asyncio.sleep(10)
+                             f"Port might be in use. Retrying in 3 seconds...")
+                await asyncio.sleep(3)
                 continue # Restart scanning/setup
             except Exception as e:
-                logger.error(f"Unexpected error setting up UDP: {e}. Retrying in 10 seconds...")
-                await asyncio.sleep(10)
+                logger.error(f"Unexpected error setting up UDP: {e}. Retrying in 3 seconds...")
+                await asyncio.sleep(3)
                 continue # Restart scanning/setup
 
             # --- Connect to BLE Device ---

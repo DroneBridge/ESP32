@@ -177,10 +177,10 @@ void db_ltm_check_arm_state_set_wifi(const msp_ltm_port_t *db_msp_ltm_port) {
     if (DB_PARAM_DIS_RADIO_ON_ARM && db_msp_ltm_port->ltm_type == LTM_TYPE_S) {
         if (db_msp_ltm_port->ltm_frame_buffer[2 + LTM_TYPE_S_PAYLOAD_SIZE] & LTM_ARMED_BIT_MASK) {
             // autopilot says it is armed
-            db_set_wifi_status(false);  // disable Wi-Fi
+            db_set_radio_status(false);  // disable Wi-Fi
         } else {
             // autopilot says it is <<not>> armed
-            db_set_wifi_status(true);   // enable Wi-Fi
+            db_set_radio_status(true);   // enable Wi-Fi
         }
     } else {
         // nothing to do

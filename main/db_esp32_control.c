@@ -737,7 +737,7 @@ _Noreturn void control_module_udp_tcp() {
                 if (esp_wifi_sta_get_rssi((int *) &db_esp_signal_quality.air_rssi) != ESP_OK) {
                     db_esp_signal_quality.air_rssi = -127;
                 } else {/* all good */}
-            } else if (!DB_WIFI_IS_OFF &&
+            } else if (!DB_RADIO_IS_OFF &&
                        (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_AP || DB_PARAM_RADIO_MODE == DB_WIFI_MODE_AP_LR)) {
                 ESP_ERROR_CHECK_WITHOUT_ABORT(
                         esp_wifi_ap_get_sta_list(&wifi_sta_list)); // update list of connected stations
