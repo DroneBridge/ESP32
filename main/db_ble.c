@@ -1,3 +1,4 @@
+#include <sys/cdefs.h>
 /***************************************************************************************************************************
  * @file db_ble.c
  * @brief DroneBridge ESP32 BLE Source File
@@ -68,6 +69,7 @@ static uint16_t ble_spp_svc_gatt_notify_val_handle;
 static uint16_t ble_spp_svc_gatt_write_val_handle;
 static uint16_t ble_spp_svc_gatt_notify_cmd_handle;
 static uint16_t ble_spp_svc_gatt_write_cmd_handle;
+static uint16_t ble_mtu_size = 23;
 
 /***************************************************************************************************************************
  * Library Function Declaration
@@ -213,43 +215,112 @@ static const struct ble_gatt_svc_def new_ble_svc_gatt_defs[] = {
  * Private Function Definition
  **************************************************************************************************************************/
 
-static void db_ble_server_uart_task() {
-    DB_RADIO_IS_OFF = false;
+/**
+ * Sends supplied buffer via BLE notification to all connected clients
+ * @param data Pointer to send buffer
+ * @param data_len Length of send buffer
+ * @return 0 on success for all clients. -1 on failure to allocate buffer or ble_gatts_notify_custom return value
+ */
+int db_ble_send_data(const uint8_t *data, uint16_t data_len) {
+    for (int i = 0; i < CONFIG_BT_NIMBLE_MAX_CONNECTIONS; i++) {
+        /* Check if the client has subscribed to notifications */
+        if (conn_handle_subs[i]) {
+            struct os_mbuf *txom;
+            // Convert BleData_t struct data into an os_mbuf buffer
+            txom = ble_hs_mbuf_from_flat(data, data_len);
+            if (!txom) {
+                ESP_LOGE(TAG, "Failed to allocate os_mbuf (data length: %i)", data_len);
+                return -1;   // maybe we ran out of memory
+            }
+
+            // Send BLE notification
+            int rc = ble_gatts_notify_custom(i, ble_spp_svc_gatt_notify_val_handle, txom);
+            if (rc != 0) {
+                ESP_LOGE(TAG, "Error sending BLE notification rc = %d", rc);
+                return rc;
+            }
+        }
+    }
+    return 0;
+}
+
+/**
+ * @brief Sends BLE data, automatically splitting it into chunks if it exceeds the MTU limit.
+ *
+ * @param data Pointer to the data buffer to send.
+ * @param data_len Length of the data in the buffer.
+ * @return 0 on success, negative error code on failure during sending. Returns 1 if data_len is 0.
+ */
+int send_ble_data_chunked(const uint8_t *data, uint16_t data_len) {
+    // NimBLE requires 3 bytes overhead for notifications (ATT header)
+    const uint16_t max_payload_size = ble_mtu_size > 3 ? ble_mtu_size - 3 : 0;
+    int ret = 0;
+
+    if (max_payload_size == 0) {
+        ESP_LOGE(TAG, "Cannot send data, effective MTU is zero (ble_mtu_size: %d)", ble_mtu_size);
+        return -1; // Indicate error: MTU too small
+    }
+
+    if (data == NULL || data_len == 0) {
+        ESP_LOGW(TAG, "No data provided to send_ble_data_chunked.");
+        return 1; // Indicate nothing was sent, but not necessarily an error state.
+    }
+
+    if (data_len <= max_payload_size) {
+        // Data fits in a single packet
+        ESP_LOGD(TAG, "Sending single packet, len: %d, max_payload: %d", data_len, max_payload_size);
+        ret = db_ble_send_data(data, data_len);
+        if (ret != 0) {
+            ESP_LOGE(TAG, "Failed to send single packet, error: %d", ret);
+        }
+    } else {
+        // Data needs to be split into multiple packets
+        ESP_LOGD(TAG, "Splitting data (len: %d) into chunks (max_payload: %d)", data_len, max_payload_size);
+        uint16_t offset = 0;
+        while (offset < data_len) {
+            // Calculate the size of the current chunk
+            uint16_t chunk_size = (data_len - offset > max_payload_size) ?
+                                  max_payload_size :
+                                  (data_len - offset);
+
+            ESP_LOGD(TAG, "Sending chunk, offset: %d, chunk_size: %d", offset, chunk_size);
+
+            // Send the current chunk (pointer arithmetic to get the chunk start)
+            ret = db_ble_send_data(data + offset, chunk_size);
+            if (ret != 0) {
+                ESP_LOGE(TAG, "Failed to send chunk at offset %d, error: %d", offset, ret);
+                break; // Stop sending further chunks on error
+            }
+
+            // Move to the next chunk
+            offset += chunk_size;
+        }
+    }
+    return ret; // Return the status of the last send operation
+}
+
+/**
+ * Main sending task for BLE data
+ */
+_Noreturn static void db_ble_server_uart_task() {
+    DB_RADIO_IS_OFF = false; // we are about to send stuff - update this parameter to indicate to others
     ESP_LOGI(TAG, "BLE server UART_task started");
     int delay_timer_cnt = 0;
-    int rc = 0;
     db_ble_queue_event_t bleData;
     while (true) {
         // Waiting for UART event.
         if (xQueueReceive(db_uart_read_queue_ble, &bleData, 0)) {
-            for (int i = 0; i < CONFIG_BT_NIMBLE_MAX_CONNECTIONS; i++) {
-                /* Check if client has subscribed to notifications */
-                if (conn_handle_subs[i]) {
-                    struct os_mbuf *txom;
-
-                    // Convert BleData_t struct data into an os_mbuf buffer
-                    txom = ble_hs_mbuf_from_flat(bleData.data, bleData.data_len);
-                    if (!txom) {
-                        ESP_LOGE(TAG, "Failed to allocate os_mbuf (data length: %i)", bleData.data_len);
-                        free(bleData.data);
-                        goto loop_end;   // maybe we ran out of memory, try again in the next while loop iteration
-                    }
-
-                    // Send BLE notification
-                    rc = ble_gatts_notify_custom(i, ble_spp_svc_gatt_notify_val_handle, txom);
-                    if (rc != 0) {
-                        ESP_LOGE(TAG, "Error sending BLE notification rc = %d", rc);
-                    }
-                }
-            }
+            // Split into multiple packets if MTU is bigger than data to send
+            // Instead, we could also change DB_PARAM_SERIAL_PACK_SIZE dynamically based on the BLE MTU, but that can
+            // result in very small buffers for the UART task to read which may cause performance issues.
+            // The serial packets arrive here with the length of DB_PARAM_SERIAL_PACK_SIZE. Fragment again if necessary.
+            send_ble_data_chunked(bleData.data, bleData.data_len);
             free(bleData.data);
         }
-        loop_end:
         if (delay_timer_cnt == 5000) {
             /* all actions are non-blocking so allow some delay so that the IDLE task of FreeRTOS and the watchdog can run
             read: https://esp32developer.com/programming-in-c-c/tasks/tasks-vs-co-routines for reference */
-            // use this timer to get the RSSI updated
-            db_ble_request_rssi(&db_esp_signal_quality.air_rssi);
+            db_ble_request_rssi(&db_esp_signal_quality.air_rssi); // use this timer to get the RSSI updated
             vTaskDelay(10 / portTICK_PERIOD_MS);
             delay_timer_cnt = 0;
         } else {
@@ -266,7 +337,7 @@ static int gap_event_handler(struct ble_gap_event *event, void *arg) {
     switch (event->type) {
         case BLE_GAP_EVENT_CONNECT:
             /* A new connection was established or a connection attempt failed. */
-            ESP_LOGI(TAG, "connection %s; status=%d ", event->connect.status == 0 ? "established" : "failed",
+            ESP_LOGI(TAG, "connection %s; status=%d", event->connect.status == 0 ? "established" : "failed",
                      event->connect.status);
             if (event->connect.status == 0) {
                 active_conn_handle = event->connect.conn_handle;
@@ -284,10 +355,7 @@ static int gap_event_handler(struct ble_gap_event *event, void *arg) {
             break;
 
         case BLE_GAP_EVENT_DISCONNECT:
-            ESP_LOGI(TAG, "disconnect; reason=%d ", event->disconnect.reason);
-            // print_conn_desc(&event->disconnect.conn);
-            ESP_LOGI(TAG, "\n");
-
+            ESP_LOGI(TAG, "disconnect; reason=%d", event->disconnect.reason);
             conn_handle_subs[event->disconnect.conn.conn_handle] = false;
             // Mark connection handle as invalid
             active_conn_handle = BLE_HS_CONN_HANDLE_NONE;
@@ -300,8 +368,6 @@ static int gap_event_handler(struct ble_gap_event *event, void *arg) {
             ESP_LOGI(TAG, "connection updated; status=%d ", event->conn_update.status);
             rc = ble_gap_conn_find(event->conn_update.conn_handle, &desc);
             assert(rc == 0);
-            // print_conn_desc(&desc);
-            ESP_LOGI(TAG, "\n");
             break;
 
         case BLE_GAP_EVENT_ADV_COMPLETE:
@@ -310,15 +376,14 @@ static int gap_event_handler(struct ble_gap_event *event, void *arg) {
             break;
 
         case BLE_GAP_EVENT_MTU:
-            ESP_LOGI(TAG, "mtu update event; conn_handle=%d cid=%d mtu=%d\n", event->mtu.conn_handle,
+            ESP_LOGI(TAG, "mtu update event; conn_handle=%d cid=%d mtu=%d", event->mtu.conn_handle,
                      event->mtu.channel_id,
                      event->mtu.value);
+            ble_mtu_size = event->mtu.value;    // ToDo: Support more than one MTU for all connections
             break;
 
         case BLE_GAP_EVENT_SUBSCRIBE:
-            ESP_LOGI(TAG,
-                     "subscribe event; conn_handle=%d attr_handle=%d "
-                     "reason=%d prevn=%d curn=%d previ=%d curi=%d\n",
+            ESP_LOGI(TAG, "subscribe event; conn_handle=%d attr_handle=%d reason=%d prevn=%d curn=%d previ=%d curi=%d",
                      event->subscribe.conn_handle, event->subscribe.attr_handle, event->subscribe.reason,
                      event->subscribe.prev_notify, event->subscribe.cur_notify, event->subscribe.prev_indicate,
                      event->subscribe.cur_indicate);
@@ -403,8 +468,7 @@ ble_svc_gatt_handler(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt
             break;
 
         case BLE_GATT_ACCESS_OP_WRITE_CHR:
-            MODLOG_DFLT(DEBUG, "Data received in write event,conn_handle = %x,attr_handle = %x", conn_handle,
-                        attr_handle);
+            ESP_LOGD(TAG, "Data received in write event,conn_handle = %x,attr_handle = %x", conn_handle, attr_handle);
             struct os_mbuf *om = ctxt->om;           // Get the received data buffer
             int len = OS_MBUF_PKTLEN(om); // Get total length of received data
             db_ble_queue_event_t bleData;            // Create a struct instance
@@ -430,7 +494,7 @@ ble_svc_gatt_handler(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt
             break;
 
         default:
-            ESP_LOGI(TAG, "\nDefault Callback");
+            ESP_LOGI(TAG, "Default Callback");
             break;
     }
     return 0;
@@ -547,6 +611,7 @@ static void nimble_host_config_init() {
     ble_hs_cfg.sync_cb = on_stack_sync;
     ble_hs_cfg.gatts_register_cb = gatt_svr_register_cb;
     ble_hs_cfg.store_status_cb = ble_store_util_status_rr;
+    ble_hs_cfg.sm_sc = 1;   // enable secure connection
 
     /** WittyWizard:
      * TO DO: Figure out what they do later, code works without them, but what they do I have no idea

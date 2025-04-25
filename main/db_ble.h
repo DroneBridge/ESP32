@@ -46,7 +46,7 @@
  * @brief Structure to hold BLE data.
  **************************************************************************************************************************/
 typedef struct {
-  uint8_t data_len; /**< Length of the data. */
+  uint16_t data_len; /**< Length of the data. */
   uint8_t *data;    /**< Pointer to the data. */
 } __attribute__((__packed__)) db_ble_queue_event_t;
 
