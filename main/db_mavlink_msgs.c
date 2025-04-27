@@ -63,11 +63,11 @@ uint8_t db_get_mav_sys_id() {
  */
 int8_t db_format_rssi(int8_t signal_strength, int8_t noise_floor) {
     if (db_param_rssi_dbm.value.db_param_u8.value) {
-        // report in [dBm]
+        // report in [dBm] - no conversion since in Wi-Fi, BLE & ESP-NOW APIs natively report dBm
         return signal_strength;
     } else {
         // dBm from [-50 to -100] scaled to 100 to 0
-        return MIN(100, 2 * (MIN(-50, signal_strength) + 100));
+        return MIN(100, 2 * (MAX(-100, MIN(-50, signal_strength)) + 100));
     }
 }
 
@@ -320,13 +320,14 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
                     (payload.base_mode & MAV_MODE_FLAG_SAFETY_ARMED ||
                     (payload.system_status > MAV_STATE_STANDBY && payload.system_status != MAV_STATE_POWEROFF))) {
                         // autopilot indicates it is armed
-                        db_set_wifi_status(false);
+                        db_set_radio_status(false);
                     } else {
                         // autopilot indicates it is <<not>> armed
-                        db_set_wifi_status(true);
+                        db_set_radio_status(true);
                     }
                     // ESP32s that are connected to a flight controller via UART will send RADIO_STATUS messages to the GND
-                    if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_STA || DB_PARAM_RADIO_MODE == DB_WIFI_MODE_ESPNOW_AIR) {
+                    if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_STA || DB_PARAM_RADIO_MODE == DB_WIFI_MODE_ESPNOW_AIR || DB_PARAM_RADIO_MODE == DB_BLUETOOTH_MODE) {
+                        // ToDo: For BLE only the last connected client is considered.
                         fmav_radio_status_t payload_r = {.fixed = 0, .txbuf=0,
                                 .noise = db_esp_signal_quality.gnd_noise_floor,
                                 .remnoise = db_esp_signal_quality.air_noise_floor,
@@ -338,9 +339,12 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
                                                                                  fmav_status);
                         db_send_to_all_clients(tcp_clients, udp_conns, buff, len);
                     } else if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_AP && wifi_sta_list.num > 0) {
-                        // We assume ESP32 is not used in DB_WIFI_MODE_AP on the ground but only on the drone side -> We are in WiFi AP mode and connected to the drone
+                        // We assume ESP32 is not used in DB_WIFI_MODE_AP on the ground but only on the drone side
+                        // -> We are in WiFi AP mode and connected to the drone
                         // Send each connected client a radio status packet.
-                        // ToDo: Only the RSSI of the first client is considered. Easier for UDP since we have a nice list with mac addresses to use for mapping. Harder for TCP -> no MAC addresses available of connected clients
+                        // ToDo: Only the RSSI of the first (Wi-Fi) is considered.
+                        //  Easier for UDP since we have a nice list with mac addresses to use for mapping.
+                        //  Harder for TCP -> no MAC addresses available of connected clients
                         fmav_radio_status_t payload_r = {.fixed = UINT8_MAX, .noise = UINT8_MAX, .remnoise = UINT8_MAX, .remrssi=db_format_rssi(wifi_sta_list.sta[0].rssi, -88), .rssi=UINT8_MAX, .rxerrors=0, .txbuf=0};
                         uint16_t len = fmav_msg_radio_status_encode_to_frame_buf(buff, db_get_mav_sys_id(),
                                                                                  db_get_mav_comp_id(), &payload_r,
