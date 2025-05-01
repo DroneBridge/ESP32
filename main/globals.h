@@ -30,7 +30,7 @@
 #define DB_MAJOR_VERSION 2
 #define DB_MINOR_VERSION 1
 #define DB_PATCH_VERSION 0
-#define DB_MATURITY_VERSION "RC1"
+#define DB_MATURITY_VERSION "stable"
 
 /* DroneBridge Parameters */
 extern uint8_t DB_RADIO_MODE;    // never change this value while the ESP32 is running, will likely lead to a crash. Assign it during startup when received from storage. Can therefore only be changed via reboot and DB_WIFI_MODE_DESIGNATED
