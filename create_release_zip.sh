@@ -3,8 +3,8 @@
 # Execute in an esp-idf enabled shell
 # This script will create a combined zip file containing binaries for all supported esp32 boards
 
-release_foldername="DroneBridge_ESP32_nightly"
-release_name_zip="DroneBridge_ESP32_nightly.zip"
+release_foldername="DroneBridge_ESP32_v2_1_nightly"
+release_name_zip="DroneBridge_ESP32_v2_1_nightly.zip"
 
 mkdir -p $release_foldername
 mkdir -p build
