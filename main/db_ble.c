@@ -7,7 +7,7 @@
  *
  * This file contains the NimBLE Initialisation functions to start the BLE Host
  * stack and start advertising the BLE Service
- * @author Witty-Wizard <agarwalshashank429@gmail.com> further modified by Wolfgang Christl
+ * @authors Witty-Wizard <agarwalshashank429@gmail.com> further modified by Wolfgang Christl
  * @license Apache License, Version 2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -172,21 +172,21 @@ ble_svc_gatt_handler(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt
  **************************************************************************************************************************/
 static const struct ble_gatt_svc_def new_ble_svc_gatt_defs[] = {
         {
-                /*** Service: SPP */
+                /*** Service: Serial Interface */
                 .type = BLE_GATT_SVC_TYPE_PRIMARY,
-                .uuid = BLE_UUID16_DECLARE(BLE_SVC_SPP_UUID16),
+                .uuid = BLE_UUID16_DECLARE(BLE_SVC_SERIAL_UUID16),
                 .characteristics =
                 (struct ble_gatt_chr_def[]) {
                         {
                                 /* Write-only characteristic */
-                                .uuid       = BLE_UUID16_DECLARE(BLE_SVC_SPP_CHR_WRITE_UUID16),
+                                .uuid       = BLE_UUID16_DECLARE(BLE_SVC_SERIAL_CHR_WRITE_UUID16),
                                 .access_cb  = ble_svc_gatt_handler,
                                 .val_handle = &ble_spp_svc_gatt_write_val_handle,
                                 .flags      = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_READ,
                         },
                         {
                                 /* Notify-only characteristic */
-                                .uuid       = BLE_UUID16_DECLARE(BLE_SVC_SPP_CHR_NOTIFY_UUID16),
+                                .uuid       = BLE_UUID16_DECLARE(BLE_SVC_SERIAL_CHR_NOTIFY_UUID16),
                                 .access_cb  = ble_svc_gatt_handler, // No direct access required, only notify
                                 .val_handle = &ble_spp_svc_gatt_notify_val_handle,
                                 .flags      = BLE_GATT_CHR_F_NOTIFY | BLE_GATT_CHR_F_READ,
@@ -430,7 +430,7 @@ static void start_advertising(void) {
     fields.name_len = strlen(name);
     fields.name_is_complete = 1;
 
-    fields.uuids16 = (ble_uuid16_t[]) {BLE_UUID16_INIT(BLE_SVC_SPP_UUID16)};
+    fields.uuids16 = (ble_uuid16_t[]) {BLE_UUID16_INIT(BLE_SVC_SERIAL_UUID16)};
     fields.num_uuids16 = 1;
     fields.uuids16_is_complete = 1;
 
