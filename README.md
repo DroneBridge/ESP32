@@ -22,7 +22,7 @@ since it does not support video encoding.
 ![DroneBridge for ESP32 concept](wiki/db_ESP32_setup.png)
 
 ## Features
--   Bidirectional: serial-to-WiFi, serial-to-WiFi Long-Range (LR), serial-to-ESP-NOW link
+-   Bidirectional: serial-to-WiFi, serial-to-WiFi Long-Range (LR), serial-to-ESP-NOW link, Bluetooth LE
 -   Support for **MAVLink**, **MSP**, **LTM** or **any other payload** using transparent option
 -   Affordable: ~7€
 -   Up to **150m range** using standard WiFi

@@ -449,11 +449,11 @@ db_parameter_t db_param_init_str_param(char *db_name, char *mav_param_name, cons
     strncpy((char *) db_str_param.db_name, db_name, DB_PARAM_NAME_MAXLEN-1);
     uint mav_param_name_str_len = strlen(mav_param_name);
     if (mav_param_name_str_len < DB_PARAM_MAX_MAV_PARAM_NAME_LEN) {
-        // normal case - param name + string terminator fit into allocated memory
+        // normal case - param name and string terminator fit into allocated memory
         strncpy((char *) db_str_param.mav_t.param_name, mav_param_name, DB_PARAM_MAX_MAV_PARAM_NAME_LEN - 1);
     } else {
-        // mav param name is allowed to be 16 chars long - it is valid without string terminator if len = 16
-        // copy first 16 chars of string without string terminator
+        // mav param name is allowed to be 16 chars long - it is valid without a string terminator if len = 16
+        // copy the first 16 chars of string without a string terminator
         memcpy((char *) db_str_param.mav_t.param_name, mav_param_name, DB_PARAM_MAX_MAV_PARAM_NAME_LEN);
     }
     db_str_param.value.db_param_str.default_value = (uint8_t *) strdup(default_value);
@@ -463,6 +463,9 @@ db_parameter_t db_param_init_str_param(char *db_name, char *mav_param_name, cons
     } else {
         // all good - init value to default value
         strncpy((char *) db_str_param.value.db_param_str.value, (char *) db_str_param.value.db_param_str.default_value, max_val_len);
+        // Ensure null termination, especially if default_value is >= max_val_len. For password this might not be necessary
+        db_str_param.value.db_param_str.value[max_val_len - 1] = '\0';
+        ESP_LOGD(TAG, "Initialized value for %s with default '%s'", db_name, (char*)db_str_param.value.db_param_str.value);
     }
     return db_str_param;
 }
@@ -529,7 +532,8 @@ void db_param_set_to_default(db_parameter_t *db_parameter) {
         case STRING:
             strncpy((char *) db_parameter->value.db_param_str.value,
                     (char *) db_parameter->value.db_param_str.default_value,
-                    DB_PARAM_VALUE_MAXLEN);
+                    db_parameter->value.db_param_str.max_len);
+            db_parameter->value.db_param_str.value[db_parameter->value.db_param_str.max_len - 1] = '\0';
             break;
         case UINT8:
             db_parameter->value.db_param_u8.value = db_parameter->value.db_param_u8.default_value;
@@ -596,18 +600,36 @@ int db_param_print_values_to_buffer(uint8_t *str_buffer) {
  * @param key NVS key as string with max length NVS_KEY_NAME_MAX_SIZE-1
  * @param dst Destination for the read value
  */
-void db_read_str_nvs(nvs_handle_t my_handle, char *key, char *dst) {
-    if (strlen(key) + 1 > NVS_KEY_NAME_MAX_SIZE)
-        ESP_LOGW(TAG, "key %s is longer than %i bytes", key, NVS_KEY_NAME_MAX_SIZE);
+void db_read_str_nvs(nvs_handle_t my_handle, db_parameter_t *db_param) {
     size_t required_size = 0;
-    esp_err_t err = nvs_get_str(my_handle, key, NULL, &required_size);
+    // First call to get size
+    esp_err_t err = nvs_get_str(my_handle, (char *) db_param->db_name, NULL, &required_size);
     if (err == ESP_OK) {
-        char *read_nvs_val = malloc(required_size);
-        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_str(my_handle, key, read_nvs_val, &required_size));
-        memcpy(dst, read_nvs_val, required_size);
-        free(read_nvs_val);
+        if (required_size > db_param->value.db_param_str.max_len) {
+            ESP_LOGW(TAG, "NVS string for %s too long (%d > %d), using default.",
+                     (char *) db_param->db_name, required_size, db_param->value.db_param_str.max_len);
+            db_param_set_to_default(db_param); // Use default if stored value too big
+        } else if (required_size == 0) {
+            // Handle case where key exists but string is empty (e.g., saved empty password)
+            ESP_LOGI(TAG, "NVS string for %s is empty, using default.", (char *) db_param->db_name);
+            db_param_set_to_default(db_param);
+        } else {
+            // Read the actual value
+            err = nvs_get_str(my_handle, (char *) db_param->db_name, (char *)db_param->value.db_param_str.value, &required_size);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Error (%s) reading string %s from NVS! Using default.", esp_err_to_name(err), (char *) db_param->db_name);
+                db_param_set_to_default(db_param);
+            } else {
+                ESP_LOGD(TAG, "Read %s from NVS: '%s'", (char *) db_param->db_name, (char *)db_param->value.db_param_str.value);
+            }
+        }
+    } else if (err == ESP_ERR_NVS_NOT_FOUND) {
+        // *** THIS IS THE CRITICAL PART ***
+        ESP_LOGI(TAG, "Parameter %s not found in NVS, using default.", (char *) db_param->db_name);
+        db_param_set_to_default(db_param); // Apply the default value
     } else {
-        ESP_LOGW(TAG, "Could not read key %s from NVS", key);
+        ESP_LOGE(TAG, "Error (%s) checking NVS for %s! Using default.", esp_err_to_name(err), (char *) db_param->db_name);
+        db_param_set_to_default(db_param); // Also use default on other errors
     }
 }
 
@@ -621,8 +643,7 @@ void db_param_read_all_params_nvs(const nvs_handle_t *nvs_handle) {
     for (int i = 0; i < sizeof(db_params) / sizeof(db_params[0]); i++) {
         switch (db_params[i]->type) {
             case STRING:
-                db_read_str_nvs(*nvs_handle, (char *) db_params[i]->db_name,
-                                (char *) db_params[i]->value.db_param_str.value);
+                db_read_str_nvs(*nvs_handle, db_params[i]);
                 if (!db_param_is_valid_str((char *) db_params[i]->value.db_param_str.value, db_params[i])) {
                     // read parameter is not valid - overwrite NVS value with default value
                     strncpy((char *) db_params[i]->value.db_param_str.value,

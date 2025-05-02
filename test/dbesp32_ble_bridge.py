@@ -44,14 +44,12 @@ UDP_TARGET_PORT = 14550
 UDP_LISTEN_IP = "127.0.0.1" # Listen on all interfaces
 UDP_LISTEN_PORT = 14551 # Choose a free port
 
-# UUIDs for the ESP-IDF SPP Server example (Service 0xABF0)
-SPP_SERVICE_UUID = "0000abf0-0000-1000-8000-00805f9b34fb"
-# Characteristic for sending data TO the ESP32 (Python Writes, ESP Receives - UUID 0xABF1)
-# Corresponds to UUID_CHR_SPP_DATA_RECEIVE in ESP code (has WRITE property)
-SPP_RX_CHAR_UUID = "0000abf1-0000-1000-8000-00805f9b34fb"
-# Characteristic for receiving data FROM the ESP32 (Python Reads via Notify, ESP Sends - UUID 0xABF2)
-# Corresponds to UUID_CHR_SPP_DATA_NOTIFY in ESP code (has NOTIFY property)
-SPP_TX_CHAR_UUID = "0000abf2-0000-1000-8000-00805f9b34fb"
+# UUIDs for the ESP-IDF SPP Server example
+DB_BLE_SERVICE_UUID = "0000db32-0000-1000-8000-00805f9b34fb"
+# Characteristic for sending data TO the ESP32 (Python Writes, ESP Receives)
+DB_BLE_RX_CHAR_UUID = "0000db33-0000-1000-8000-00805f9b34fb"
+# Characteristic for receiving data FROM the ESP32 (Python Reads via Notify, ESP Sends)
+DB_BLE_TX_CHAR_UUID = "0000db34-0000-1000-8000-00805f9b34fb"
 # ---------------------
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -210,31 +208,31 @@ async def main():
                     ble_client_global = ble_client # Store globally
 
                     # --- Find Characteristics ---
-                    logger.info(f"Looking for SPP Service: {SPP_SERVICE_UUID}")
+                    logger.info(f"Looking for SPP Service: {DB_BLE_SERVICE_UUID}")
                     # Ensure services are discovered (should happen on connect, but check)
                     await ble_client.get_services()
-                    service = ble_client.services.get_service(SPP_SERVICE_UUID)
+                    service = ble_client.services.get_service(DB_BLE_SERVICE_UUID)
                     if not service:
-                        logger.error(f"SPP Service {SPP_SERVICE_UUID} not found on device.")
+                        logger.error(f"SPP Service {DB_BLE_SERVICE_UUID} not found on device.")
                         await ble_client.disconnect()
                         if udp_transport: udp_transport.close()
                         await asyncio.sleep(5)
                         continue # Restart process
 
-                    logger.info(f"Looking for SPP Notify Characteristic (TX): {SPP_TX_CHAR_UUID}")
-                    tx_char = service.get_characteristic(SPP_TX_CHAR_UUID)
+                    logger.info(f"Looking for SPP Notify Characteristic (TX): {DB_BLE_TX_CHAR_UUID}")
+                    tx_char = service.get_characteristic(DB_BLE_TX_CHAR_UUID)
                     if not tx_char or "notify" not in tx_char.properties:
-                        logger.error(f"SPP Notify Characteristic {SPP_TX_CHAR_UUID} (with Notify) not found.")
+                        logger.error(f"SPP Notify Characteristic {DB_BLE_TX_CHAR_UUID} (with Notify) not found.")
                         await ble_client.disconnect()
                         if udp_transport: udp_transport.close()
                         await asyncio.sleep(5)
                         continue # Restart process
 
-                    logger.info(f"Looking for SPP Write Characteristic (RX): {SPP_RX_CHAR_UUID}")
-                    rx_char = service.get_characteristic(SPP_RX_CHAR_UUID)
+                    logger.info(f"Looking for SPP Write Characteristic (RX): {DB_BLE_RX_CHAR_UUID}")
+                    rx_char = service.get_characteristic(DB_BLE_RX_CHAR_UUID)
                     # Check for write or write-without-response
                     if not rx_char or not any(p in rx_char.properties for p in ["write", "write-without-response"]):
-                        logger.error(f"SPP Write Characteristic {SPP_RX_CHAR_UUID} (with Write) not found.")
+                        logger.error(f"SPP Write Characteristic {DB_BLE_RX_CHAR_UUID} (with Write) not found.")
                         await ble_client.disconnect()
                         if udp_transport: udp_transport.close()
                         await asyncio.sleep(5)

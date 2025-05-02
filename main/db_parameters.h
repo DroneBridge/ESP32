@@ -29,9 +29,9 @@
 
 #define DB_BUILD_VERSION 16
 #define DB_MAJOR_VERSION 2
-#define DB_MINOR_VERSION 1
+#define DB_MINOR_VERSION 2
 #define DB_PATCH_VERSION 0
-#define DB_MATURITY_VERSION "RC2"
+#define DB_MATURITY_VERSION "RC1"
 
 #define DB_PARAM_TOTAL_NUM          25  // total number of db parameters
 #define DB_PARAM_MAV_CNT            17  // Number of MAVLink parameters returned by ESP32 in the PARAM message. Needed by GCS.
