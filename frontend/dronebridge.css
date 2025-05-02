@@ -136,13 +136,20 @@ input, select {
     opacity: 1;
 }
 
-div.note {
+div.info {
     background-color: #00316600;
-    border-left: solid 4px #ff881a;
     line-height: 18px;
     overflow: hidden;
     padding: 12px;
     margin-bottom: 1.1rem
+}
+
+div.note {
+    border-left: solid 4px #ff881a;
+}
+
+div.issue {
+    border-left: solid 4px #f63e3e;
 }
 
 @supports (-webkit-appearance: none) or (-moz-appearance: none) {

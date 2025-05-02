@@ -25,6 +25,9 @@
 <div class="container">
     <form id="settings_form">
         <div>
+            <div class="info issue" id="issue_div">
+                There might be an issue with your baud rate configuration.<br>Match the UART baud rates on the flight controller and the ESP32.<br>The ESP32 is receiving serial bytes but fails to decode the MAVLink messages.
+            </div>
             <h2>Statistics</h2>
             <div class="row">
                 <div id="web_conn_status" class="six columns small_text">
@@ -67,14 +70,14 @@
                         <option value="5">ESP-NOW LR Mode GND</option>
                         <option value="6">Bluetooth LE</option>
                     </select>
-                    <div class="note" id="esp-lr-ap-disclaimer"><h4>Attention:</h4>
+                    <div class="info note" id="esp-lr-ap-disclaimer"><h4>Attention:</h4>
                         LR Mode makes the device invisible for non-LR enabled devices!<br>You will not be able to change the config!<br><br>
                         The data rate is reduced to ~0.25Mbps. The range may be increase by a factor of ~2.<br>Press the boot
                         button (short press for AP-Mode with password "dronebridge" or long press for reset to defaults)
                         or erase the flash memory of the ESP32 and re-flash DroneBridge for ESP32 to get back into
                         normal Wi-Fi Mode!
                     </div>
-                    <div class="note" id="ble_disclaimer_div"><h4>Attention:</h4>
+                    <div class="info note" id="ble_disclaimer_div"><h4>Attention:</h4>
                         <b>BETA: Bluetooth LE (BLE) is currently in beta testing.</b><br>
                         The application (e.g. GCS software) must explicitly support DroneBridge BLE connections.<br>
                         At the moment only the recent Betaflight Configurator supports BLE connections but does so very poorly.<br>
@@ -212,9 +215,9 @@
                         <option value="1500000">2000000</option>
                         <option value="1500000">1500000</option>
                         <option value="1000000">1000000</option>
-                        <option value="500000">500000</option>
                         <option value="921600">921600</option>
                         <option value="576000">576000</option>
+						<option value="500000">500000</option>
                         <option value="460800">500800</option>
                         <option value="460800">460800</option>
                         <option value="230400">230400</option>
@@ -291,6 +294,7 @@
     // get stats every half a second
     setInterval(get_stats, 500)
     setInterval(update_conn_status, 500)
+    setInterval(check_for_issues, 1000)
     setTimeout(change_msp_ltm_visibility, 500)
     setTimeout(change_ap_ip_visibility, 500)
     setTimeout(change_uart_visibility, 500)

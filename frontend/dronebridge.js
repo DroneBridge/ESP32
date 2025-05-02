@@ -6,6 +6,9 @@ let serial_via_JTAG = 0;	// set to 1 if ESP32 is using the USB interface as seri
 let last_byte_count = 0;
 let last_timestamp_byte_count = 0;
 let esp_chip_model = 0;		// according to get_esp_chip_model_str()
+let recv_ser_bytes = 0;		// Total bytes received from serial interface
+let serial_dec_mav_msgs = 0;	// Total MAVLink messages decoded from serial interface
+let set_telem_proto = null;		// Telemetry protocol received by the ESP32
 
 function change_radio_dis_arm_visibility() {
 	// we only support this feature when MAVLink or LTM are set AND when a standard Wi-Fi mode or BLE is enabled
@@ -269,21 +272,22 @@ function get_stats() {
 	get_json("api/system/stats").then(json_data => {
 		conn_status = 1
 		let d = new Date();
-		let bytes = parseInt(json_data["read_bytes"])
+		recv_ser_bytes = parseInt(json_data["read_bytes"]);
+		serial_dec_mav_msgs = parseInt(json_data["serial_dec_mav_msgs"]);
 		let bytes_per_second = 0;
 		let current_time = d.getTime();
-		if (last_byte_count > 0 && last_timestamp_byte_count > 0 && !isNaN(bytes)) {
-			bytes_per_second = (bytes - last_byte_count) / ((current_time - last_timestamp_byte_count) / 1000);
+		if (last_byte_count > 0 && last_timestamp_byte_count > 0 && !isNaN(recv_ser_bytes)) {
+			bytes_per_second = (recv_ser_bytes - last_byte_count) / ((current_time - last_timestamp_byte_count) / 1000);
 		}
 		last_timestamp_byte_count = current_time;
-		if (!isNaN(bytes) && bytes > 1000000) {
-			document.getElementById("read_bytes").innerHTML = (bytes / 1000000).toFixed(3) + " MB (" + ((bytes_per_second*8)/1000).toFixed(2) + " kbit/s)"
-		} else if (!isNaN(bytes) && bytes > 1000) {
-			document.getElementById("read_bytes").innerHTML = (bytes / 1000).toFixed(2) + " kB (" + ((bytes_per_second*8)/1000).toFixed(2) + " kbit/s)"
-		} else if (!isNaN(bytes)) {
-			document.getElementById("read_bytes").innerHTML = bytes + " bytes (" + Math.round(bytes_per_second) + " byte/s)"
+		if (!isNaN(recv_ser_bytes) && recv_ser_bytes > 1000000) {
+			document.getElementById("read_bytes").innerHTML = (recv_ser_bytes / 1000000).toFixed(3) + " MB (" + ((bytes_per_second*8)/1000).toFixed(2) + " kbit/s)"
+		} else if (!isNaN(recv_ser_bytes) && recv_ser_bytes > 1000) {
+			document.getElementById("read_bytes").innerHTML = (recv_ser_bytes / 1000).toFixed(2) + " kB (" + ((bytes_per_second*8)/1000).toFixed(2) + " kbit/s)"
+		} else if (!isNaN(recv_ser_bytes)) {
+			document.getElementById("read_bytes").innerHTML = recv_ser_bytes + " bytes (" + Math.round(bytes_per_second) + " byte/s)"
 		}
-		last_byte_count = bytes;
+		last_byte_count = recv_ser_bytes;
 
 		let tcp_clients = parseInt(json_data["tcp_connected"])
 		if (!isNaN(tcp_clients) && tcp_clients === 1) {
@@ -357,6 +361,7 @@ function get_settings() {
 				}
 			}
 		}
+		set_telem_proto = document.getElementById("proto").value;
 	}).catch(error => {
 		conn_status = 0
 		error.message;
@@ -443,6 +448,15 @@ function check_validity() {
 		valid = false;
 	}
 	return valid;
+}
+
+function check_for_issues() {
+	let issue_div = document.getElementById("issue_div");
+	if (set_telem_proto === "4" && serial_dec_mav_msgs === 0 && recv_ser_bytes !== 0) {
+		issue_div.style.display = "block";
+	} else {
+		issue_div.style.display = "none";
+	}
 }
 
 function save_settings() {

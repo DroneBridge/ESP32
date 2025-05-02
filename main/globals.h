@@ -33,6 +33,7 @@ extern uint8_t LOCAL_MAC_ADDRESS[6];       // filled with the mac address during
 extern uint8_t DB_MAV_SYS_ID;              // stores the local system ID - set by heartbeat that is received via UART (UART is the local connection)
 
 extern uint32_t serial_total_byte_count;                // Total bytes read from serial link (UART or USB/JTAG)
+extern uint32_t serial_total_decoded_mav_msgs;          // Total decoded MAVLink messages from serial link (UART or USB/JTAG)
 extern int8_t num_connected_tcp_clients;
 extern udp_conn_list_t *udp_conn_list;   // List of UDP clients that the ESP32 will send to
 

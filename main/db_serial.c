@@ -48,6 +48,7 @@
 
 uint8_t DB_MAV_SYS_ID = 1;
 uint32_t serial_total_byte_count = 0;
+uint32_t serial_total_decoded_mav_msgs = 0;
 uint16_t DB_SERIAL_READ_TIMEOUT_MS = DB_SERIAL_READ_TIMEOUT_MS_DEFAULT;
 
 uint8_t ltm_frame_buffer[MAX_LTM_FRAMES_IN_BUFFER * LTM_MAX_FRAME_SIZE];
@@ -314,7 +315,6 @@ void db_parse_mavlink_from_radio(int *tcp_clients, udp_conn_list_t *udp_conns, u
  */
 void db_read_serial_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *serial_buffer,
                                   unsigned int *serial_buff_pos) {
-    static uint mav_msg_counter = 0;
     static uint8_t mav_parser_rx_buf[296];  // at least 280 bytes which is the max len for a MAVLink v2 packet
     static fmav_status_t fmav_status_serial;    // fmav parser status struct for serial parser
     uint8_t uart_read_buf[DB_PARAM_SERIAL_PACK_SIZE];
@@ -352,9 +352,8 @@ void db_read_serial_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, 
         fmav_result_t result = {0};
 
         if (fmav_parse_and_check_to_frame_buf(&result, mav_parser_rx_buf, &fmav_status_serial, uart_read_buf[i])) {
-            ESP_LOGD(TAG, "Parser detected a full message (%i total): result.frame_len %i", mav_msg_counter,
+            ESP_LOGD(TAG, "Parser detected a full message (%lu total): result.frame_len %i", serial_total_decoded_mav_msgs,
                      result.frame_len);
-            mav_msg_counter++;
             // Check if the new message will fit in the buffer
             if (*serial_buff_pos == 0 && result.frame_len > DB_PARAM_SERIAL_PACK_SIZE) {
                 // frame_len is bigger than DB_PARAM_SERIAL_PACK_SIZE -> Split into multiple messages since
@@ -385,6 +384,7 @@ void db_read_serial_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, 
             // Decode message and react to it if it was for us
             fmav_frame_buf_to_msg(&msg, &result, mav_parser_rx_buf);
             if (result.res == FASTMAVLINK_PARSE_RESULT_OK) {
+                serial_total_decoded_mav_msgs++;
                 if (fmav_msg_is_for_me(db_get_mav_sys_id(), db_get_mav_comp_id(), &msg)) {
                     // This will also instantly send a response. That is OK at this position since we buffer and send
                     // out only full packets and this "MAVLink packet injection" into the stream will not mess with the
