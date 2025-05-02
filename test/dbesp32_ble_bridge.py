@@ -45,13 +45,13 @@ UDP_LISTEN_IP = "127.0.0.1" # Listen on all interfaces
 UDP_LISTEN_PORT = 14551 # Choose a free port
 
 # UUIDs for the ESP-IDF SPP Server example (Service 0xABF0)
-SPP_SERVICE_UUID = "0000abf0-0000-1000-8000-00805f9b34fb"
+SPP_SERVICE_UUID = "0000db32-0000-1000-8000-00805f9b34fb"
 # Characteristic for sending data TO the ESP32 (Python Writes, ESP Receives - UUID 0xABF1)
 # Corresponds to UUID_CHR_SPP_DATA_RECEIVE in ESP code (has WRITE property)
-SPP_RX_CHAR_UUID = "0000abf1-0000-1000-8000-00805f9b34fb"
+SPP_RX_CHAR_UUID = "0000db33-0000-1000-8000-00805f9b34fb"
 # Characteristic for receiving data FROM the ESP32 (Python Reads via Notify, ESP Sends - UUID 0xABF2)
 # Corresponds to UUID_CHR_SPP_DATA_NOTIFY in ESP code (has NOTIFY property)
-SPP_TX_CHAR_UUID = "0000abf2-0000-1000-8000-00805f9b34fb"
+SPP_TX_CHAR_UUID = "0000db34-0000-1000-8000-00805f9b34fb"
 # ---------------------
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
