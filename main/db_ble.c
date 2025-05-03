@@ -227,7 +227,12 @@ static const struct ble_gatt_svc_def new_ble_svc_gatt_defs[] = {
         if (conn_handle_subs[i]) {
 
             /* Write to the characteristics */
-            int rc = ble_gatts_write(i,ble_spp_svc_gatt_notify_val_handle,data,data_len);
+            int rc = ble_gattc_write_flat(i,ble_spp_svc_gatt_notify_val_handle,
+                data,     /* Data pointer */
+                data_len, /* Data length */
+                NULL,     /* Callback function */
+                NULL      /* Callback function arguments */
+            );
             if (rc != 0) {
                 ESP_LOGE(TAG, "Failed to write characteristic value (rc = %d)", rc);
                 return rc;
