@@ -589,7 +589,7 @@ static void gatt_svr_register_cb(struct ble_gatt_register_ctxt *ctxt, void *arg)
             break;
 
         case BLE_GATT_REGISTER_OP_CHR:
-            ESP_LOGD(TAG,"registering characteristic %s with def_handle=%d val_handle=%d\n",
+            ESP_LOGD(TAG, "registering characteristic %s with def_handle=%d val_handle=%d\n",
                         ble_uuid_to_str(ctxt->chr.chr_def->uuid, buf), ctxt->chr.def_handle, ctxt->chr.val_handle);
             break;
 

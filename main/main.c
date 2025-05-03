@@ -416,7 +416,7 @@ int db_init_wifi_clientmode() {
     ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE)); // disable power saving
     ESP_ERROR_CHECK(esp_wifi_start());
     DB_RADIO_IS_OFF = false; // just to be sure, but should not be necessary
-    // consider connection lost after 1s of no beacon - triggers reconnect via WIFI_EVENT_STA_DISCONNECTED event
+    // Consider connection lost after 1s of no beacon - triggers reconnect via WIFI_EVENT_STA_DISCONNECTED event
     ESP_ERROR_CHECK(esp_wifi_set_inactive_time(WIFI_IF_STA, 3));
 
     ESP_LOGI(TAG, "Init of WiFi Client-Mode finished. (SSID: %s PASS: %s)", DB_PARAM_WIFI_SSID, DB_PARAM_PASS);
@@ -620,7 +620,7 @@ void db_read_settings_nvs() {
  */
 void short_press_callback(void *arg, void *usr_data) {
     ESP_LOGW(TAG, "Short press detected setting wifi mode to access point with password: dronebridge");
-    DB_RADIO_MODE_DESIGNATED = DB_WIFI_MODE_AP;  // do not directly change DB_PARAM_RADIO_MODE since it is not safe and constantly processed by other tasks. Save settings and reboot will assign DB_RADIO_MODE_DESIGNATED to DB_PARAM_RADIO_MODE.
+    DB_RADIO_MODE_DESIGNATED = DB_WIFI_MODE_AP;  // Do not directly change DB_PARAM_RADIO_MODE since it is not safe and constantly processed by other tasks. Save settings and reboot will assign DB_RADIO_MODE_DESIGNATED to DB_PARAM_RADIO_MODE.
     db_param_set_to_default(&db_param_ssid);
     db_param_set_to_default(&db_param_pass);
     db_write_settings_to_nvs();
@@ -634,7 +634,7 @@ void short_press_callback(void *arg, void *usr_data) {
  */
 void long_press_callback(void *arg, void *usr_data) {
     ESP_LOGW(TAG, "Reset triggered via GPIO %i. Resetting settings and rebooting", DB_RESET_PIN);
-    DB_RADIO_MODE_DESIGNATED = DB_WIFI_MODE_AP;  // do not directly change DB_PARAM_RADIO_MODE since it is not safe and constantly processed by other tasks. Save settings and reboot will assign DB_RADIO_MODE_DESIGNATED to DB_PARAM_RADIO_MODE.
+    DB_RADIO_MODE_DESIGNATED = DB_WIFI_MODE_AP;  // Do not directly change DB_PARAM_RADIO_MODE since it is not safe and constantly processed by other tasks. Save settings and reboot will assign DB_RADIO_MODE_DESIGNATED to DB_PARAM_RADIO_MODE.
     db_param_reset_all();
     db_write_settings_to_nvs();
     esp_restart();
