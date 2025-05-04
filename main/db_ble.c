@@ -221,20 +221,25 @@ static const struct ble_gatt_svc_def new_ble_svc_gatt_defs[] = {
  * @param data_len Length of send buffer
  * @return 0 on success for all clients. -1 on failure to allocate buffer or ble_gatts_notify_custom return value
  */
-int db_ble_send_data(const uint8_t *data, uint16_t data_len) {
+ int db_ble_send_data(const uint8_t *data, uint16_t data_len) {
     for (int i = 0; i < CONFIG_BT_NIMBLE_MAX_CONNECTIONS; i++) {
         /* Check if the client has subscribed to notifications */
         if (conn_handle_subs[i]) {
-            struct os_mbuf *txom;
-            // Convert BleData_t struct data into an os_mbuf buffer
-            txom = ble_hs_mbuf_from_flat(data, data_len);
-            if (!txom) {
-                ESP_LOGE(TAG, "Failed to allocate os_mbuf (data length: %i)", data_len);
-                return -1;   // maybe we ran out of memory
+
+            /* Write to the characteristics */
+            int rc = ble_gattc_write_flat(i,ble_spp_svc_gatt_notify_val_handle,
+                data,     /* Data pointer */
+                data_len, /* Data length */
+                NULL,     /* Callback function */
+                NULL      /* Callback function arguments */
+            );
+            if (rc != 0) {
+                ESP_LOGE(TAG, "Failed to write characteristic value (rc = %d)", rc);
+                return rc;
             }
 
-            // Send BLE notification
-            int rc = ble_gatts_notify_custom(i, ble_spp_svc_gatt_notify_val_handle, txom);
+            /* Now send a notification with the updated characteristic value */
+            rc = ble_gatts_notify(i, ble_spp_svc_gatt_notify_val_handle);
             if (rc != 0) {
                 ESP_LOGE(TAG, "Error sending BLE notification rc = %d", rc);
                 return rc;
