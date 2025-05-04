@@ -564,7 +564,9 @@ void db_param_reset_all() {
  * @param str_buffer Buffer to write the parameter string - must be long enough ~512 bytes
  */
 int db_param_print_values_to_buffer(uint8_t *str_buffer) {
-    int str_len = 0; // overall length of the string in the str_buffer
+    int str_len = 1; // overall length of the string in the str_buffer
+    str_buffer[0] = '\n';
+    str_buffer[1] = '\0';
     for (int i = 0; i < sizeof(db_params) / sizeof(db_params[0]); i++) {
         uint8_t param_str_buf[128]; // buffer for the string of a single value
         switch (db_params[i]->type) {

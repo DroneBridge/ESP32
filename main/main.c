@@ -513,7 +513,7 @@ void db_set_radio_status(uint8_t enable_wifi) {
 void db_write_settings_to_nvs() {
     // print parameters to console for logging
     ESP_LOGI(TAG, "Trying to save parameters:");
-    uint8_t param_str_buffer[512];
+    uint8_t param_str_buffer[512] = {0};
     db_param_print_values_to_buffer(param_str_buffer);
     ESP_LOGI(TAG, "%s", param_str_buffer);
     ESP_LOGI(TAG, "Saving to NVS %s", NVS_NAMESPACE);
@@ -586,7 +586,7 @@ void db_read_settings_nvs() {
         // print parameters to console for logging
         uint8_t param_str_buffer[512] = {0};
         db_param_print_values_to_buffer(param_str_buffer);
-        ESP_LOGI(TAG, "\n%s", (char *) param_str_buffer);
+        ESP_LOGI(TAG, "%s", (char *) param_str_buffer);
 
         // Check if we have a saved UDP client from the last session. Add it to the known udp clients if there is one.
         if (strlen((char *) db_param_udp_client_ip.value.db_param_str.value) > 0 &&
