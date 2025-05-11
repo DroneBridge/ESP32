@@ -177,7 +177,7 @@ connectButton.onclick = async () => {
 }
 
 /**
- * Reads file (DroneBridge firmware file) from server and returns it
+ * Reads file (DroneBridge firmware file) from the server and returns it
  * @param url
  * @returns {Promise<unknown>}
  */
@@ -185,6 +185,9 @@ async function read_file(url) {
     try {
         // Fetch the binary file from the server
         const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Response status: ${response.status}. Could not get the file: ${url}`);
+        }
         const buffer = await response.arrayBuffer(); // Convert the response to an ArrayBuffer
 
         // Create a Blob from the ArrayBuffer
@@ -271,6 +274,7 @@ flash_button.onclick = async () => {
             };
             await esploader.writeFlash(flashOptions);
         } catch (e) {
+            alert(`Something went wrong flashing the firmware: ${e}`);
             console.error(e);
             // term.writeln(`Error: ${e.message}`);
         } finally {
