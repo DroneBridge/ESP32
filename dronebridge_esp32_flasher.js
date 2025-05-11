@@ -118,8 +118,8 @@ let t2_1stable_esps3_usbserial = new DBTarget("ESP32-S3", "ESP32-S3 (USBSerial)"
 let t2_1stable_esps3_noUARTConsole = new DBTarget("ESP32-S3", "ESP32-S3 (noUARTConsole)", "esp32s3_noUARTConsole/", ["bootloader.bin", "partition-table.bin", "db_esp32.bin", "www.bin"], [0x0, 0x8000, 0x10000, 0x190000], "DIO", "80MHz");
 let release_210_stable = new DBRelease("v2.1.0 (stable)", "./db_releases/2_1_0/",
     [t2_1stable_esp32,
-        t2_1stable_espc3, t2_1stable_espc3_official, t2_1stable_espc3_usbserial, t2_1stable_espc3_noUARTConsole,
-        t2_1stable_espc6, t2_1stable_espc6_official, t2_1stable_espc6_official_usbserial, t2_1stable_espc6_official_noUARTConsole, t2_1stable_espc6_usbserial, t2_1stable_espc6_noUARTConsole,
+        t2_1stable_espc3_official, t2_1stable_espc3, t2_1stable_espc3_usbserial, t2_1stable_espc3_noUARTConsole,
+        t2_1stable_espc6_official, t2_1stable_espc6_official_usbserial, t2_1stable_espc6_official_noUARTConsole, t2_1stable_espc6, t2_1stable_espc6_usbserial, t2_1stable_espc6_noUARTConsole,
         t2_1stable_esps2, t2_1stable_esps2_noUARTConsole,
         t2_1stable_esps3, t2_1stable_esps3_usbserial, t2_1stable_esps3_noUARTConsole]);
 
