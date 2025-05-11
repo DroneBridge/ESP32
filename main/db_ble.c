@@ -45,6 +45,7 @@
 #include "services/gap/ble_svc_gap.h"
 #include "services/gatt/ble_svc_gatt.h"
 #include "globals.h"
+#include "db_serial.h"
 
 /***************************************************************************************************************************
  * MACROS
@@ -225,21 +226,16 @@ static const struct ble_gatt_svc_def new_ble_svc_gatt_defs[] = {
     for (int i = 0; i < CONFIG_BT_NIMBLE_MAX_CONNECTIONS; i++) {
         /* Check if the client has subscribed to notifications */
         if (conn_handle_subs[i]) {
-
-            /* Write to the characteristics */
-            int rc = ble_gattc_write_flat(i,ble_spp_svc_gatt_notify_val_handle,
-                data,     /* Data pointer */
-                data_len, /* Data length */
-                NULL,     /* Callback function */
-                NULL      /* Callback function arguments */
-            );
-            if (rc != 0) {
-                ESP_LOGE(TAG, "Failed to write characteristic value (rc = %d)", rc);
-                return rc;
+            struct os_mbuf *txom;
+            // Convert BleData_t struct data into an os_mbuf buffer
+            txom = ble_hs_mbuf_from_flat(data, data_len);
+            if (!txom) {
+                ESP_LOGE(TAG, "Failed to allocate os_mbuf (data length: %i)", data_len);
+                return -1;   // maybe we ran out of memory
             }
 
-            /* Now send a notification with the updated characteristic value */
-            rc = ble_gatts_notify(i, ble_spp_svc_gatt_notify_val_handle);
+            // Send BLE notification
+            int rc = ble_gatts_notify_custom(i, ble_spp_svc_gatt_notify_val_handle, txom);
             if (rc != 0) {
                 ESP_LOGE(TAG, "Error sending BLE notification rc = %d", rc);
                 return rc;
@@ -469,7 +465,7 @@ static int
 ble_svc_gatt_handler(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg) {
     switch (ctxt->op) {
         case BLE_GATT_ACCESS_OP_READ_CHR:
-            ESP_LOGI(TAG, "Callback for read");
+            ESP_LOGI(TAG, "Callback for read with buffer len %i - Ignoring", ctxt->om->om_len);
             break;
 
         case BLE_GATT_ACCESS_OP_WRITE_CHR:
@@ -492,7 +488,7 @@ ble_svc_gatt_handler(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt
             }
 
             // Send the received data to the FreeRTOS queue
-            if (xQueueSend(db_uart_write_queue_ble, &bleData, portMAX_DELAY) != pdPASS) {
+            if (xQueueSend(db_uart_write_queue_ble, &bleData, pdMS_TO_TICKS(50)) != pdPASS) {
                 ESP_LOGE(TAG, "Failed to send BLE data to queue");
                 free(bleData.data);
             }

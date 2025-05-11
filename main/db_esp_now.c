@@ -631,7 +631,7 @@ _Noreturn void process_espnow_data() {
         if(db_espnow_send_recv_callback_queue != NULL && xQueueReceive(db_espnow_send_recv_callback_queue, &evt, 0) == pdTRUE) {
             switch (evt.id) {
                 case DB_ESPNOW_SEND_CB: {
-                    db_espnow_event_send_cb_t *send_cb = &evt.info.send_cb;
+                    // db_espnow_event_send_cb_t *send_cb = &evt.info.send_cb;  // no needed for now
                     // indicate that we can send next packet - the last sending callback has returned, so we keep the order
                     // of packets. ESP-NOW by default does not guarantee the order when many packets are sent in quick succession
                     ready_to_send = true;
