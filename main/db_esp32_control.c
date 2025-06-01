@@ -758,70 +758,84 @@ _Noreturn void control_module_udp_tcp() {
 #ifdef CONFIG_BT_ENABLED
 
 _Noreturn void control_module_ble() {
-    ESP_LOGI(TAG, "Starting control module (Bluetooth)");
+  ESP_LOGI(TAG, "Starting control module (Bluetooth)");
 
-    /* Initialize error code as failed, because UART is not initialized*/
-    esp_err_t serial_socket = ESP_FAIL;
+  /* Initialize error code as failed, because UART is not initialized*/
+  esp_err_t serial_socket = ESP_FAIL;
 
-    /* open serial socket for comms with FC or GCS */
-    serial_socket = open_serial_socket();
-    if (serial_socket == ESP_FAIL) {
-        ESP_LOGE(TAG, "UART socket not opened. Aborting start of control module.");
-        vTaskDelete(NULL);
-    }
+  /* open serial socket for comms with FC or GCS */
+  serial_socket = open_serial_socket();
+  if (serial_socket == ESP_FAIL) {
+    ESP_LOGE(TAG, "UART socket not opened. Aborting start of control module.");
+    vTaskDelete(NULL);
+  }
 #ifdef CONFIG_DB_SERIAL_OPTION_JTAG
-    else {
-      db_jtag_serial_info_print();
-    }
+  else {
+    db_jtag_serial_info_print();
+  }
 #endif
 
-    uint8_t msp_message_buffer[UART_BUF_SIZE];
-    uint8_t serial_buffer[DB_PARAM_SERIAL_PACK_SIZE];
-    msp_ltm_port_t db_msp_ltm_port;
-    db_ble_queue_event_t bleData;
-    uint transparent_buff_pos = 0;
-    uint msp_ltm_buff_pos = 0;
-    uint delay_timer_cnt = 0;
+  uint8_t msp_message_buffer[UART_BUF_SIZE];
+  uint8_t serial_buffer[DB_PARAM_SERIAL_PACK_SIZE];
+  msp_ltm_port_t db_msp_ltm_port;
+  db_ble_queue_event_t bleData;
+  uint transparent_buff_pos = 0;
+  uint msp_ltm_buff_pos = 0;
+  uint delay_timer_cnt = 0;
 
-    /* Event Loop */
-    while (1) {
-        /* Read UART and send data to BLE */
-        read_process_serial_link(NULL,                  // NULL, not using TCP
-                                 &transparent_buff_pos, // transparent buffer position
-                                 &msp_ltm_buff_pos,     // msp buffer position
-                                 msp_message_buffer,    // msp buffer
-                                 serial_buffer,         // serial buffer
-                                 &db_msp_ltm_port       // msp port
-        );
+  /* Event Loop */
+  while (1) {
+    /* Read UART and send data to BLE */
+    read_process_serial_link(
+        NULL,                  // NULL, not using TCP
+        &transparent_buff_pos, // transparent buffer position
+        &msp_ltm_buff_pos,     // msp buffer position
+        msp_message_buffer,    // msp buffer
+        serial_buffer,         // serial buffer
+        &db_msp_ltm_port       // msp port
+    );
 
-        if (db_uart_write_queue_ble != NULL && xQueueReceive(db_uart_write_queue_ble, &bleData, 0) == pdTRUE) {
-            if (DB_PARAM_SERIAL_PROTO == DB_SERIAL_PROTOCOL_MAVLINK) {
-                // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
-                // We cannot write to serial first since we might inject packets and do not know when to do so to not "destroy" an
-                // existing packet
-                db_parse_mavlink_from_radio(NULL, NULL, bleData.data, bleData.data_len);
-            } else {
-                // no parsing with any other protocol - transparent here - just pass through
-                write_to_serial(bleData.data, bleData.data_len);
-            }
-            free(bleData.data);
-        } else {
-            if (db_uart_write_queue_ble == NULL)
-                ESP_LOGE(TAG, "db_uart_write_queue is NULL!");
-            // no new data available to be sent via serial link do nothing
-        }
-
-        /**Yield to the scheduler if delay_timer_cnt reaches 5000,allowing other
-         * tasks to execute and preventing starvation.
+    if (db_uart_write_queue_ble != NULL &&
+        xQueueReceive(db_uart_write_queue_ble, &bleData, 0) == pdTRUE) {
+      switch (DB_PARAM_SERIAL_PROTO) {
+      case DB_SERIAL_PROTOCOL_MAVLINK:
+        /**
+         * Parse, so we can listen in and react to certain messages - function
+         * will send parsed messages to serial link. We cannot write to serial
+         * first since we might inject packets and do not know when to do so to
+         * not "destroy" an existing packet
          */
-        if (delay_timer_cnt == 5000) {
-            vTaskDelay(10 / portTICK_PERIOD_MS);
-            delay_timer_cnt = 0;
-        } else {
-            delay_timer_cnt++;
-        }
+        db_parse_mavlink_from_radio(NULL, NULL, bleData.data, bleData.data_len);
+        break;
+      case DB_SERIAL_PROTOCOL_MSPLTM:
+        db_parse_msp_ltm_radio(bleData.data, bleData.data_len);
+
+      case DB_SERIAL_PROTOCOL_TRANSPARENT:
+      default:
+        /**
+         * no parsing - transparent here - just pass through
+         */
+        write_to_serial(bleData.data, bleData.data_len);
+        break;
+      }
+      free(bleData.data);
+    } else {
+      if (db_uart_write_queue_ble == NULL)
+        ESP_LOGE(TAG, "db_uart_write_queue is NULL!");
+      // no new data available to be sent via serial link do nothing
     }
-    vTaskDelete(NULL);
+
+    /**Yield to the scheduler if delay_timer_cnt reaches 5000,allowing other
+     * tasks to execute and preventing starvation.
+     */
+    if (delay_timer_cnt == 5000) {
+      vTaskDelay(10 / portTICK_PERIOD_MS);
+      delay_timer_cnt = 0;
+    } else {
+      delay_timer_cnt++;
+    }
+  }
+  vTaskDelete(NULL);
 }
 
 #endif

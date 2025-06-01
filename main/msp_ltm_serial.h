@@ -20,6 +20,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 #define MSP_MAX_HEADER_SIZE 9
 #define MSP_V2_FRAME_ID         255
@@ -136,5 +137,7 @@ typedef struct mspPacket_s {
 //static msp_ltm_port_t mspPorts[MAX_MSP_PORT_COUNT];
 
 bool parse_msp_ltm_byte(msp_ltm_port_t *msp_ltm_port, uint8_t new_byte);
+
+void db_parse_msp_ltm_radio(uint8_t *data_buffer, size_t data_length);
 
 #endif //CONTROL_STATUS_MSP_SERIAL_H

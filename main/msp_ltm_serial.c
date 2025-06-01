@@ -20,6 +20,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "msp_ltm_serial.h"
+#include "db_serial.h"
 #include "db_crc.h"
 
 /**
@@ -279,4 +280,38 @@ bool parse_msp_ltm_byte(msp_ltm_port_t *msp_ltm_port, uint8_t new_byte) {
             break;
     }
     return true;
+}
+
+void db_parse_msp_ltm_radio(uint8_t *data_buffer, size_t data_length){
+    static msp_ltm_port_t db_msp_ltm_port;
+    static uint8_t msp_message_buffer[MSP_PORT_INBUF_SIZE];
+    static unsigned int msp_read_bytes = 0;
+
+    for (size_t i = 0; i < data_length; i++) {
+        uint8_t data_byte = data_buffer[i];
+        if (parse_msp_ltm_byte(&db_msp_ltm_port,  data_byte)) {
+
+            msp_message_buffer[msp_read_bytes++] = data_byte;
+            msp_read_bytes =
+                msp_read_bytes %
+                MSP_PORT_INBUF_SIZE; // Ensure we don't overflow the buffer,
+                                     // does not do error handling
+
+            switch (db_msp_ltm_port.parse_state) {
+                case MSP_PACKET_RECEIVED:
+                write_to_serial(msp_message_buffer, msp_read_bytes);
+                    break;
+                case LTM_PACKET_RECEIVED:
+                    // Handle LTM packet received
+                    // Process db_msp_ltm_port.ltm_frame_buffer here
+                    break;
+                default:
+                    break;
+            }
+        }
+        else{
+            msp_read_bytes = 0; // Reset read bytes on parse error
+        }
+    }
+    
 }
