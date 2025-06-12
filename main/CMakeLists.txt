@@ -11,7 +11,11 @@ set(SRCS
         db_parameters.c)
 
 if(CONFIG_BT_ENABLED)
+    if(CONFIG_BT_BLUEDROID_ENABLED)
+        list(APPEND SRCS db_ble_bluedroid.c)
+    elseif (CONFIG_BT_NIMBLE_ENABLED)
     list(APPEND SRCS db_ble.c)
+    endif()
 endif()
 
 idf_component_register(SRCS ${SRCS}
