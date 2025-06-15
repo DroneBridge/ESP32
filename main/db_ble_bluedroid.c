@@ -24,10 +24,12 @@
 #include "db_ble.h"
 #include <freertos/queue.h>
 #include <stdint.h>
-#include <esp_bt_main.h>
-#include <esp_gatt_common_api.h>
-#include <esp_gatts_api.h>
-#include <esp_gap_ble_api.h>
+#include "esp_gap_ble_api.h"
+#include "esp_gatts_api.h"
+#include "esp_bt_defs.h"
+#include "esp_bt_main.h"
+#include "esp_bt_device.h"
+#include "esp_gatt_common_api.h"
 #include <esp_bt.h>
 #include "esp_log.h"
 #include "globals.h"
@@ -192,9 +194,8 @@ static const esp_gatts_attr_db_t spp_gatt_db[SPP_IDX_NB] = {
 
         //SPP -  data notify characteristic - Client Characteristic Configuration Descriptor
         [SPP_IDX_SPP_DATA_NTF_CFG]         =
-                {{ESP_GATT_AUTO_RSP},
-                 {ESP_UUID_LEN_16, (uint8_t *) &character_client_config_uuid, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
-                         sizeof(uint16_t), sizeof(spp_data_notify_ccc), (uint8_t *) spp_data_notify_ccc}},
+                {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t *)&character_client_config_uuid, ESP_GATT_PERM_READ|ESP_GATT_PERM_WRITE,
+                        sizeof(uint16_t), sizeof(spp_data_notify_ccc), (uint8_t *)spp_data_notify_ccc}},
 
         //SPP -  command characteristic Declaration
         [SPP_IDX_SPP_COMMAND_CHAR]            =
@@ -248,7 +249,7 @@ void db_ble_send_to_uart(uint8_t *data, uint16_t data_len) {
         free(bleData.data);
         return;
     }
-
+    ESP_LOGI(TAG, "Sending to UART");
     // Send the received data to the FreeRTOS queue
     if (xQueueSend(db_uart_write_queue_ble, &bleData, pdMS_TO_TICKS(50)) != pdPASS) {
         ESP_LOGE(TAG, "Failed to send BLE data to queue");
@@ -375,7 +376,7 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
             ESP_LOGI(TAG, "Characteristic read");
             break;
         case ESP_GATTS_WRITE_EVT: {
-            // ESP_LOGI(TAG, "Characteristic write, conn_id %d, handle %d", param->write.conn_id, param->write.handle);
+            ESP_LOGI(TAG, "Characteristic write, conn_id %d, handle %d", param->write.conn_id, param->write.handle);
             res = find_char_and_desr_index(p_data->write.handle);
             if (p_data->write.is_prep == false) {
                 if (res == SPP_IDX_SPP_COMMAND_VAL) {
@@ -417,6 +418,7 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
                     //TODO:
                 }
             } else if ((p_data->write.is_prep == true) && (res == SPP_IDX_SPP_DATA_RECV_VAL)) {
+                ESP_LOGI(TAG, "Storing data");
                 store_wr_buffer(p_data);
             }
             break;
@@ -528,6 +530,7 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
  */
 int db_ble_send_data(uint8_t *data, uint16_t data_len, uint8_t need_confirm) {
     int suc = esp_ble_gatts_send_indicate(spp_gatts_if, spp_conn_id, spp_handle_table[SPP_IDX_SPP_DATA_NTY_VAL], data_len, data, need_confirm);
+    ESP_LOGI(TAG, "Sending BLE Data");
     if (suc != ESP_OK) {
         ESP_LOGE(TAG, "Error sending indicate esp_ble_gatts_send_indicate: %i", suc);
     }
@@ -543,42 +546,47 @@ int db_ble_send_data(uint8_t *data, uint16_t data_len, uint8_t need_confirm) {
  * @param data_len Length of send buffer
  * @return 0 on success for all clients. -1 on failure. Gives esp_ble_gatts_send_indicate return value
  */
-int send_ble_data_chunked_espressif(const uint8_t *data, uint16_t data_len) {
-    uint8_t total_num = 0;
-    uint8_t current_num = 0;
-    uint8_t *ntf_value_p = NULL;
-
-    if ((data_len % (ble_mtu_size - 7)) == 0) {
-        total_num = data_len / (ble_mtu_size - 7);
+int send_ble_data_chunked_espressif(uint8_t *data, uint16_t data_len) {
+    if (data_len <= (ble_mtu_size - 3)) {
+        db_ble_send_data(data, data_len, true);
     } else {
-        total_num = data_len / (ble_mtu_size - 7) + 1;
-    }
-    current_num = 1;
-    ntf_value_p = (uint8_t *)malloc((ble_mtu_size-3)*sizeof(uint8_t));
-    if (ntf_value_p == NULL) {
-        ESP_LOGE(TAG, "%s malloc.2 failed", __func__);
-        return -1;
-    }
-    while (current_num <= total_num) {
-        if (current_num < total_num) {
-            ntf_value_p[0] = '#';
-            ntf_value_p[1] = '#';
-            ntf_value_p[2] = total_num;
-            ntf_value_p[3] = current_num;
-            memcpy(ntf_value_p + 4, data + (current_num - 1)*(ble_mtu_size-7), (ble_mtu_size-7));
-            db_ble_send_data(ntf_value_p, (ble_mtu_size-3), false);
-        } else if(current_num == total_num) {
-            ntf_value_p[0] = '#';
-            ntf_value_p[1] = '#';
-            ntf_value_p[2] = total_num;
-            ntf_value_p[3] = current_num;
-            memcpy(ntf_value_p + 4, data + (current_num - 1)*(ble_mtu_size-7), (data_len - (current_num - 1)*(ble_mtu_size - 7)));
-            db_ble_send_data(ntf_value_p, (data_len - (current_num - 1)*(ble_mtu_size - 7) + 4), false);
+        uint8_t total_num = 0;
+        uint8_t current_num = 0;
+        uint8_t *ntf_value_p = NULL;
+
+        if ((data_len % (ble_mtu_size - 7)) == 0) {
+            total_num = data_len / (ble_mtu_size - 7);
+        } else {
+            total_num = data_len / (ble_mtu_size - 7) + 1;
         }
-        vTaskDelay(20 / portTICK_PERIOD_MS);
-        current_num++;
+        current_num = 1;
+        ntf_value_p = (uint8_t *)malloc((ble_mtu_size-3)*sizeof(uint8_t));
+        if (ntf_value_p == NULL) {
+            ESP_LOGE(TAG, "%s malloc.2 failed", __func__);
+            return -1;
+        }
+
+        while (current_num <= total_num) {
+            if (current_num < total_num) {
+                ntf_value_p[0] = '#';
+                ntf_value_p[1] = '#';
+                ntf_value_p[2] = total_num;
+                ntf_value_p[3] = current_num;
+                memcpy(ntf_value_p + 4, data + (current_num - 1)*(ble_mtu_size-7), (ble_mtu_size-7));
+                db_ble_send_data(ntf_value_p, (ble_mtu_size-3), false);
+            } else if(current_num == total_num) {
+                ntf_value_p[0] = '#';
+                ntf_value_p[1] = '#';
+                ntf_value_p[2] = total_num;
+                ntf_value_p[3] = current_num;
+                memcpy(ntf_value_p + 4, data + (current_num - 1)*(ble_mtu_size-7), (data_len - (current_num - 1)*(ble_mtu_size - 7)));
+                db_ble_send_data(ntf_value_p, (data_len - (current_num - 1)*(ble_mtu_size - 7) + 4), false);
+            }
+            vTaskDelay(20 / portTICK_PERIOD_MS);
+            current_num++;
+        }
+        free(ntf_value_p);
     }
-    free(ntf_value_p);
     return 0;
 }
 
@@ -589,7 +597,7 @@ int send_ble_data_chunked_espressif(const uint8_t *data, uint16_t data_len) {
  * @param data_len Length of the data in the buffer.
  * @return 0 on success, negative error code on failure during sending. Returns 1 if data_len is 0.
  */
-int send_ble_data_chunked(const uint8_t *data, uint16_t data_len) {
+int send_ble_data_chunked(uint8_t *data, uint16_t data_len) {
     // BLE requires 3 bytes overhead for notifications (ATT header)
     const uint16_t max_payload_size = ble_mtu_size > 3 ? ble_mtu_size - 3 : 0;
     int ret = 0;
@@ -652,6 +660,10 @@ _Noreturn static void db_ble_server_uart_task() {
             // Instead, we could also change DB_PARAM_SERIAL_PACK_SIZE dynamically based on the BLE MTU, but that can
             // result in very small buffers for the UART task to read which may cause performance issues.
             // The serial packets arrive here with the length of DB_PARAM_SERIAL_PACK_SIZE. Fragment again if necessary.
+            if(!enable_data_ntf){
+                ESP_LOGE(TAG, "%s do not enable data Notify", __func__);
+                continue;
+            }
             if (USE_ESPRESSIF_EXAMPLE_HEADER) {
                 send_ble_data_chunked_espressif(bleData.data, bleData.data_len);
             } else {
@@ -689,6 +701,15 @@ void db_ble_init() {
     esp_err_t ret;
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
 
+    /* Start BLE Notify Task*/
+    xTaskCreate(db_ble_server_uart_task, /**< Task Function */
+                "BLETask",                 /**< Task Name */
+                4096,                    /**< Stack size */
+                NULL,                    /**< Parameters, NULL as no parameters required */
+                5,                       /**< Task Priority */
+                NULL                     /**< Task reference, used to change behaviour of task from another task */
+    );
+
     ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
 
     ret = esp_bt_controller_init(&bt_cfg);
@@ -725,14 +746,7 @@ void db_ble_init() {
         ESP_LOGE(TAG, "set local  MTU failed, error code = %x", local_mtu_ret);
     }
 
-    /* Start BLE Notify Task*/
-    xTaskCreate(db_ble_server_uart_task, /**< Task Function */
-                "BLETask",                 /**< Task Name */
-                4096,                    /**< Stack size */
-                NULL,                    /**< Parameters, NULL as no parameters required */
-                5,                       /**< Task Priority */
-                NULL                     /**< Task reference, used to change behaviour of task from another task */
-    );
+
 }
 
 void db_ble_deinit() {
