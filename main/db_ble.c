@@ -347,10 +347,19 @@ static int gap_event_handler(struct ble_gap_event *event, void *arg) {
                 assert(rc == 0);
                 // print_conn_desc(&desc);
             }
+            /* Try to update connection parameters - necessary for Betaflight Configurator connections since they are very demanding */
+            struct ble_gap_upd_params params = { 0 };
+            params.itvl_min = 6;
+            params.itvl_max = 24;
+            params.latency = 0;
+            params.supervision_timeout = 20;
+            int bc = ble_gap_update_params(event->connect.conn_handle, &params);
+            if (bc != 0) {
+                ESP_LOGE(TAG, "failed to update connection parameters, error code: %d", rc);
+            }
             ESP_LOGI(TAG, "\n");
             if (event->connect.status != 0 || CONFIG_BT_NIMBLE_MAX_CONNECTIONS > 1) {
-                /* Connection failed or if multiple connection allowed; resume
-                 * advertising. */
+                /* Connection failed, or if multiple connection allowed; resume advertising. */
                 start_advertising();
             }
             break;
