@@ -407,12 +407,8 @@ static esp_err_t settings_get_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-// rest_server_context_t rest_context_r;
-
 esp_err_t start_rest_server(const char *base_path) {
     REST_CHECK(base_path, "wrong base path", err);
-    heap_caps_print_heap_info(MALLOC_CAP_8BIT);
-    // rest_server_context_t *rest_context = &rest_context_r;
     rest_server_context_t *rest_context = calloc(1, sizeof(rest_server_context_t));
     REST_CHECK(rest_context, "No memory for rest context", err);
     strlcpy(rest_context->base_path, base_path, sizeof(rest_context->base_path));

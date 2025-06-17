@@ -77,12 +77,6 @@ menu "DroneBridge for ESP32 Configuration"
             In WiFi Client Mode the ESP32 will open an additional UDP port 14555 that receives Skybrush broadcast msgs.
             The messages will be transparently forwarded to the serial port/UART.
 
-    config DB_ESPNOW_SUPPORT
-          bool "Enable support for ESP-NOW protocol. Lower data rate and longer range"
-          default y
-          help
-            Special WiFi mode with more range at the cost of data rate. Can be selected in the UI.
-
     choice WEB_DEPLOY_MODE
         prompt "Website deploy mode"
         default WEB_DEPLOY_SF

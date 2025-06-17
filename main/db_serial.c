@@ -91,7 +91,7 @@ esp_err_t open_uart_serial_socket() {
     ESP_ERROR_CHECK(uart_set_pin(UART_NUM, DB_PARAM_GPIO_TX, DB_PARAM_GPIO_RX,
                                  flow_control ? DB_PARAM_GPIO_RTS : UART_PIN_NO_CHANGE,
                                  flow_control ? DB_PARAM_GPIO_CTS : UART_PIN_NO_CHANGE));
-    return uart_driver_install(UART_NUM, 1024, 0, 0, NULL, 0);
+    return uart_driver_install(UART_NUM, 1024, 0, 10, NULL, 0);
 }
 
 /**

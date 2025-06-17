@@ -194,14 +194,14 @@ static const struct ble_gatt_svc_def new_ble_svc_gatt_defs[] = {
                         },
                         {
                                 /* Write-only characteristic */
-                                .uuid       = BLE_UUID16_DECLARE(BLE_SVC_SERIAL_CMD_WRITE_UUID16),
+                                .uuid       = BLE_UUID16_DECLARE(BLE_SVC_SPP_CMD_WRITE_UUID16),
                                 .access_cb  = ble_svc_gatt_handler, // No direct access required, only notify
                                 .val_handle = &ble_spp_svc_gatt_write_cmd_handle,
                                 .flags      = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_READ,
                         },
                         {
                                 /* Notify-only characteristic */
-                                .uuid       = BLE_UUID16_DECLARE(BLE_SVC_SERIAL_CMD_NOTIFY_UUID16),
+                                .uuid       = BLE_UUID16_DECLARE(BLE_SVC_SPP_CMD_NOTIFY_UUID16),
                                 .access_cb  = ble_svc_gatt_handler, // No direct access required, only notify
                                 .val_handle = &ble_spp_svc_gatt_notify_cmd_handle,
                                 .flags      = BLE_GATT_CHR_F_NOTIFY | BLE_GATT_CHR_F_READ,
@@ -346,21 +346,6 @@ static int gap_event_handler(struct ble_gap_event *event, void *arg) {
                 rc = ble_gap_conn_find(active_conn_handle, &desc);
                 assert(rc == 0);
                 // print_conn_desc(&desc);
-
-                /* Try to update connection parameters */
-                struct ble_gap_upd_params params = { 0 };
-                params.itvl_min = 6;
-                params.itvl_max = 24;
-                params.latency = 0;
-                params.supervision_timeout = 20;
-                int bc = ble_gap_update_params(event->connect.conn_handle, &params);
-                if (bc != 0) {
-                    ESP_LOGE(
-                            TAG,
-                            "failed to update connection parameters, error code: %d",
-                            rc);
-                    return rc;
-                }
             }
             ESP_LOGI(TAG, "\n");
             if (event->connect.status != 0 || CONFIG_BT_NIMBLE_MAX_CONNECTIONS > 1) {
