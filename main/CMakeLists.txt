@@ -5,16 +5,19 @@ set(SRCS
         http_server.c
         db_esp32_control.c
         db_crc.c
-        db_esp_now.c
         db_serial.c
         db_mavlink_msgs.c
         db_parameters.c)
+
+if(CONFIG_DB_ESPNOW_SUPPORT)
+    list(APPEND SRCS db_esp_now.c)
+endif()
 
 if(CONFIG_BT_ENABLED)
     if(CONFIG_BT_BLUEDROID_ENABLED)
         list(APPEND SRCS db_ble_bluedroid.c)
     elseif (CONFIG_BT_NIMBLE_ENABLED)
-    list(APPEND SRCS db_ble.c)
+        list(APPEND SRCS db_ble.c)
     endif()
 endif()
 

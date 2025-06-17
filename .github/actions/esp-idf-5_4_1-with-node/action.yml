@@ -1,0 +1,22 @@
+name: "Espressif IoT Development Framework (ESP-IDF), plus node.js and npm"
+branding:
+  color: red
+  icon: wifi
+inputs:
+  target:
+    description: "ESP32 variant to build for"
+    default: "esp32"
+    required: false
+  command:
+    description: "Command to run inside the docker container (default: builds the project)"
+    default: "idf.py build"
+    required: false
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  env:
+    IDF_TARGET: "${{inputs.target}}"
+  args:
+    - "/bin/bash"
+    - "-c"
+    - "${{inputs.command}}"

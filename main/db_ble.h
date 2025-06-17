@@ -34,9 +34,9 @@
 /***************************************************************************************************************************
  * MACROS
  **************************************************************************************************************************/
-#define BLE_SVC_SERIAL_UUID16             0xABF0 // 0xDB32 ///< 16-bit UUID for the Serial service.
-#define BLE_SVC_SERIAL_CHR_WRITE_UUID16   0xABF1 // 0xDB33 ///< 16-bit UUID for the Serial Receive service characteristic.
-#define BLE_SVC_SERIAL_CHR_NOTIFY_UUID16  0xABF2 // 0xDB34 ///< 16-bit UUID for the Serial Send service characteristic.
+#define BLE_SVC_SERIAL_UUID16             0xDB32 // 0xABF0  ///< 16-bit UUID for the Serial service.
+#define BLE_SVC_SERIAL_CHR_WRITE_UUID16   0xDB33 // 0xABF1 ///< 16-bit UUID for the Serial Receive service characteristic.
+#define BLE_SVC_SERIAL_CHR_NOTIFY_UUID16  0xDB34 // 0xABF2  ///< 16-bit UUID for the Serial Send service characteristic.
 // ToDo: Implement Control/Management Plane Interface via BLE - Below char. are not used
 #define BLE_SVC_SERIAL_CMD_WRITE_UUID16      0xABF3 ///< 16-bit UUID for the - Receive command characteristic.
 #define BLE_SVC_SERIAL_CMD_NOTIFY_UUID16     0xABF4 ///< 16-bit UUID for the - Send command characteristic.
@@ -82,12 +82,6 @@ enum{
     SPP_IDX_SPP_STATUS_CHAR,
     SPP_IDX_SPP_STATUS_VAL,
     SPP_IDX_SPP_STATUS_CFG,
-
-#ifdef SUPPORT_HEARTBEAT
-    SPP_IDX_SPP_HEARTBEAT_CHAR,
-    SPP_IDX_SPP_HEARTBEAT_VAL,
-    SPP_IDX_SPP_HEARTBEAT_CFG,
-#endif
 
     SPP_IDX_NB,
 };

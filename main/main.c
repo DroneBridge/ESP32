@@ -16,38 +16,33 @@
  *   limitations under the License.
  *
  */
-
 #include <stdio.h>
 #include <nvs_flash.h>
 #include <esp_wifi_types.h>
 #include <string.h>
 #include <driver/gpio.h>
 #include <lwip/apps/netbiosns.h>
-
 #include "freertos/event_groups.h"
 #include "esp_mac.h"
 #include "esp_wifi.h"
-#include "esp_wifi_types.h"
 #include "esp_log.h"
 #include "esp_event.h"
 #include "db_esp32_control.h"
 #include "http_server.h"
 #include "db_protocol.h"
-#include "esp_vfs_semihost.h"
 #include "esp_spiffs.h"
 #include "http_server.h"
 #include "main.h"
 #include "db_parameters.h"
 #include "mdns.h"
-#include "db_esp_now.h"
 #include "iot_button.h"
 #include "db_serial.h"
 #include "globals.h"
-
+#ifdef CONFIG_DB_ESPNOW_SUPPORT
+#include "db_esp_now.h"
+#endif
 #ifdef CONFIG_BT_ENABLED
-
 #include "db_ble.h"
-
 #endif
 
 #define NVS_NAMESPACE "settings"
@@ -714,12 +709,19 @@ void app_main() {
             break;
         case DB_WIFI_MODE_ESPNOW_AIR:
         case DB_WIFI_MODE_ESPNOW_GND:
+#ifdef CONFIG_DB_ESPNOW_SUPPORT
             db_init_wifi_espnow();
             db_start_espnow_module();
+#else
+            ESP_LOGE(TAG, "ESP-NOW is not enabled with this build. Please enable it in menuconfig and re-compile. Switching to AP mode.");
+            DB_PARAM_RADIO_MODE = DB_WIFI_MODE_AP;
+            DB_RADIO_MODE_DESIGNATED = DB_WIFI_MODE_AP;
+            db_init_wifi_apmode(DB_WIFI_MODE_AP);
+#endif
             break;
         case DB_BLUETOOTH_MODE:
 #ifdef CONFIG_BT_ENABLED
-            // db_init_wifi_apmode(DB_WIFI_MODE_AP);   // WiFi & BLE co-existence to enable webinterface
+            db_init_wifi_apmode(DB_WIFI_MODE_AP);   // WiFi & BLE co-existence to enable webinterface
             db_ble_queue_init();
             db_ble_init();
 #else
@@ -738,7 +740,7 @@ void app_main() {
     }
 
     if (DB_PARAM_RADIO_MODE != DB_WIFI_MODE_ESPNOW_AIR && DB_PARAM_RADIO_MODE != DB_WIFI_MODE_ESPNOW_GND &&
-        DB_PARAM_RADIO_MODE != DB_WIFI_MODE_AP_LR && DB_PARAM_RADIO_MODE != DB_BLUETOOTH_MODE) {
+        DB_PARAM_RADIO_MODE != DB_WIFI_MODE_AP_LR) {
         // no need to start these services - won`t be available anyway - safe the resources
         start_mdns_service();
         netbiosns_init();
@@ -748,7 +750,7 @@ void app_main() {
     db_start_control_module();
 
     if (DB_PARAM_RADIO_MODE != DB_WIFI_MODE_ESPNOW_AIR && DB_PARAM_RADIO_MODE != DB_WIFI_MODE_ESPNOW_GND &&
-        DB_PARAM_RADIO_MODE != DB_WIFI_MODE_AP_LR && DB_PARAM_RADIO_MODE != DB_BLUETOOTH_MODE) {
+        DB_PARAM_RADIO_MODE != DB_WIFI_MODE_AP_LR) {
         // no need to start these services - won`t be available anyway - safe the resources
         ESP_ERROR_CHECK(start_rest_server(CONFIG_WEB_MOUNT_POINT));
         ESP_LOGI(TAG, "Rest Server started");

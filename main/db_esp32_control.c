@@ -43,7 +43,9 @@
 #include <db_parameters.h>
 #include "main.h"
 #include "db_serial.h"
+#ifdef CONFIG_DB_ESPNOW_SUPPORT
 #include "db_esp_now.h"
+#endif
 
 #define TAG "DB_CONTROL"
 
@@ -211,6 +213,7 @@ void db_send_to_all_udp_clients(udp_conn_list_t *n_udp_conn_list, const uint8_t 
     }
 }
 
+#ifdef CONFIG_DB_ESPNOW_SUPPORT
 /**
  * Adds a payload to be sent via ESP-NOW to the ESP-NOW queue (where the esp-now task will pick it up, encrypt, package
  * and finally send it over the air)
@@ -231,6 +234,7 @@ void db_send_to_all_espnow(uint8_t data[], const uint16_t *data_length) {
         // all good
     }
 }
+#endif
 
 /**
  * Main call for sending anything over the air.
@@ -247,6 +251,7 @@ void db_send_to_all_espnow(uint8_t data[], const uint16_t *data_length) {
 void db_send_to_all_clients(int tcp_clients[], udp_conn_list_t *n_udp_conn_list, uint8_t data[], uint16_t data_length) {
     db_ble_queue_event_t bleData;
     switch (DB_PARAM_RADIO_MODE) {
+#ifdef CONFIG_DB_ESPNOW_SUPPORT
         case DB_WIFI_MODE_ESPNOW_AIR:
         case DB_WIFI_MODE_ESPNOW_GND:
             // ESP-NOW mode
@@ -266,8 +271,8 @@ void db_send_to_all_clients(int tcp_clients[], udp_conn_list_t *n_udp_conn_list,
                 // Packet is properly sized - send to ESP-NOW outbound queue
                 db_send_to_all_espnow(data, &data_length);
             }
+#endif
             break;
-
         case DB_BLUETOOTH_MODE:
 #ifdef CONFIG_BT_ENABLED
             bleData.data = malloc(data_length);
@@ -445,6 +450,7 @@ void read_process_serial_link(int *tcp_clients, uint *transparent_buff_pos, uint
     }
 }
 
+#ifdef CONFIG_DB_ESPNOW_SUPPORT
 /**
  * Thread that manages all incoming and outgoing ESP-NOW and serial (UART) connections.
  * Called only when ESP-NOW mode is selected
@@ -502,6 +508,7 @@ _Noreturn void control_module_esp_now() {
     }
     vTaskDelete(NULL);
 }
+#endif
 
 /**
  * Sends DroneBridge internal telemetry to tell every connected WiFi station how well we receive their data (rssi).
@@ -576,7 +583,7 @@ void handle_internal_telemetry(int tel_sock, uint8_t *udp_buffer, socklen_t *soc
         if (recv_length > 0) {
             ESP_LOGD(TAG, "Got internal telem. frame containing %i entries", udp_buffer[0]);
             for (int i = 1; i < (udp_buffer[0] * 7); i += 7) {
-                if (memcmp(LOCAL_MAC_ADDRESS, &udp_buffer[i], ESP_NOW_ETH_ALEN) == 0) {
+                if (memcmp(LOCAL_MAC_ADDRESS, &udp_buffer[i], 6) == 0) {
                     // found us in the list (this local ESP32 AIR unit) -> update internal telemetry buffer,
                     // so it gets sent with next Mavlink RADIO STATUS in case MAVLink radio status is enabled
                     db_esp_signal_quality.gnd_rssi = (int8_t) udp_buffer[i + 6];
@@ -598,7 +605,7 @@ _Noreturn void control_module_udp_tcp() {
     ESP_LOGI(TAG, "Starting control module (Wi-Fi)");
     esp_err_t serial_socket_status = open_serial_socket();
     if (serial_socket_status == ESP_FAIL) {
-        ESP_LOGE(TAG, "JTAG serial socket not opened. Aborting start of control module.");
+        ESP_LOGE(TAG, "Serial socket not opened. Aborting start of control module.");
         vTaskDelete(NULL);
     } else {
 #ifdef CONFIG_DB_SERIAL_OPTION_JTAG
@@ -756,7 +763,6 @@ _Noreturn void control_module_udp_tcp() {
 }
 
 #ifdef CONFIG_BT_ENABLED
-
 _Noreturn void control_module_ble() {
     ESP_LOGI(TAG, "Starting control module (Bluetooth)");
 
@@ -823,7 +829,6 @@ _Noreturn void control_module_ble() {
     }
     vTaskDelete(NULL);
 }
-
 #endif
 
 /**
@@ -834,6 +839,7 @@ _Noreturn void control_module_ble() {
  */
 void db_start_control_module() {
     switch (DB_PARAM_RADIO_MODE) {
+#ifdef CONFIG_DB_ESPNOW_SUPPORT
         case DB_WIFI_MODE_ESPNOW_GND:
         case DB_WIFI_MODE_ESPNOW_AIR:
             xTaskCreate(&control_module_esp_now, /**< Task function for ESP-NOW communication */
@@ -844,7 +850,7 @@ void db_start_control_module() {
                         NULL                   /**< Task handle (unused) */
             );
             break;
-
+#endif
         case DB_BLUETOOTH_MODE:
 #ifdef CONFIG_BT_ENABLED
             xTaskCreate(&control_module_ble,   /**< Task function for Bluetooth BLE communication */

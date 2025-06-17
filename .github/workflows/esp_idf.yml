@@ -25,6 +25,23 @@ jobs:
       with:
         target: "${{ matrix.target }}"
         command: "idf.py set-target ${{matrix.target}} build"
+  build_idf_v5_4_1_generic:
+  runs-on: ubuntu-latest
+  strategy:
+    matrix:
+      target: ["esp32", "esp32s2", "esp32s3", "esp32c3", "esp32c6"]
+    fail-fast: false
+  steps:
+  - name: Checkout repo
+    uses: actions/checkout@v4
+    with:
+      ref: ${{ github.ref }}
+      submodules: 'recursive'
+  - name: Generic ESP-IDF v5.4.1 target build
+    uses: ./.github/actions/esp-idf-5_4_1-with-node
+    with:
+      target: "${{ matrix.target }}"
+      command: "idf.py set-target ${{matrix.target}} build"
   build_idf_v5_3_nightly_release:
     runs-on: ubuntu-latest
     steps:
