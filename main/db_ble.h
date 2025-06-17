@@ -38,8 +38,8 @@
 #define BLE_SVC_SERIAL_CHR_WRITE_UUID16   0xDB33 ///< 16-bit UUID for the Serial Receive service characteristic.
 #define BLE_SVC_SERIAL_CHR_NOTIFY_UUID16  0xDB34 ///< 16-bit UUID for the Serial Send service characteristic.
 // ToDo: Implement Control/Management Plane Interface via BLE - Below char. are not used
-#define BLE_SVC_SERIAL_CMD_WRITE_UUID16      0xABF3 ///< 16-bit UUID for the - Receive command characteristic.
-#define BLE_SVC_SERIAL_CMD_NOTIFY_UUID16     0xABF4 ///< 16-bit UUID for the - Send command characteristic.
+#define BLE_SVC_SPP_CMD_WRITE_UUID16      0xABF3 ///< 16-bit UUID for the - Receive command characteristic.
+#define BLE_SVC_SPP_CMD_NOTIFY_UUID16     0xABF4 ///< 16-bit UUID for the - Send command characteristic.
 #define BLE_GAP_APPEARANCE_GENERIC_TAG    0x0180 ///< Generic tag appearance value for BLE GAP.
 #define BLE_GAP_LE_ROLE_PERIPHERAL        0x00   ///< LE role value indicating a peripheral device.
 
@@ -59,38 +59,6 @@ extern QueueHandle_t db_uart_write_queue_ble; /** Queue for data to be written t
                                                  communication interface task */
 extern QueueHandle_t
     db_uart_read_queue_ble; /** Queue for data to be written to wireless communication interface - used by BLE, filled by UART */
-
-#define spp_sprintf(s,...)         sprintf((char*)(s), ##__VA_ARGS__)
-#define SPP_DATA_MAX_LEN           (512)
-#define SPP_CMD_MAX_LEN            (20)
-#define SPP_STATUS_MAX_LEN         (20)
-#define SPP_DATA_BUFF_MAX_LEN      (2*1024)
-///Attributes State Machine
-enum{
-    SPP_IDX_SVC,
-
-    SPP_IDX_SPP_DATA_RECV_CHAR,
-    SPP_IDX_SPP_DATA_RECV_VAL,
-
-    SPP_IDX_SPP_DATA_NOTIFY_CHAR,
-    SPP_IDX_SPP_DATA_NTY_VAL,
-    SPP_IDX_SPP_DATA_NTF_CFG,
-
-    SPP_IDX_SPP_COMMAND_CHAR,
-    SPP_IDX_SPP_COMMAND_VAL,
-
-    SPP_IDX_SPP_STATUS_CHAR,
-    SPP_IDX_SPP_STATUS_VAL,
-    SPP_IDX_SPP_STATUS_CFG,
-
-#ifdef SUPPORT_HEARTBEAT
-    SPP_IDX_SPP_HEARTBEAT_CHAR,
-    SPP_IDX_SPP_HEARTBEAT_VAL,
-    SPP_IDX_SPP_HEARTBEAT_CFG,
-#endif
-
-    SPP_IDX_NB,
-};
 
 /***************************************************************************************************************************
  * Public Function Declaration
