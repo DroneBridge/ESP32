@@ -35,26 +35,30 @@
  * You should have received a copy of the GNU General Public License
  * along with Cleanflight.  If not, see <http://www.gnu.org/licenses/>.
  */
-uint8_t crc8_dvb_s2(uint8_t crc, unsigned char a)
+uint8_t
+crc8_dvb_s2(uint8_t crc, unsigned char a)
 {
-    crc ^= a;
-    for (int ii = 0; ii < 8; ++ii) {
-        if (crc & 0x80) {
-            crc = (crc << 1) ^ 0xD5;
-        } else {
-            crc = crc << 1;
-        }
+  crc ^= a;
+  for(int ii = 0; ii < 8; ++ii) {
+    if(crc & 0x80) {
+      crc = (crc << 1) ^ 0xD5;
     }
-    return crc;
+    else {
+      crc = crc << 1;
+    }
+  }
+  return crc;
 }
 
 /**
- * Does the same as crc8_dvb_s2 just way more efficient (CPU) but with a little bit more RAM usage
+ * Does the same as crc8_dvb_s2 just way more efficient (CPU) but with a little
+ * bit more RAM usage
  * @param crc The current crc value
  * @param a The next byte
  * @return The new crc value
  */
-uint8_t crc8_dvb_s2_table(uint8_t crc, unsigned char a)
+uint8_t
+crc8_dvb_s2_table(uint8_t crc, unsigned char a)
 {
-    return (uint8_t) (crc_dvb_s2_table[(crc ^ a)] & 0xff);
+  return (uint8_t)(crc_dvb_s2_table[(crc ^ a)] & 0xff);
 }

@@ -1,10 +1,11 @@
-/***************************************************************************************************************************
+/******************************************************************************
  * @file db_ble.h
  * @brief DroneBridge ESP32 BLE Header file
  *
  * This file is part of DroneBridge and CosmicBridge
  *
- * @authors Witty-Wizard <agarwalshashank429@gmail.com> modified for DroneBridge for ESP32 by Wolfgang Christl
+ * @authors Witty-Wizard <agarwalshashank429@gmail.com> modified for
+ *DroneBridge for ESP32 by Wolfgang Christl
  * @license Apache License, Version 2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,69 +19,83 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- **************************************************************************************************************************/
+ *******************************************************************************/
 
 #ifndef DB_BLE_H
 #define DB_BLE_H
 
-/***************************************************************************************************************************
+/******************************************************************************
  * Standard & System Headers
- **************************************************************************************************************************/
+ *******************************************************************************/
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
 #include <freertos/queue.h>
 #include <stdint.h>
 
-/***************************************************************************************************************************
+/******************************************************************************
  * MACROS
- **************************************************************************************************************************/
-#define BLE_SVC_SERIAL_UUID16             0xDB32 ///< 16-bit UUID for the Serial service.
-#define BLE_SVC_SERIAL_CHR_WRITE_UUID16   0xDB33 ///< 16-bit UUID for the Serial Receive service characteristic.
-#define BLE_SVC_SERIAL_CHR_NOTIFY_UUID16  0xDB34 ///< 16-bit UUID for the Serial Send service characteristic.
-// ToDo: Implement Control/Management Plane Interface via BLE - Below char. are not used
-#define BLE_SVC_SPP_CMD_WRITE_UUID16      0xABF3 ///< 16-bit UUID for the - Receive command characteristic.
-#define BLE_SVC_SPP_CMD_NOTIFY_UUID16     0xABF4 ///< 16-bit UUID for the - Send command characteristic.
-#define BLE_GAP_APPEARANCE_GENERIC_TAG    0x0180 ///< Generic tag appearance value for BLE GAP.
-#define BLE_GAP_LE_ROLE_PERIPHERAL        0x00   ///< LE role value indicating a peripheral device.
+ *******************************************************************************/
+#define BLE_SVC_SERIAL_UUID16 0xDB32 ///< 16-bit UUID for the Serial service.
+#define BLE_SVC_SERIAL_CHR_WRITE_UUID16                                       \
+  0xDB33 ///< 16-bit UUID for the Serial Receive service characteristic.
+#define BLE_SVC_SERIAL_CHR_NOTIFY_UUID16                                      \
+  0xDB34 ///< 16-bit UUID for the Serial Send service characteristic.
+// ToDo: Implement Control/Management Plane Interface via BLE - Below char. are
+// not used
+#define BLE_SVC_SPP_CMD_WRITE_UUID16                                          \
+  0xABF3 ///< 16-bit UUID for the - Receive command characteristic.
+#define BLE_SVC_SPP_CMD_NOTIFY_UUID16                                         \
+  0xABF4 ///< 16-bit UUID for the - Send command characteristic.
+#define BLE_GAP_APPEARANCE_GENERIC_TAG                                        \
+  0x0180 ///< Generic tag appearance value for BLE GAP.
+#define BLE_GAP_LE_ROLE_PERIPHERAL                                            \
+  0x00 ///< LE role value indicating a peripheral device.
 
-/***************************************************************************************************************************
+/******************************************************************************
  * @brief Structure to hold BLE data.
- **************************************************************************************************************************/
-typedef struct {
+ *******************************************************************************/
+typedef struct
+{
   uint16_t data_len; /**< Length of the data. */
-  uint8_t *data;    /**< Pointer to the data. */
+  uint8_t *data;     /**< Pointer to the data. */
 } __attribute__((__packed__)) db_ble_queue_event_t;
 
-/***************************************************************************************************************************
+/******************************************************************************
  * Queue Handles
- **************************************************************************************************************************/
+ *******************************************************************************/
 
-extern QueueHandle_t db_uart_write_queue_ble; /** Queue for data to be written to UART, filled by wireless
-                                                 communication interface task */
 extern QueueHandle_t
-    db_uart_read_queue_ble; /** Queue for data to be written to wireless communication interface - used by BLE, filled by UART */
+  db_uart_write_queue_ble; /** Queue for data to be written to UART, filled by
+                              wireless communication interface task */
+extern QueueHandle_t
+  db_uart_read_queue_ble; /** Queue for data to be written to wireless
+                             communication interface - used by BLE, filled by
+                             UART */
 
-/***************************************************************************************************************************
+/******************************************************************************
  * Public Function Declaration
- **************************************************************************************************************************/
+ *******************************************************************************/
 
-/***************************************************************************************************************************
+/******************************************************************************
  * @brief Drone Bridge BLE initialisation function
- **************************************************************************************************************************/
+ *******************************************************************************/
 void db_ble_init();
 
-/***************************************************************************************************************************
+/******************************************************************************
  * @brief Initializes the global UART read and write queues.
  *
  * This function creates two FreeRTOS queues using xQueueCreate().
- * - `db_uart_write_queue_ble`: Used to store data that needs to be written to UART.
- * - `db_uart_read_queue_ble`: Used to store data read from UART for further processing.
+ * - `db_uart_write_queue_ble`: Used to store data that needs to be written to
+ *UART.
+ * - `db_uart_read_queue_ble`: Used to store data read from UART for further
+ *processing.
  *
  * The queue size is set to 5, with each element being the size of `BleData_t`.
- * If queue creation fails, appropriate error messages are logged using `ESP_LOGI()`.
+ * If queue creation fails, appropriate error messages are logged using
+ *`ESP_LOGI()`.
  *
  * @return void
- **************************************************************************************************************************/
+ *******************************************************************************/
 void db_ble_queue_init();
 
 /**

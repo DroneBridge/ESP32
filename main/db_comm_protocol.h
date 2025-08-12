@@ -20,7 +20,6 @@
 #ifndef DB_ESP32_DB_COMM_PROTOCOL_H
 #define DB_ESP32_DB_COMM_PROTOCOL_H
 
-
 #define DB_COMM_ORIGIN_GND "groundstation"
 #define DB_COMM_ORIGIN_UAV "drone"
 #define DB_COMM_TYPE_SETTINGS_SUCCESS "settingssuccess"
@@ -45,13 +44,12 @@
 #define DB_COMM_DST_GCS 4
 #define DB_COMM_DST_UAV 5
 
-
 #define DB_COMM_KEY_TYPE "type"
 #define DB_COMM_KEY_ORIGIN "origin"
 #define DB_COMM_KEY_ID "id"
 #define DB_COMM_KEY_DEST "destination"
-#define DB_COMM_KEY_HARDWID "HID"   // Hardware ID
-#define DB_COMM_KEY_FIRMWID "FID"   // Firmware version
+#define DB_COMM_KEY_HARDWID "HID" // Hardware ID
+#define DB_COMM_KEY_FIRMWID "FID" // Firmware version
 #define DB_COMM_KEY_MSG "message"
 
 #define DB_COMM_CHANGE_DB "db"
@@ -59,4 +57,4 @@
 
 #define DB_ESP32_FID 101
 
-#endif //DB_ESP32_DB_COMM_PROTOCOL_H
+#endif // DB_ESP32_DB_COMM_PROTOCOL_H

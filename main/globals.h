@@ -24,18 +24,28 @@
 #include <esp_wifi_types.h>
 #include "db_esp32_control.h"
 
-extern char CURRENT_CLIENT_IP[IP4ADDR_STRLEN_MAX];  // IP address of the ESP32 when we are in client mode connected
+extern char
+  CURRENT_CLIENT_IP[IP4ADDR_STRLEN_MAX]; // IP address of the ESP32 when we are
+                                         // in client mode connected
 
 extern uint8_t DB_RADIO_IS_OFF;
-extern db_esp_signal_quality_t db_esp_signal_quality;   // used on AIR/station side to store RSSI information
-extern wifi_sta_list_t wifi_sta_list;      // updated when ESP32 is in ap mode. Contains RSSI of every connected station
-extern uint8_t LOCAL_MAC_ADDRESS[6];       // filled with the mac address during init of WiFi interface
-extern uint8_t DB_MAV_SYS_ID;              // stores the local system ID - set by heartbeat that is received via UART (UART is the local connection)
+extern db_esp_signal_quality_t
+  db_esp_signal_quality; // used on AIR/station side to store RSSI information
+extern wifi_sta_list_t
+  wifi_sta_list; // updated when ESP32 is in ap mode. Contains RSSI of every
+                 // connected station
+extern uint8_t LOCAL_MAC_ADDRESS[6]; // filled with the mac address during init
+                                     // of WiFi interface
+extern uint8_t
+  DB_MAV_SYS_ID; // stores the local system ID - set by heartbeat that is
+                 // received via UART (UART is the local connection)
 
-extern uint32_t serial_total_byte_count;                // Total bytes read from serial link (UART or USB/JTAG)
+extern uint32_t serial_total_byte_count; // Total bytes read from serial link
+                                         // (UART or USB/JTAG)
 extern int8_t num_connected_tcp_clients;
-extern udp_conn_list_t *udp_conn_list;   // List of UDP clients that the ESP32 will send to
+extern udp_conn_list_t
+  *udp_conn_list; // List of UDP clients that the ESP32 will send to
 
 // extern int WIFI_ESP_MAXIMUM_RETRY;
 
-#endif //DB_ESP32_GLOBALS_H
+#endif // DB_ESP32_GLOBALS_H
