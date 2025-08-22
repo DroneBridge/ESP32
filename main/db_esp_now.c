@@ -49,7 +49,7 @@ db_esp_now_clients_list_t *db_esp_now_clients_list; // Local list of known ESP-N
 static db_esp_now_packet_t db_esp_now_packet_global = {
         .db_esp_now_packet_header.seq_num = 0,
         .db_esp_now_packet_header.packet_type = DB_ESP_NOW_PACKET_TYPE_DATA
-};   // make static so it is gets instanced only once
+};   // make static so it gets instanced only once
 
 mbedtls_gcm_context aes;
 uint8_t const db_esp_now_packet_header_len = sizeof(db_esp_now_packet_header_t);
@@ -192,7 +192,7 @@ bool db_espnow_encrypt_auth_send(db_esp_now_packet_t *db_esp_now_packet, const u
     static esp_err_t err;
     // after encryption the payload_length_decrypted will be unreadable -> keep a copy (payload_length) for sending the packet
     // const uint8_t payload_length = db_esp_now_packet->db_esp_now_packet_protected_data.payload_length_decrypted;
-    ret = db_encrypt_payload(db_esp_now_packet, (*db_esp_now_packet).db_esp_now_packet_protected_data.payload_length_decrypted + 1);
+    ret = db_encrypt_payload(db_esp_now_packet, db_esp_now_packet->db_esp_now_packet_protected_data.payload_length_decrypted + 1);
     if (ret == 0) {
         err = esp_now_send(BROADCAST_MAC, (const uint8_t *) db_esp_now_packet, (db_esp_now_packet_header_len + DB_ESPNOW_AES_TAG_LEN + payload_length + 1));
         if (err != ESP_OK) {
@@ -376,6 +376,13 @@ void db_espnow_process_rcv_data(uint8_t *data, uint16_t data_len, uint8_t *src_a
  * So, it is recommended that sending the next ESP-NOW data after the sending callback function of the previous sending
  * has returned.
  */
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 5, 0)
+static void db_espnow_send_callback(const esp_now_send_info_t *esp_now_send_info, esp_now_send_status_t status) {
+    if (status == ESP_NOW_SEND_FAIL) {
+        ESP_LOGE(TAG, "Failed to send ESP-NOW packet - MAC: %02xh:%02xh:%02xh:%02xh:%02xh:%02xh",
+                 esp_now_send_info->des_addr[0], esp_now_send_info->des_addr[1], esp_now_send_info->des_addr[2], esp_now_send_info->des_addr[3], esp_now_send_info->des_addr[4], esp_now_send_info->des_addr[5]);
+    }
+#else
 static void db_espnow_send_callback(const uint8_t *mac_addr, esp_now_send_status_t status) {
     if (mac_addr == NULL) {
         ESP_LOGE(TAG, "Send callback arg error");
@@ -386,12 +393,17 @@ static void db_espnow_send_callback(const uint8_t *mac_addr, esp_now_send_status
         ESP_LOGE(TAG, "Failed to send ESP-NOW packet - MAC: %02xh:%02xh:%02xh:%02xh:%02xh:%02xh",
                  mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
     }
+#endif
 
     db_espnow_event_t evt;
     db_espnow_event_send_cb_t *send_cb = &evt.info.send_cb;
 
     evt.id = DB_ESPNOW_SEND_CB;
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 5, 0)
+    memcpy(send_cb->mac_addr, esp_now_send_info->des_addr, ESP_NOW_ETH_ALEN);
+#else
     memcpy(send_cb->mac_addr, mac_addr, ESP_NOW_ETH_ALEN);
+#endif
     send_cb->status = status;
     if (xQueueSend(db_espnow_send_recv_callback_queue, &evt, ESPNOW_MAXDELAY) != pdTRUE) {
         ESP_LOGW(TAG, "Send to send queue fail");
@@ -541,8 +553,7 @@ esp_err_t db_espnow_init() {
     ESP_ERROR_CHECK(esp_now_register_recv_cb(db_espnow_receive_callback));
 
     /* Add broadcast peer information to peer list. */
-    esp_now_peer_info_t peer;
-    memset(&peer, 0, sizeof(esp_now_peer_info_t));
+    esp_now_peer_info_t peer = {0};
     memcpy(peer.peer_addr, BROADCAST_MAC, 6);
     if (!esp_now_is_peer_exist(BROADCAST_MAC)) ESP_ERROR_CHECK(esp_now_add_peer(&peer));
 

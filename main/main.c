@@ -37,10 +37,13 @@
 #include "esp_spiffs.h"
 #include "http_server.h"
 #include "main.h"
+
+#include <button_gpio.h>
+#include <iot_button.h>
+
 #include "db_parameters.h"
 #include "mdns.h"
 #include "db_esp_now.h"
-#include "iot_button.h"
 #include "db_serial.h"
 #include "globals.h"
 
@@ -567,13 +570,13 @@ void db_read_settings_nvs() {
         nvs_close(my_handle);
         ESP_ERROR_CHECK(nvs_flash_erase());
         ESP_ERROR_CHECK(nvs_flash_init());
-        
+
         // Set all parameters to their default values when flash is empty
         db_param_reset_all();
-        
+
         // Now save these defaults to NVS
         db_write_settings_to_nvs();
-        
+
         // Print parameters to console for logging
         uint8_t param_str_buffer[512] = {0};
         db_param_print_values_to_buffer(param_str_buffer);
@@ -641,26 +644,27 @@ void long_press_callback(void *arg, void *usr_data) {
 }
 
 /**
- * Setup boot button GPIO to reset entire ESP32 settings and to force a reboot of the system
+ * Set up the boot button GPIO to reset entire ESP32 settings and to force a reboot of the system
  */
 void set_reset_trigger() {
     button_config_t gpio_btn_cfg = {
-            .type = BUTTON_TYPE_GPIO,
-            .long_press_time = CONFIG_BUTTON_LONG_PRESS_TIME_MS,
-            .short_press_time = CONFIG_BUTTON_SHORT_PRESS_TIME_MS,
-            .gpio_button_config = {
-                    .gpio_num = DB_RESET_PIN,
-                    .active_level = 0,
-            },
+        .long_press_time = CONFIG_BUTTON_LONG_PRESS_TIME_MS,
+        .short_press_time = CONFIG_BUTTON_SHORT_PRESS_TIME_MS,
     };
-    button_handle_t gpio_btn = iot_button_create(&gpio_btn_cfg);
-    if (NULL == gpio_btn) {
-        ESP_LOGE(TAG, "Creating reset button failed");
+    button_gpio_config_t btn_gpio_cfg = {
+        .gpio_num = DB_RESET_PIN,
+        .active_level = 0,
+    };
+    button_handle_t gpio_btn = NULL;
+    ESP_ERROR_CHECK(iot_button_new_gpio_device(&gpio_btn_cfg, &btn_gpio_cfg, &gpio_btn));
+    if(NULL == gpio_btn) {
+        ESP_LOGE(TAG, "Button create failed");
     } else {
-        iot_button_register_cb(gpio_btn, BUTTON_SINGLE_CLICK, short_press_callback, NULL);
-        iot_button_register_cb(gpio_btn, BUTTON_LONG_PRESS_UP, long_press_callback, NULL);
+        iot_button_register_cb(gpio_btn, BUTTON_SINGLE_CLICK, NULL, short_press_callback, NULL);
+        iot_button_register_cb(gpio_btn, BUTTON_LONG_PRESS_UP, NULL, long_press_callback, NULL);
     }
 }
+
 
 /**
  * For simple debugging when serial via JTAG is enabled. Printed once control module configured USB serial socket.
