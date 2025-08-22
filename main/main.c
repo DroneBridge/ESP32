@@ -37,10 +37,13 @@
 #include "esp_spiffs.h"
 #include "http_server.h"
 #include "main.h"
+
+#include <button_gpio.h>
+#include <iot_button.h>
+
 #include "db_parameters.h"
 #include "mdns.h"
 #include "db_esp_now.h"
-#include "iot_button.h"
 #include "db_serial.h"
 #include "globals.h"
 
@@ -416,7 +419,7 @@ int db_init_wifi_clientmode() {
     ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE)); // disable power saving
     ESP_ERROR_CHECK(esp_wifi_start());
     DB_RADIO_IS_OFF = false; // just to be sure, but should not be necessary
-    // consider connection lost after 1s of no beacon - triggers reconnect via WIFI_EVENT_STA_DISCONNECTED event
+    // Consider connection lost after 1s of no beacon - triggers reconnect via WIFI_EVENT_STA_DISCONNECTED event
     ESP_ERROR_CHECK(esp_wifi_set_inactive_time(WIFI_IF_STA, 3));
 
     ESP_LOGI(TAG, "Init of WiFi Client-Mode finished. (SSID: %s PASS: %s)", DB_PARAM_WIFI_SSID, DB_PARAM_PASS);
@@ -513,7 +516,7 @@ void db_set_radio_status(uint8_t enable_wifi) {
 void db_write_settings_to_nvs() {
     // print parameters to console for logging
     ESP_LOGI(TAG, "Trying to save parameters:");
-    uint8_t param_str_buffer[512];
+    uint8_t param_str_buffer[512] = {0};
     db_param_print_values_to_buffer(param_str_buffer);
     ESP_LOGI(TAG, "%s", param_str_buffer);
     ESP_LOGI(TAG, "Saving to NVS %s", NVS_NAMESPACE);
@@ -567,13 +570,13 @@ void db_read_settings_nvs() {
         nvs_close(my_handle);
         ESP_ERROR_CHECK(nvs_flash_erase());
         ESP_ERROR_CHECK(nvs_flash_init());
-        
+
         // Set all parameters to their default values when flash is empty
         db_param_reset_all();
-        
+
         // Now save these defaults to NVS
         db_write_settings_to_nvs();
-        
+
         // Print parameters to console for logging
         uint8_t param_str_buffer[512] = {0};
         db_param_print_values_to_buffer(param_str_buffer);
@@ -586,7 +589,7 @@ void db_read_settings_nvs() {
         // print parameters to console for logging
         uint8_t param_str_buffer[512] = {0};
         db_param_print_values_to_buffer(param_str_buffer);
-        ESP_LOGI(TAG, "\n%s", (char *) param_str_buffer);
+        ESP_LOGI(TAG, "%s", (char *) param_str_buffer);
 
         // Check if we have a saved UDP client from the last session. Add it to the known udp clients if there is one.
         if (strlen((char *) db_param_udp_client_ip.value.db_param_str.value) > 0 &&
@@ -620,7 +623,7 @@ void db_read_settings_nvs() {
  */
 void short_press_callback(void *arg, void *usr_data) {
     ESP_LOGW(TAG, "Short press detected setting wifi mode to access point with password: dronebridge");
-    DB_RADIO_MODE_DESIGNATED = DB_WIFI_MODE_AP;  // do not directly change DB_PARAM_RADIO_MODE since it is not safe and constantly processed by other tasks. Save settings and reboot will assign DB_RADIO_MODE_DESIGNATED to DB_PARAM_RADIO_MODE.
+    DB_RADIO_MODE_DESIGNATED = DB_WIFI_MODE_AP;  // Do not directly change DB_PARAM_RADIO_MODE since it is not safe and constantly processed by other tasks. Save settings and reboot will assign DB_RADIO_MODE_DESIGNATED to DB_PARAM_RADIO_MODE.
     db_param_set_to_default(&db_param_ssid);
     db_param_set_to_default(&db_param_pass);
     db_write_settings_to_nvs();
@@ -634,33 +637,34 @@ void short_press_callback(void *arg, void *usr_data) {
  */
 void long_press_callback(void *arg, void *usr_data) {
     ESP_LOGW(TAG, "Reset triggered via GPIO %i. Resetting settings and rebooting", DB_RESET_PIN);
-    DB_RADIO_MODE_DESIGNATED = DB_WIFI_MODE_AP;  // do not directly change DB_PARAM_RADIO_MODE since it is not safe and constantly processed by other tasks. Save settings and reboot will assign DB_RADIO_MODE_DESIGNATED to DB_PARAM_RADIO_MODE.
+    DB_RADIO_MODE_DESIGNATED = DB_WIFI_MODE_AP;  // Do not directly change DB_PARAM_RADIO_MODE since it is not safe and constantly processed by other tasks. Save settings and reboot will assign DB_RADIO_MODE_DESIGNATED to DB_PARAM_RADIO_MODE.
     db_param_reset_all();
     db_write_settings_to_nvs();
     esp_restart();
 }
 
 /**
- * Setup boot button GPIO to reset entire ESP32 settings and to force a reboot of the system
+ * Set up the boot button GPIO to reset entire ESP32 settings and to force a reboot of the system
  */
 void set_reset_trigger() {
     button_config_t gpio_btn_cfg = {
-            .type = BUTTON_TYPE_GPIO,
-            .long_press_time = CONFIG_BUTTON_LONG_PRESS_TIME_MS,
-            .short_press_time = CONFIG_BUTTON_SHORT_PRESS_TIME_MS,
-            .gpio_button_config = {
-                    .gpio_num = DB_RESET_PIN,
-                    .active_level = 0,
-            },
+        .long_press_time = CONFIG_BUTTON_LONG_PRESS_TIME_MS,
+        .short_press_time = CONFIG_BUTTON_SHORT_PRESS_TIME_MS,
     };
-    button_handle_t gpio_btn = iot_button_create(&gpio_btn_cfg);
-    if (NULL == gpio_btn) {
-        ESP_LOGE(TAG, "Creating reset button failed");
+    button_gpio_config_t btn_gpio_cfg = {
+        .gpio_num = DB_RESET_PIN,
+        .active_level = 0,
+    };
+    button_handle_t gpio_btn = NULL;
+    ESP_ERROR_CHECK(iot_button_new_gpio_device(&gpio_btn_cfg, &btn_gpio_cfg, &gpio_btn));
+    if(NULL == gpio_btn) {
+        ESP_LOGE(TAG, "Button create failed");
     } else {
-        iot_button_register_cb(gpio_btn, BUTTON_SINGLE_CLICK, short_press_callback, NULL);
-        iot_button_register_cb(gpio_btn, BUTTON_LONG_PRESS_UP, long_press_callback, NULL);
+        iot_button_register_cb(gpio_btn, BUTTON_SINGLE_CLICK, NULL, short_press_callback, NULL);
+        iot_button_register_cb(gpio_btn, BUTTON_LONG_PRESS_UP, NULL, long_press_callback, NULL);
     }
 }
+
 
 /**
  * For simple debugging when serial via JTAG is enabled. Printed once control module configured USB serial socket.

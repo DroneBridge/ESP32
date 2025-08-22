@@ -1,6 +1,7 @@
 {
   "stats": {
     "read_bytes": 46585,
+    "serial_dec_mav_msgs": 1898,
     "tcp_connected": 0,
     "udp_connected": 2,
     "udp_clients": [
@@ -39,7 +40,7 @@
     "db_build_version": 18,
     "major_version": 2,
     "minor_version": 1,
-    "patch_version": 0,
+    "patch_version": 3,
     "maturity_version": "stable",
     "esp_chip_model": 5,
     "esp_mac": "EC:DA:3B:BC:XX:XX",
