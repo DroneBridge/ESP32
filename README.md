@@ -62,7 +62,7 @@ These boards are very low in price, have everything you need and are also very s
 
 ## Installation/Flashing using precompiled binaries
 
-[It is recommended that you use the official online flashing tool!](https://dronebridge.github.io/ESP32/install.html)
+[It is recommended that you use the official online flashing tool!](https://drone-bridge.com/flasher/)
 
 In any other case, there are multiple ways how to flash the firmware.  
 **[For further info please check the wiki!](https://dronebridge.gitbook.io/docs/dronebridge-for-esp32/installation)**
