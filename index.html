@@ -18,11 +18,11 @@
 <div class="container">
     <div class="header">
         <div class="logo">
-            <a href="index.html"><img src="images/DroneBridgeLogo_noblue_aligned.svg" alt="DroneBridge for ESP32"/></a>
+            <a href="https://drone-bridge.com/"><img src="images/DroneBridgeLogo_noblue_aligned.svg" alt="DroneBridge for ESP32"/></a>
         </div>
         <div class="nav">
-            <a href="index.html">Home</a>
-            <a href="install.html">Install</a>
+            <a href="https://drone-bridge.com/">Home</a>
+            <a href="https://drone-bridge.com/flasher/">Install</a>
             <a href="https://dronebridge.gitbook.io/docs/dronebridge-for-esp32/untitled">Docs</a>
             <a href="https://github.com/DroneBridge/ESP32"><img src="images/github-mark-white.svg" alt="Discord Logo for support" height="20em"></a>
             <a href="https://discord.gg/pqmHJNArE3"><img src="images/discord-mark-white.svg" alt="Discord Logo for support" height="20em"></a>
@@ -32,99 +32,8 @@
     <div class="container hero">
         <h5 class="h5">A secure & transparent telemetry link with support for WiFi and ESP-NOW.</h5>
     </div>
-    <div class="container">
-        <div class="row">
-            <h5 style="margin-top: 2rem">WiFi Data Link</h5>
-        </div>
-        <img alt="DroneBridge for ESP32 WiFi connection to GCS" class="image-fullwidth" src="images/DB_ESP32_Docs_Trans_2.png"/>
-        <div>
-            <p>DroneBridge for ESP32 supports traditional WiFi. Run the access point directly on the drones ESP32 or connect to a central access point on the ground.</p>
-        </div>
-    </div>
-    <div class="container">
-        <div class="row">
-            <h5 style="margin-top: 2rem">Long Range ESP-NOW Data Link</h5>
-        </div>
-        <img alt="DroneBridge for ESP32 ESP-NOW connection to GCS" class="image-fullwidth" src="images/DB_ESP32_Docs_Trans_6.png"/>
-        <div>
-            <p>DroneBridge for ESP32 supports ESP-NOW as a protocol. While similar to WiFi it offers far more range at the cost of some data rate (still 250kbit brutto rate). In contrast to a WiFi setup you will need two ESP32`s running DroneBridge for ESP32. On one the ground and one on every drone.</p>
-        </div>
-    </div>
-    <div class="container">
-        <h5>Features</h5>
-        <ul>
-            <li>Up to 150m range using standard WiFi</li>
-            <li>Up to 1km of range using ESP-NOW or Wi-Fi LR Mode</li>
-            <li>Fully encrypted in WiFi & ESP-NOW (AES-GCM 256 bit)</li>
-            <li>High data rates (250kbit ESP-NOW & 11Mbit WiFi mode)</li>
-            <li>Bidirectional</li>
-            <li>Support for MAVLink, MSP & LTM telemetry</li>
-            <li>Support for any payload using transparent option</li>
-            <li>Supported by QGroundControl, Mission Planner, mwptools, impload etc.</li>
-            <li>Easy to set up: Power connection + UART connection to flight controller</li>
-            <li>Fully configurable through an easy-to-use web interface</li>
-            <li>Parsing modes for reduced packet loss</li>
-            <li>Ideal for central drone swarm control</li>
-            <li>Reliable</li>
-            <li>Low latency</li>
-            <li>Affordable</li>
-            <li>Weight: <8 g</li>
-        </ul>
-    </div>
-    <div class="container">
-        <p>A firmware for the popular ESP32 modules from Espressif Systems. Probably the cheapest way to communicate with your drone, UAV, UAS, ground-based vehicle.
-        <br>It also allows for a fully transparent serial to WiFi pass-through link with variable packet size.<br>It is ideal for connecting many drones in one single network.</p>
-        <p>DroneBridge for ESP32 is a telemetry/low data rate-only solution. There is no support for cameras connected to the ESP32 since it does not support video encoding.</p>
-    </div>
-    <div style="margin-top: 5rem" class="container">
-        <h5>Official Hardware</h5>
-        <div class="row">
-            <div class="six columns">
-                <b>External Antenna</b><br>
-                <button class="button-primary" id="button_official_board_c3">
-                    Get the official board!
-                </button><br>
-                <b>Onboard Antenna</b><br>
-                <button class="button-primary" id="button_official_board_c6">
-                    Get the official board!
-                </button>
-                <div>Back in stock! Get started in no time!<br>Designed according to the DS-009 Pixhawk Connector Standard for easy Plug&Play integration.<br>Private limited sale. Currently shipping from Germany to the EU (EEA) and other selected countries (incl. USA, CAN).<br>For more non-EEA shipping destinations or express options please contact me via <a href="https://www.linkedin.com/in/wolfgang-christl/">LinkedIn</a>.</div>
-            </div>
-            <div class="six columns">
-                <b>DIY Board</b><br>
-                <button class="button-primary" id="button_pcb_files">
-                    DIY official board!
-                </button>
-                <div>You want to build the official board yourself or shipping from the EU is not an option?<br>While I recommend to just get the ready-made board (cheaper and less of a hassle) you can also get the design & manufacturing files of the official board. E.g. just upload to JLCPCB and assemble yourself.<br>[Easy Solder] version is now available!</div>
-            </div>
-        </div>
-    </div>
-    <div style="margin-top: 5rem" class="container u-full-width">
-        <h5>Support</h5>
-        <div>Visit the Discord Channel to receive community support.</div>
-        <div><a href="https://discord.gg/pqmHJNArE3"><img style="margin: 2rem" src="images/discord-logo-white.svg" alt="Discord Logo for support" height="30em"></a></div>
-    </div>
-    <div class="container">
-        <h5>Donate</h5>
-        <div class="" style="max-width: 600px">
-            <div class="row donate_div">
-                <div class="twelve columns ">DroneBridge for ESP32 is free and almost everything is maintained by a single developer! It takes many hundreds of hours to develop, debug and document such software.<br><b>Please consider supporting the development by donating any amount or even an Espresso or by ordering the official boards to keep the project running!</b></div>
-            </div>
-            <div class="row">
-                <div class="six columns">
-                    <div class="center-all">
-                        <a href="https://www.buymeacoffee.com/seeul8er" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
-                    </div>
-                </div>
-                <div class="six columns">
-                    <div class="paypal_button center-all">
-                        <a href="https://www.paypal.com/donate/?hosted_button_id=SG97392AJN73J">
-                            <img src="images/de-pp-logo-150px.png" alt="Donate via PayPal" />
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div class="container hero">
+        <h5>For the latest information please visit the official website<br><a href="https://drone-bridge.com">drone-bridge.com</a></h5>
     </div>
 
     <footer class="footer">
@@ -139,37 +48,5 @@
 <!-- 100% privacy-first analytics -->
 <script data-collect-dnt="true" async defer src="https://scripts.simpleanalyticscdn.com/latest.js"></script>
 <noscript><img src="https://queue.simpleanalyticscdn.com/noscript.gif?collect-dnt=true" alt="" referrerpolicy="no-referrer-when-downgrade" /></noscript>
-<script>
-    const button_official_board_c3 = document.getElementById("button_official_board_c3");
-    const button_official_board_c6 = document.getElementById("button_official_board_c6");
-    const button_pcb_files = document.getElementById("button_pcb_files");
-
-    button_official_board_c3.onclick = async () => {
-        try {
-            sa_event("click_get_board_c3", {});
-        } catch (e) {
-            console.log("Could not run simpleanalytics: " + e);
-        }
-        window.open("https://www.ebay.com/itm/116647288610", '_blank').focus();
-    }
-
-    button_official_board_c6.onclick = async () => {
-        try {
-            sa_event("click_get_board_c6", {});
-        } catch (e) {
-            console.log("Could not run simpleanalytics: " + e);
-        }
-        window.open("https://www.ebay.com/itm/116504820293", '_blank').focus();
-    }
-
-    button_pcb_files.onclick = async () => {
-        try {
-            sa_event("click_get_pcb", {});
-        } catch (e) {
-            console.log("Could not run simpleanalytics: " + e);
-        }
-        window.open("https://buymeacoffee.com/seeul8er/extras", '_blank').focus();
-    }
-</script>
 </body>
 </html>
