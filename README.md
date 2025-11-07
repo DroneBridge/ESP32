@@ -46,11 +46,25 @@ since it does not support video encoding.
 DroneBridge for ESP32 supports ESP-NOW LR, enabling ranges of more than 1km with external receiving antennas.<br />The number of drones is only limited by the channel capacity and the ESP32s processing power. All data is encrypted using AES256-GCM.
 </div>
 
+## Drone Light Show Edition (DLSE)
+![DragonDroneShow](https://github.com/user-attachments/assets/979ba184-3fab-4bdf-a315-61321d533b82)
+
+Special version that is optimised to work for Drone Shows using [Skybrush](https://skybrush.io/)    
+Check [drone-bridge.com](https://drone-bridge.com) to get the latest release!
+
+-   Support for Skybrush
+-   Remote Power Management (sleep, wakeup) of the show drone
+-   Lots of additional checks to improve safety and reliability
+-   [Open Source Commercial Support Suite](https://github.com/DroneBridge/DLSECommercialSupportSuite) to help you flash, manage & maintain your drones efficiently. Script your own tools following the given examples using the DLSE API.
+-   Over The Air (OTA) Updates for the ESP32
+-   WiFi6 (OFDMA) & 5GHz support on supported ESP32 chips
+-   ESP32-C3, ESP32-C5 & ESP32-C6
+
 ## Hardware
 
 **Officially supported and tested boards:**  
 Do the project and yourself a favour and use one of the officially supported and tested boards below.   
-These boards are very low in price, have everything you need and are also very small. Perfect for use on any drone. 
+These boards are very affordable, have everything you need, and are also very compact. Perfect for use on any drone. 
 
 **[You can find more info on how to get the official boards here!](https://dronebridge.gitbook.io/docs/dronebridge-for-esp32/hardware-and-wiring#officially-supported-boards)**
 
