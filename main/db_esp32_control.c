@@ -650,11 +650,18 @@ _Noreturn void control_module_udp_tcp() {
     while (1) {
         // Read incoming wireless data (Wi-Fi)
         // Wi-Fi based modes that use TCP and UDP communication
+        
+        bool data_processed = false;
+        uint32_t prev_serial_count = serial_total_byte_count;
+        int8_t prev_tcp_clients = num_connected_tcp_clients;
+
         handle_tcp_master(tcp_master_socket, tcp_clients);
+        if (num_connected_tcp_clients != prev_tcp_clients) data_processed = true;
         for (int i = 0; i < CONFIG_LWIP_MAX_ACTIVE_TCP; i++) {  // handle TCP clients
             if (tcp_clients[i] > 0) {
                 ssize_t recv_length = recv(tcp_clients[i], tcp_client_buffer, TCP_BUFF_SIZ, 0);
                 if (recv_length > 0) {
+                    data_processed = true;
                     if (DB_PARAM_SERIAL_PROTO == DB_SERIAL_PROTOCOL_MAVLINK) {
                         // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
                         // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existign packet
@@ -682,6 +689,7 @@ _Noreturn void control_module_udp_tcp() {
         ssize_t recv_length = recvfrom(udp_conn_list->udp_socket, udp_buffer, UDP_BUF_SIZE, 0,
                                        (struct sockaddr *) &new_db_udp_client.udp_client, &udp_socklen);
         if (recv_length > 0) {
+            data_processed = true;
             if (DB_PARAM_SERIAL_PROTO == DB_SERIAL_PROTOCOL_MAVLINK) {
                 // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
                 // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existing packet
@@ -706,6 +714,7 @@ _Noreturn void control_module_udp_tcp() {
             recv_length = recvfrom(udp_broadcast_skybrush_socket, udp_buffer, UDP_BUF_SIZE, 0,
                                    (struct sockaddr *) &new_db_udp_client.udp_client, &udp_socklen);
             if (recv_length > 0) {
+                data_processed = true;
                 // no parsing - transparent here
                 write_to_serial(udp_buffer, recv_length);
                 // add Skybrush server to known UDP target/distribution list
@@ -726,7 +735,9 @@ _Noreturn void control_module_udp_tcp() {
                                  serial_buffer,
                                  &db_msp_ltm_port);
 
-        if (delay_timer_cnt == 6000) {
+        if (serial_total_byte_count != prev_serial_count) data_processed = true;
+
+        if (delay_timer_cnt >= 6000) {
             // all actions are non-blocking so allow some delay so that the IDLE task of FreeRTOS and the watchdog can run
             // read: https://esp32developer.com/programming-in-c-c/tasks/tasks-vs-co-routines for reference
             vTaskDelay(10 / portTICK_PERIOD_MS);
@@ -750,6 +761,10 @@ _Noreturn void control_module_udp_tcp() {
 //            ESP_LOGI(TAG, "Free heap: %i, low mark: %i", free_dram, lowmark_dram);
         } else {
             delay_timer_cnt++;
+        }
+
+        if (!data_processed) {
+            vTaskDelay(1);
         }
     }
     vTaskDelete(NULL);
