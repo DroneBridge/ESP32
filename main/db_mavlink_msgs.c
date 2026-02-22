@@ -345,7 +345,7 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
                         // ToDo: Only the RSSI of the first (Wi-Fi) is considered.
                         //  Easier for UDP since we have a nice list with mac addresses to use for mapping.
                         //  Harder for TCP -> no MAC addresses available of connected clients
-                        fmav_radio_status_t payload_r = {.fixed = UINT8_MAX, .noise = UINT8_MAX, .remnoise = UINT8_MAX, .remrssi=db_format_rssi(wifi_sta_list.sta[0].rssi, -88), .rssi=UINT8_MAX, .rxerrors=0, .txbuf=0};
+                        fmav_radio_status_t payload_r = {.fixed = UINT8_MAX, .noise = UINT8_MAX, .remnoise = UINT8_MAX, .remrssi=UINT8_MAX, .rssi=db_format_rssi(wifi_sta_list.sta[0].rssi, -88), .rxerrors=0, .txbuf=0};
                         uint16_t len = fmav_msg_radio_status_encode_to_frame_buf(buff, db_get_mav_sys_id(),
                                                                                  db_get_mav_comp_id(), &payload_r,
                                                                                  fmav_status);
