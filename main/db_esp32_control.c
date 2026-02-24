@@ -17,7 +17,6 @@
  *   limitations under the License.
  *
  */
-#include <sys/cdefs.h>
 #include <sys/fcntl.h>
 #include <sys/param.h>
 #include <string.h>
@@ -304,7 +303,7 @@ void handle_tcp_master(const int tcp_master_socket, int tcp_clients[]) {
                 tcp_clients[i] = new_tcp_client;
                 fcntl(tcp_clients[i], F_SETFL, O_NONBLOCK);
                 char addr_str[128];
-                inet_ntoa_r(((struct sockaddr_in *) &source_addr)->sin_addr.s_addr, addr_str, sizeof(addr_str) - 1);
+                inet_ntoa_r(((struct sockaddr_in *) &source_addr)->sin_addr, addr_str, sizeof(addr_str) - 1);
                 ESP_LOGI(TAG, "TCP: New client connected: %s", addr_str);
                 num_connected_tcp_clients++;
                 return;
@@ -657,7 +656,7 @@ _Noreturn void control_module_udp_tcp() {
                 if (recv_length > 0) {
                     if (DB_PARAM_SERIAL_PROTO == DB_SERIAL_PROTOCOL_MAVLINK) {
                         // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
-                        // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existign packet
+                        // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existing packet
                         db_parse_mavlink_from_radio(tcp_clients, udp_conn_list, tcp_client_buffer, recv_length);
                     } else {
                         // no parsing with any other protocol - transparent here
