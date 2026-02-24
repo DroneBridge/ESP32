@@ -221,6 +221,10 @@ void db_send_to_all_udp_clients(udp_conn_list_t *n_udp_conn_list, const uint8_t 
 void db_send_to_all_espnow(uint8_t data[], const uint16_t *data_length) {
     db_espnow_queue_event_t evt;
     evt.data = malloc(*data_length);
+    if (evt.data == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for ESPNOW data");
+        return;
+    }
     memcpy(evt.data, data, *data_length);
     evt.data_len = *data_length;
     evt.packet_type = DB_ESP_NOW_PACKET_TYPE_DATA;
@@ -271,6 +275,10 @@ void db_send_to_all_clients(int tcp_clients[], udp_conn_list_t *n_udp_conn_list,
         case DB_BLUETOOTH_MODE:
 #ifdef CONFIG_BT_ENABLED
             bleData.data = malloc(data_length);
+            if (bleData.data == NULL) {
+                ESP_LOGE(TAG, "Failed to allocate memory for BLE data");
+                break;
+            }
             bleData.data_len = data_length;
             memcpy(bleData.data, data, bleData.data_len);
             if (xQueueSend(db_uart_read_queue_ble, &bleData, portMAX_DELAY) != pdPASS) {
@@ -575,7 +583,7 @@ void handle_internal_telemetry(int tel_sock, uint8_t *udp_buffer, socklen_t *soc
                                        (struct sockaddr *) udp_client, sock_len);
         if (recv_length > 0) {
             ESP_LOGD(TAG, "Got internal telem. frame containing %i entries", udp_buffer[0]);
-            for (int i = 1; i < (udp_buffer[0] * 7); i += 7) {
+            for (int i = 1; (i + 6) < recv_length && (i < (udp_buffer[0] * 7)); i += 7) {
                 if (memcmp(LOCAL_MAC_ADDRESS, &udp_buffer[i], ESP_NOW_ETH_ALEN) == 0) {
                     // found us in the list (this local ESP32 AIR unit) -> update internal telemetry buffer,
                     // so it gets sent with next Mavlink RADIO STATUS in case MAVLink radio status is enabled

@@ -91,7 +91,10 @@ esp_err_t open_uart_serial_socket() {
     ESP_ERROR_CHECK(uart_set_pin(UART_NUM, DB_PARAM_GPIO_TX, DB_PARAM_GPIO_RX,
                                  flow_control ? DB_PARAM_GPIO_RTS : UART_PIN_NO_CHANGE,
                                  flow_control ? DB_PARAM_GPIO_CTS : UART_PIN_NO_CHANGE));
-    return uart_driver_install(UART_NUM, 1024, 0, 10, NULL, 0);
+    if (!uart_is_driver_installed(UART_NUM)) {
+        return uart_driver_install(UART_NUM, 1024, 0, 10, NULL, 0);
+    }
+    return ESP_OK;
 }
 
 /**
@@ -133,6 +136,7 @@ esp_err_t open_serial_socket() {
  * @param data_length Size of payload to write to UART
  */
 void write_to_serial(const uint8_t data_buffer[], const unsigned int data_length) {
+    if (data_length == 0) return;
 #ifdef CONFIG_DB_SERIAL_OPTION_JTAG
     // Writes data from buffer to JTAG based serial interface
     int written = usb_serial_jtag_write_bytes(data_buffer, data_length, 20 / portTICK_PERIOD_MS);
