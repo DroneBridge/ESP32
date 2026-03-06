@@ -1,8 +1,8 @@
 # Execute in an esp-idf enabled PowerShell
 # This script will create a combined zip file containing binaries for all supported esp32 boards
 
-$release_foldername = "DroneBridge_ESP32_v2_2_2_RC1"
-$release_name_zip = "DroneBridge_ESP32_v2_2_2_RC1.zip"
+$release_foldername = "DroneBridge_ESP32_v2_2_0_stable"
+$release_name_zip = "DroneBridge_ESP32_v2_2_0_stable.zip"
 
 mkdir $release_foldername
 mkdir build
