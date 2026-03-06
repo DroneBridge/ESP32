@@ -731,7 +731,9 @@ _Noreturn void control_module_udp_tcp() {
                                  &db_msp_ltm_port);
         if (serial_total_byte_count != prev_serial_count) data_processed = true;
 
-        if (delay_timer_cnt == 6000) {
+        if (serial_total_byte_count != prev_serial_count) data_processed = true;
+
+        if (delay_timer_cnt >= 6000) {
             // all actions are non-blocking so allow some delay so that the IDLE task of FreeRTOS and the watchdog can run
             // read: https://esp32developer.com/programming-in-c-c/tasks/tasks-vs-co-routines for reference
             vTaskDelay(10 / portTICK_PERIOD_MS);
