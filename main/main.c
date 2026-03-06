@@ -47,6 +47,8 @@
 #include "db_serial.h"
 #include "globals.h"
 
+#include <db_timers.h>
+
 #ifdef CONFIG_BT_ENABLED
 
 #include "db_ble.h"
@@ -77,7 +79,6 @@ uint8_t DB_RADIO_IS_OFF = false;  // keep track if we switched Wi-Fi/BLE off alr
 db_esp_signal_quality_t db_esp_signal_quality = {.air_rssi = UINT8_MAX, .air_noise_floor = UINT8_MAX, .gnd_rssi= UINT8_MAX, .gnd_noise_floor = UINT8_MAX};
 wifi_sta_list_t wifi_sta_list = {.num = 0};
 uint8_t LOCAL_MAC_ADDRESS[6];
-udp_conn_list_t *udp_conn_list;
 
 // Wi-Fi client mode vars
 static int s_retry_num = 0;
@@ -750,6 +751,9 @@ void app_main() {
     }
     ESP_ERROR_CHECK(init_fs());
     db_start_control_module();
+
+    db_timer_start_mavlink_heartbeat();
+    db_timer_start_mavlink_radio_status();
 
     if (DB_PARAM_RADIO_MODE != DB_WIFI_MODE_ESPNOW_AIR && DB_PARAM_RADIO_MODE != DB_WIFI_MODE_ESPNOW_GND &&
         DB_PARAM_RADIO_MODE != DB_WIFI_MODE_AP_LR) {
