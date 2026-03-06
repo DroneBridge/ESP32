@@ -8,7 +8,7 @@ on:
     branches: [ master ]
 
 jobs:
-  build_idf_v5_4_2_generic:
+  build_idf_v5_4_3_generic:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -20,12 +20,12 @@ jobs:
       with:
         ref: ${{ github.ref }}
         submodules: 'recursive'
-    - name: Generic ESP-IDF v5.4.2 target build
-      uses: ./.github/actions/esp-idf-5_4_2-with-node
+    - name: Generic ESP-IDF v5.4.3 target build
+      uses: ./.github/actions/esp-idf-5_4_3-with-node
       with:
         target: "${{ matrix.target }}"
         command: "idf.py set-target ${{matrix.target}} build"
-  build_idf_v5_4_2_nightly_release:
+  build_idf_v5_4_3_nightly_release:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repo
@@ -33,8 +33,8 @@ jobs:
       with:
         ref: ${{ github.ref }}
         submodules: 'recursive'
-    - name: Release config build ESP-IDF v5.4.2
-      uses: ./.github/actions/esp-idf-5_4_2-with-node_nightly
+    - name: Release config build ESP-IDF v5.4.3
+      uses: ./.github/actions/esp-idf-5_4_3-with-node_nightly
       with:
         command: "bash ./create_release_zip.sh"
     - uses: actions/upload-artifact@v4
