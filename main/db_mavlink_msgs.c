@@ -73,14 +73,39 @@ int8_t db_format_rssi(int8_t signal_strength, int8_t noise_floor) {
 
 /**
  * Creates and writes Mavlink heartbeat message to supplied buffer
+ *
  * @param buff Buffer to write heartbeat to (>280 bytes)
+ * @param fmav_status Status struct of the fmav parser. Will be used to set and update the squence number of the packet.
  * @return Length of the message in the buffer
  */
-uint16_t db_create_heartbeat(uint8_t *buff, fmav_status_t *fmav_status) {
+uint16_t db_mav_create_heartbeat(uint8_t *buff, fmav_status_t *fmav_status) {
     return fmav_msg_heartbeat_pack_to_frame_buf(
             buff, db_get_mav_sys_id(), db_get_mav_comp_id(),
             MAV_TYPE_ONBOARD_CONTROLLER, MAV_AUTOPILOT_INVALID, MAV_MODE_FLAG_CUSTOM_MODE_ENABLED, 0, MAV_STATE_ACTIVE,
             fmav_status);
+}
+
+/**
+ * Acknowledge mavlink command by sending ACK response
+ *
+ * @param the_msg The mavlink message that was parsed (containing the_command)
+ * @param result
+ * @param status fastmavlink parser status structure
+ * @param buff Supply output buffer for sending data
+ * @param origin Origin of the command as defined by DB_MAVLINK_DATA_ORIGIN
+ * @param tcp_clients List of connected tcp clients as sockets
+ * @param udp_conns List of connected UDP clients
+ */
+void db_ack_mavlink_command(uint16_t msg_id, MAV_RESULT result, const fmav_message_t *the_msg, fmav_status_t *status,
+                            uint8_t *buff, enum DB_MAVLINK_DATA_ORIGIN *origin, int *tcp_clients,
+                            udp_conn_list_t *udp_conns) {
+    fmav_command_ack_t a = {.command = msg_id,
+            .result = result,
+            .target_system = the_msg->sysid,
+            .target_component = the_msg->compid};
+    uint16_t len = fmav_msg_command_ack_encode_to_frame_buf(buff, db_get_mav_sys_id(), db_get_mav_comp_id(), &a,
+                                                            status);
+    db_route_mavlink_response(buff, len, (*origin), tcp_clients, udp_conns);
 }
 
 /**
@@ -209,21 +234,20 @@ void db_answer_mavlink_cmd_request_message(uint16_t requested_msg_id,
                                            fmav_status_t *status) {
     switch (requested_msg_id) {
         case FASTMAVLINK_MSG_ID_AUTOPILOT_VERSION: {
-            fmav_command_ack_t a = {.command = MAV_CMD_REQUEST_MESSAGE,
-                    .result = MAV_RESULT_ACCEPTED,
-                    .target_system = the_msg->sysid,
-                    .target_component = the_msg->compid};
-            uint16_t len = fmav_msg_command_ack_encode_to_frame_buf(buff, db_get_mav_sys_id(), db_get_mav_comp_id(), &a,
-                                                                    status);
-            db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
-
+            db_ack_mavlink_command(MAV_CMD_REQUEST_MESSAGE, MAV_RESULT_ACCEPTED, the_msg, status, buff, &origin, tcp_clients, udp_conns);
             fmav_autopilot_version_t autopilot_version = {
-                    .board_version = 0,
-                    .capabilities = MAV_PROTOCOL_CAPABILITY_MAVLINK2 | MAV_PROTOCOL_CAPABILITY_PARAM_ENCODE_BYTEWISE,
-                    .flight_sw_version = DB_MAJOR_VERSION,
-                    .middleware_sw_version = DB_MINOR_VERSION
+                .board_version = (0 & 0xFFFF0000) | (1205 & 0xFFFF), // AP_HW_ESP32_PERIPH for the first 16 bits
+                .capabilities = MAV_PROTOCOL_CAPABILITY_MAVLINK2 | MAV_PROTOCOL_CAPABILITY_PARAM_ENCODE_BYTEWISE,
+                .flight_sw_version = ((uint32_t)DB_MAJOR_VERSION << 24) |
+                          ((uint32_t)DB_MINOR_VERSION << 16) |
+                          ((uint32_t)DB_PATCH_VERSION << 8)  |
+                          ((uint32_t)DB_TYPE_VERSION),
+                .middleware_sw_version = DB_BUILD_VERSION,
+                .os_sw_version = CONFIG_IDF_FIRMWARE_CHIP_ID,
+                .vendor_id = DB_VENDOR_ID,
+                .product_id = DB_PRODUCT_ID,
             };
-            len = fmav_msg_autopilot_version_encode_to_frame_buf(buff, db_get_mav_sys_id(),
+            uint16_t len = fmav_msg_autopilot_version_encode_to_frame_buf(buff, db_get_mav_sys_id(),
                                                                  db_get_mav_comp_id(), &autopilot_version, status);
             db_route_mavlink_response(buff, len, origin, tcp_clients, udp_conns);
         }
@@ -300,11 +324,6 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
                     DB_MAV_SYS_ID = new_msg->sysid;
                     // We must be in either one of these modes: AP LR or ESP-NOW GND
                     if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_ESPNOW_GND || DB_PARAM_RADIO_MODE == DB_WIFI_MODE_AP_LR) {
-                        // Send heartbeat to GCS: Every ESP32 no matter its role or mode is emitting a heartbeat
-                        uint16_t length = db_create_heartbeat(buff, fmav_status);
-                        ESP_LOGD(TAG, "Sending back heartbeat via serial link to GCS");
-                        // In AP LR mode and in ESP-NOW GND mode the heartbeat has to be emitted via serial directly to the GCS
-                        write_to_serial(buff, length);
                     } else {
                         ESP_LOGW(TAG, "We received a heartbeat from GCS while not being in DB_WIFI_MODE_ESPNOW_GND or "
                                       "DB_WIFI_MODE_AP_LR mode. Check your configuration! AIR-Side ESP32 seems to be "
@@ -325,41 +344,9 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
                         // autopilot indicates it is <<not>> armed
                         db_set_radio_status(true);
                     }
-                    // ESP32s that are connected to a flight controller via UART will send RADIO_STATUS messages to the GND
-                    if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_STA || DB_PARAM_RADIO_MODE == DB_WIFI_MODE_ESPNOW_AIR || DB_PARAM_RADIO_MODE == DB_BLUETOOTH_MODE) {
-                        // ToDo: For BLE only the last connected client is considered.
-                        fmav_radio_status_t payload_r = {.fixed = 0, .txbuf=0,
-                                .noise = db_esp_signal_quality.gnd_noise_floor,
-                                .remnoise = db_esp_signal_quality.air_noise_floor,
-                                .remrssi = db_format_rssi(db_esp_signal_quality.air_rssi, db_esp_signal_quality.air_noise_floor),
-                                .rssi = db_format_rssi(db_esp_signal_quality.gnd_rssi, db_esp_signal_quality.gnd_noise_floor),
-                                .rxerrors = db_esp_signal_quality.gnd_rx_packets_lost};
-                        uint16_t len = fmav_msg_radio_status_encode_to_frame_buf(buff, db_get_mav_sys_id(),
-                                                                                 db_get_mav_comp_id(), &payload_r,
-                                                                                 fmav_status);
-                        db_send_to_all_clients(tcp_clients, udp_conns, buff, len);
-                    } else if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_AP && wifi_sta_list.num > 0) {
-                        // We assume ESP32 is not used in DB_WIFI_MODE_AP on the ground but only on the drone side
-                        // -> We are in WiFi AP mode and connected to the drone
-                        // Send each connected client a radio status packet.
-                        // ToDo: Only the RSSI of the first (Wi-Fi) is considered.
-                        //  Easier for UDP since we have a nice list with mac addresses to use for mapping.
-                        //  Harder for TCP -> no MAC addresses available of connected clients
-                        fmav_radio_status_t payload_r = {.fixed = UINT8_MAX, .noise = UINT8_MAX, .remnoise = UINT8_MAX, .remrssi=db_format_rssi(wifi_sta_list.sta[0].rssi, -88), .rssi=UINT8_MAX, .rxerrors=0, .txbuf=0};
-                        uint16_t len = fmav_msg_radio_status_encode_to_frame_buf(buff, db_get_mav_sys_id(),
-                                                                                 db_get_mav_comp_id(), &payload_r,
-                                                                                 fmav_status);
-                        db_send_to_all_clients(tcp_clients, udp_conns, buff, len);
-                    } else {
-                        // In AP LR mode the clients will send the info to the GCS
-                    }
                 } else {
                     // We do not react to any other heartbeat!
                 }
-                // ToDo: Check if that is a good idea or push to extra thread
-                uint16_t length = db_create_heartbeat(buff, fmav_status);
-                // Send heartbeat to GND clients: Every ESP32 no matter its role or mode is emitting a heartbeat
-                db_send_to_all_clients(tcp_clients, udp_conns, buff, length);
             } // do not react to heartbeats received via wireless interface - reaction to serial is sufficient
             break;
         case FASTMAVLINK_MSG_ID_PARAM_REQUEST_LIST: {

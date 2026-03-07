@@ -57,6 +57,10 @@ uint ltm_frames_in_buffer_pnt = 0;
 
 fmav_message_t msg;
 
+// global parser variables used by timers and mavlink parser functions
+fmav_status_t fmav_status_serial;    // fmav parser status struct for parser handling serial interface
+fmav_status_t fmav_status_radio; // fmav parser status struct for parser handling the radio/ESPNOW/WiFi/BLE interface
+
 /**
  * Opens UART socket.
  * Enables UART flow control if RTS and CTS pins do NOT match.
@@ -258,7 +262,6 @@ void db_route_mavlink_response(uint8_t *buffer, uint16_t length, enum DB_MAVLINK
  */
 void db_parse_mavlink_from_radio(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *buffer, int bytes_read) {
     static uint8_t mav_parser_rx_buf[296];  // at least 280 bytes which is the max len for a MAVLink v2 packet
-    static fmav_status_t fmav_status_radio; // fmav parser status struct for radio/ESPNOW/WiFi parser
 
     // Parse each byte received
     for (int i = 0; i < bytes_read; ++i) {
@@ -316,7 +319,6 @@ void db_parse_mavlink_from_radio(int *tcp_clients, udp_conn_list_t *udp_conns, u
 void db_read_serial_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *serial_buffer,
                                   unsigned int *serial_buff_pos) {
     static uint8_t mav_parser_rx_buf[296];  // at least 280 bytes which is the max len for a MAVLink v2 packet
-    static fmav_status_t fmav_status_serial;    // fmav parser status struct for serial parser
     uint8_t uart_read_buf[DB_PARAM_SERIAL_PACK_SIZE];
     // timeout variables
     static TickType_t last_tick = 0;    // time when we received something from the serial interface for the last time

@@ -256,10 +256,10 @@ db_parameter_t db_param_gpio_rts_thresh = {
         },
         .value = {
                 .db_param_u8 = {
-                        .value = 64,
-                        .default_value = 64,
+                        .value = 127,
+                        .default_value = 127,
                         .min = 0,
-                        .max = 128,
+                        .max = 127,
                 }
         }
 };

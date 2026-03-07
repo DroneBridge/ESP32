@@ -55,6 +55,22 @@ typedef struct rest_server_context {
 #define CHECK_FILE_EXTENSION(filename, ext) (strcasecmp(&filename[strlen(filename) - strlen(ext)], ext) == 0)
 
 /**
+ * Sends a http response with retries
+ * @param req Request Object
+ * @param resp_str Request String
+ */
+static void db_http_resp_sendstr_with_retry(httpd_req_t *req, const char *resp_str) {
+    for (int i = 0; i < 3; i++) {
+        if (httpd_resp_sendstr(req, resp_str) == ESP_OK) {
+            return;
+        }
+        ESP_LOGW(TAG, "httpd_resp_sendstr failed, retrying %d/3", i + 1);
+        vTaskDelay(pdMS_TO_TICKS(150));
+    }
+    ESP_LOGE(TAG, "httpd_resp_sendstr failed after 3 retries");
+}
+
+/**
  * Set HTTP response content type according to file extension
  */
 static esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filepath) {
@@ -154,26 +170,18 @@ static esp_err_t settings_post_handler(httpd_req_t *req) {
     buf[total_len] = '\0';
 
     cJSON *root = cJSON_Parse(buf);
-
     db_param_read_all_params_json(root);
     db_write_settings_to_nvs();
     ESP_LOGI(TAG, "Settings changed!");
-    
+
     cJSON_Delete(root);
-    httpd_resp_sendstr(req, "{\n"
-                            "    \"status\": \"success\",\n"
-                            "    \"msg\": \"Settings changed! Rebooting ...\"\n"
-                            "  }");
-    vTaskDelay(1000 / portTICK_PERIOD_MS);  // wait to allow the website displaying the success message
-    // Send reboot message
-    httpd_resp_set_type(req, "application/json");
-    cJSON *reboot_info = cJSON_CreateObject();
-    cJSON_AddStringToObject(reboot_info, "msg", "Rebooting!");
-    const char *sys_info = cJSON_Print(reboot_info);
-    httpd_resp_sendstr(req, sys_info);
-    free((void *) sys_info);
-    cJSON_Delete(reboot_info);
-    vTaskDelay(500 / portTICK_PERIOD_MS);  // wait 1s to allow the website displaying the success message
+    const char *resp_str = "{\n"
+                           "    \"status\": \"success\",\n"
+                           "    \"msg\": \"Settings changed! Rebooting ...\"\n"
+                           "  }";
+    db_http_resp_sendstr_with_retry(req, resp_str);
+
+    vTaskDelay(pdMS_TO_TICKS(2000));  // wait to allow the website displaying the success message
     esp_restart();
     return ESP_OK;
 }
@@ -305,7 +313,7 @@ static esp_err_t system_info_get_handler(httpd_req_t *req) {
     cJSON_AddNumberToObject(root, "serial_via_JTAG", 0);
 #endif
     const char *sys_info = cJSON_Print(root);
-    httpd_resp_sendstr(req, sys_info);
+    db_http_resp_sendstr_with_retry(req, sys_info);
     free((void *) sys_info);
     cJSON_Delete(root);
     return ESP_OK;
@@ -354,7 +362,7 @@ static esp_err_t system_stats_get_handler(httpd_req_t *req) {
         // other modes like ESP-NOW do not activate HTTP server so do nothing
     }
     const char *sys_info = cJSON_Print(root);
-    httpd_resp_sendstr(req, sys_info);
+    db_http_resp_sendstr_with_retry(req, sys_info);
     free((void *) sys_info);
     cJSON_Delete(root);
     return ESP_OK;
@@ -385,7 +393,7 @@ static esp_err_t system_clients_get_handler(httpd_req_t *req) {
     cJSON_AddItemToObject(root, "udp_clients", udp_clients);
 
     const char *sys_info = cJSON_Print(root);
-    httpd_resp_sendstr(req, sys_info);
+    db_http_resp_sendstr_with_retry(req, sys_info);
     free((void *) sys_info);
     cJSON_Delete(root);
     return ESP_OK;
@@ -401,7 +409,7 @@ static esp_err_t settings_get_handler(httpd_req_t *req) {
     cJSON *root = cJSON_CreateObject();
     db_param_write_all_params_json(root);
     const char *sys_info = cJSON_Print(root);
-    httpd_resp_sendstr(req, sys_info);
+    db_http_resp_sendstr_with_retry(req, sys_info);
     free((void *) sys_info);
     cJSON_Delete(root);
     return ESP_OK;
