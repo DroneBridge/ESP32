@@ -46,7 +46,6 @@
 
 #define TAG "DB_SERIAL"
 
-uint8_t DB_MAV_SYS_ID = 1;
 uint32_t serial_total_byte_count = 0;
 uint32_t serial_total_decoded_mav_msgs = 0;
 uint16_t DB_SERIAL_READ_TIMEOUT_MS = DB_SERIAL_READ_TIMEOUT_MS_DEFAULT;

@@ -37,11 +37,11 @@
                 <div id="current_client_ip" class="twelve columns small_text">
                 </div>
             </div>
-            <div class="row">
-                <div class="four columns">
-                    <label>received bytes serial port</label>
-                    <div id="read_bytes">-</div>
+            <div class="row" id="fc_sys_id_div" class="twelve columns small_text">
+                <div id="fc_sys_id_div">
                 </div>
+            </div>
+            <div class="row">
                 <div class="four columns">
                     <label>Connected TCP clients</label>
                     <div id="tcp_connected">-</div>
@@ -53,6 +53,12 @@
                         <img class="img_button" style="margin-left: 5rem; padding: 0.2rem" height="20em" alt="add" src="add_16dp_icon.png" onclick="add_new_udp_client()"/>
                         <img class="img_button" style="margin-left: 0.5rem; padding: 0.2rem" height="20em" alt="delete" src="remove_16dp_icon.png" onclick="clear_udp_clients()"/>
                     </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="four columns">
+                    <label>received bytes serial port</label>
+                    <div id="read_bytes">-</div>
                 </div>
             </div>
         </div>

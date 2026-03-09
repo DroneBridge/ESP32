@@ -32,6 +32,7 @@
 #include "globals.h"
 #include "main.h"
 #include "db_serial.h"
+#include "db_mavlink_msgs.h"
 
 #define TAG "DB_HTTP_REST"
 #define REST_CHECK(a, str, goto_tag, ...)                                              \
@@ -332,6 +333,8 @@ static esp_err_t system_stats_get_handler(httpd_req_t *req) {
     cJSON_AddNumberToObject(root, "serial_dec_mav_msgs", serial_total_decoded_mav_msgs);
     cJSON_AddNumberToObject(root, "tcp_connected", num_connected_tcp_clients);
     cJSON_AddNumberToObject(root, "udp_connected", udp_conn_list->size);
+    cJSON_AddBoolToObject(root, "fc_connected", fc_connected());
+    cJSON_AddNumberToObject(root, "fc_sys_id", db_get_fc_sys_id());
     // add IP:PORT info on connected UDP clients
     cJSON *udp_clients = cJSON_CreateArray();
     for (int i = 0; i < udp_conn_list->size; i++) {
