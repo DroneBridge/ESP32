@@ -18,6 +18,7 @@
  */
 #include <string.h>
 #include <esp_log.h>
+#include <esp_timer.h>
 
 #include "db_mavlink_msgs.h"
 #include "db_parameters.h"
