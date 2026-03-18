@@ -176,7 +176,20 @@ void db_send_to_all_udp_clients(const uint8_t *data, uint data_length) {
         if (sent != data_length) {
             int err = errno;
             char *client_ip = inet_ntoa(((struct sockaddr_in *)&udp_conn_list->db_udp_clients[i].udp_client)->sin_addr);
-            ESP_LOGE(TAG, "UDP - Error sending (%i/%i) to %s because of %s", sent, data_length, client_ip, strerror(err));
+            udp_conn_list->db_udp_clients[i].send_fail_count++;
+            if (udp_conn_list->db_udp_clients[i].send_fail_count >= 5) {
+                ESP_LOGW(TAG, "UDP - Removing unreachable client %s after repeated send failures (last errno: %d)",
+                         client_ip, err);
+                for (int j = i; j < udp_conn_list->size - 1; j++) {
+                    udp_conn_list->db_udp_clients[j] = udp_conn_list->db_udp_clients[j + 1];
+                }
+                udp_conn_list->size--;
+                i--;
+            } else {
+                ESP_LOGE(TAG, "UDP - Error sending (%i/%i) to %s because of %s", sent, data_length, client_ip, strerror(err));
+            }
+        } else {
+            udp_conn_list->db_udp_clients[i].send_fail_count = 0;
         }
     }
 }
