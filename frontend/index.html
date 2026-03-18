@@ -296,6 +296,20 @@
                     </div>
                 </div>
             </div>
+            <div id="mav_broadcast_div" class="row">
+                <div class="twelve columns">
+                    <div class="checkbox-wrapper-14">
+                        <input id="mav_broadcast" name="mav_broadcast" type="checkbox" class="switch" onchange="change_mav_blacklist_visibility()" checked>
+                        <label class="tooltip" for="mav_broadcast"><span class="tooltiptext">When enabled, the ESP32 acts as a MAVLink Hub, forwarding messages between all connected drones. Disable this to reduce network load if you have multiple drones and only need data in the GCS.</span>MAVLink Hub (Cross-Forwarding)</label>
+                    </div>
+                </div>
+            </div>
+            <div id="mav_blacklist_div" class="row" style="display: none;">
+                <div class="twelve columns">
+                    <label class="tooltip" for="mav_blacklist"><span class="tooltiptext">Comma separated list of MAVLink System IDs to exclude from forwarding. Heartbeats are always forwarded. e.g. 1,5,10</span>MAVLink Hub Blacklist (System IDs)</label>
+                    <input class="u-full-width" type="text" placeholder="1,5,10" id="mav_blacklist" name="mav_blacklist">
+                </div>
+            </div>
         </div>
     </form>
     <div class="row">

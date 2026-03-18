@@ -258,17 +258,19 @@ void db_route_mavlink_response(uint8_t *buffer, uint16_t length, enum DB_MAVLINK
  * @param up_conns Structure containing all UDP connection data including the sockets
  * @param buffer Buffer containing the raw bytes to be parsed
  * @param bytes_read Number of bytes in the buffer
- * @param origin Origin of the data - serial link or radio link
+ * @param forward_to_serial If true, complete MAVLink frames will be written to the local serial port
  */
-void db_parse_mavlink_from_radio(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *buffer, int bytes_read) {
+void db_parse_mavlink_from_radio(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *buffer, int bytes_read, bool forward_to_serial) {
     static uint8_t mav_parser_rx_buf[296];  // at least 280 bytes which is the max len for a MAVLink v2 packet
 
     // Parse each byte received
     for (int i = 0; i < bytes_read; ++i) {
         fmav_result_t result = {0};
         if (fmav_parse_and_check_to_frame_buf(&result, mav_parser_rx_buf, &fmav_status_radio, buffer[i])) {
-            // Parser detected a full message, write to serial
-            write_to_serial(mav_parser_rx_buf, result.frame_len);
+            // Parser detected a full message, write to serial if allowed
+            if (forward_to_serial) {
+                write_to_serial(mav_parser_rx_buf, result.frame_len);
+            }
             // Decode message and react to it if it was for us
             fmav_frame_buf_to_msg(&msg, &result, mav_parser_rx_buf);
             if (result.res == FASTMAVLINK_PARSE_RESULT_OK) {
