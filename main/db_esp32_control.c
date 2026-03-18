@@ -314,7 +314,7 @@ void db_send_to_all_clients(int tcp_clients[], udp_conn_list_t *n_udp_conn_list,
         default:
             // Other modes (WiFi Modes using TCP/UDP)
             db_send_to_all_tcp_clients(tcp_clients, data, data_length);
-            db_send_to_all_udp_clients(data, data_length);
+            db_send_to_all_udp_clients(udp_conn_list, data, data_length);
             break;
     }
 }
@@ -365,7 +365,7 @@ void db_send_to_all_radio_clients(uint8_t data[], uint16_t data_length) {
         default:
             // Other modes (WiFi Modes using TCP/UDP)
             db_send_to_all_tcp_clients(connected_tcp_clients, data, data_length);
-            db_send_to_all_udp_clients(data, data_length);
+            db_send_to_all_udp_clients(udp_conn_list, data, data_length);
             break;
     }
 }
@@ -743,7 +743,7 @@ _Noreturn void control_module_udp_tcp() {
                     if (DB_PARAM_SERIAL_PROTO == DB_SERIAL_PROTOCOL_MAVLINK) {
                         // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
                         // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existign packet
-                        db_parse_mavlink_from_radio(connected_tcp_clients, udp_conn_list, tcp_client_buffer, recv_length);
+                        db_parse_mavlink_from_radio(connected_tcp_clients, udp_conn_list, tcp_client_buffer, recv_length, true);
                     } else {
                         // no parsing with any other protocol - transparent here
                         write_to_serial(tcp_client_buffer, recv_length);
