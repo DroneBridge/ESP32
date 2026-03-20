@@ -796,8 +796,9 @@ _Noreturn void control_module_udp_tcp() {
                 // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link if allowed.
                 // Packets from other drones are parsed (for ESP32 params) but not pushed to local FC UART if Hub is disabled.
                 // Apply blacklist to serial: if the local FC's SysID is blacklisted, only heartbeats reach it.
+                // GCS packets (SysID 255) always bypass the blacklist so commands always reach the FC.
                 bool should_forward_to_serial = (is_gcs_packet || DB_PARAM_MAV_BROADCAST || is_heartbeat)
-                                                && (is_heartbeat || !is_system_id_blacklisted(db_get_mav_sys_id()));
+                                                && (is_heartbeat || is_gcs_packet || !is_system_id_blacklisted(db_get_mav_sys_id()));
                 db_parse_mavlink_from_radio(connected_tcp_clients, udp_conn_list, udp_buffer, recv_length, should_forward_to_serial);
 
                 // Forward radio data to all other network clients (MAVLink Router/Hub functionality)
@@ -818,8 +819,8 @@ _Noreturn void control_module_udp_tcp() {
                         // 3. If Hub mode is ON: Forward everything (unless blacklisted).
                         // 4. If Hub mode is OFF: Only forward to identified GCS clients.
                         if (is_heartbeat || is_gcs_packet || DB_PARAM_MAV_BROADCAST || udp_conn_list->db_udp_clients[i].is_gcs) {
-                            // Apply blacklist: skip blacklisted targets (heartbeats always pass through)
-                            if (!is_heartbeat && is_system_id_blacklisted(udp_conn_list->db_udp_clients[i].system_id)) {
+                            // Apply blacklist: skip blacklisted targets (heartbeats and GCS packets always pass through)
+                            if (!is_heartbeat && !is_gcs_packet && is_system_id_blacklisted(udp_conn_list->db_udp_clients[i].system_id)) {
                                 continue;
                             }
                             sendto(udp_conn_list->udp_socket, udp_buffer, recv_length, 0,
