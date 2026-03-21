@@ -298,8 +298,8 @@ db_parameter_t db_param_serial_pack_size = {
         },
         .value = {
                 .db_param_u16 = {
-                        .value = 128,
-                        .default_value = 128,
+                        .value = 576,
+                        .default_value = 576,
                         .min = 16,
                         .max = 1023,
                 }
@@ -320,8 +320,8 @@ db_parameter_t db_param_serial_read_timeout = {
         },
         .value = {
                 .db_param_u16 = {
-                        .value = 50,
-                        .default_value = 50,
+                        .value = 20,
+                        .default_value = 20,
                         .min = 1,
                         .max = UINT16_MAX,
                 }
