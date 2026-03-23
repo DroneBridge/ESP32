@@ -162,7 +162,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         ip_event_ap_staipassigned_t *event = (ip_event_ap_staipassigned_t *) event_data;
         ESP_LOGI(TAG, "IP_EVENT_AP_STAIPASSIGNED - New station IP:" IPSTR, IP2STR(&event->ip));
         ESP_LOGI(TAG, "IP_EVENT_AP_STAIPASSIGNED - MAC: " MACSTR, MAC2STR(event->mac));
-        struct db_udp_client_t db_udp_client;
+        struct db_udp_client_t db_udp_client = {0};
         db_udp_client.udp_client.sin_family = PF_INET;
         db_udp_client.udp_client.sin_port = htons(APP_PORT_PROXY_UDP);
         db_udp_client.udp_client.sin_len = 16;

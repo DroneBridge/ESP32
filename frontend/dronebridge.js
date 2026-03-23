@@ -20,6 +20,17 @@ function change_radio_dis_arm_visibility() {
 	}
 }
 
+function change_mav_blacklist_visibility() {
+	let mav_broadcast = document.getElementById("mav_broadcast");
+	let mav_broadcast_div = document.getElementById("mav_broadcast_div");
+	let mav_blacklist_div = document.getElementById("mav_blacklist_div");
+	if (mav_broadcast_div.style.display !== "none" && mav_broadcast.checked) {
+		mav_blacklist_div.style.display = "block";
+	} else {
+		mav_blacklist_div.style.display = "none";
+	}
+}
+
 function change_ap_ip_visibility() {
 	const esp32Mode = document.getElementById("esp32_mode").value;
 	const elements = {
@@ -31,7 +42,14 @@ function change_ap_ip_visibility() {
 		wifi_en_gn_div: document.getElementById("wifi_en_gn_div"),
 		static_ip_config_div: document.getElementById("static_ip_config_div"),
 		pass_div: document.getElementById("pass_div"),
+		mav_broadcast_div: document.getElementById("mav_broadcast_div"),
 	};
+
+	if (esp32Mode === "1" || esp32Mode === "3") {
+		elements.mav_broadcast_div.style.display = "block";
+	} else {
+		elements.mav_broadcast_div.style.display = "none";
+	}
 
 	if (esp32Mode === "2") {
 		elements.ap_ip_div.style.display = "none";
@@ -69,6 +87,7 @@ function change_ap_ip_visibility() {
 	} else {
 		elements.wifi_ssid_div.style.visibility = "visible";
 	}
+	change_mav_blacklist_visibility();
 	change_radio_dis_arm_visibility();
 }
 

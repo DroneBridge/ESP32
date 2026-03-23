@@ -44,6 +44,7 @@
 #include "main.h"
 #include "db_serial.h"
 #include "db_esp_now.h"
+#include "db_mavlink_msgs.h"
 
 #define TAG "DB_CONTROL"
 
@@ -168,8 +169,68 @@ int db_open_int_telemetry_udp_socket() {
  * @param data Buffer with the data to send
  * @param data_length Length of the data in the buffer
  */
+/**
+ * Checks if a MAVLink system ID is in the blacklist
+ * @param system_id The system ID to check
+ * @return true if blacklisted, false otherwise
+ */
+bool is_system_id_blacklisted(uint8_t system_id) {
+    char *blacklist = DB_PARAM_MAV_BLACKLIST;
+    if (blacklist == NULL || blacklist[0] == '\0') return false;
+
+    char temp_blacklist[DB_PARAM_VALUE_MAXLEN];
+    strncpy(temp_blacklist, blacklist, sizeof(temp_blacklist));
+    temp_blacklist[sizeof(temp_blacklist)-1] = '\0';
+
+    char *token = strtok(temp_blacklist, ",");
+    while (token != NULL) {
+        if (atoi(token) == (int)system_id) return true;
+        token = strtok(NULL, ",");
+    }
+    return false;
+}
+
+/**
+ * Sends the data to all registered UDP clients.
+ * @param n_udp_conn_list The list of UDP clients
+ * @param data The data to be sent
+ * @param data_length Length of the data in the buffer
+ */
 void db_send_to_all_udp_clients(const uint8_t *data, uint data_length) {
+    // Simple MAVLink Sniffer to identify Heartbeats
+    bool is_heartbeat = false;
+    if (data_length >= 8) {
+        if (data[0] == 0xFE) { // MAVLink v1
+            if (data[5] == 0) is_heartbeat = true;
+        } else if (data[0] == 0xFD && data_length >= 10) { // MAVLink v2
+            if (data[7] == 0 && data[8] == 0 && data[9] == 0) is_heartbeat = true;
+        }
+    }
+
     for (int i = 0; i < udp_conn_list->size; i++) {  // send to all UDP clients
+        // If Hub mode is OFF and we are in AP mode:
+        // 1. Always allow Heartbeats
+        // 2. Always allow clients with no MAC (manually saved static IPs, e.g. a GCS configured via the UI)
+        //    since they were never registered via the WiFi STA event and start with is_gcs=false after reboot.
+        // 3. Only allow other telemetry to reach clients identified as GCS at runtime (SysID 255).
+        if (!is_heartbeat && !DB_PARAM_MAV_BROADCAST && (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_AP || DB_PARAM_RADIO_MODE == DB_WIFI_MODE_AP_LR)) {
+            bool has_mac = false;
+            for (int m = 0; m < 6; m++) {
+                if (udp_conn_list->db_udp_clients[i].mac[m] != 0) {
+                    has_mac = true;
+                    break;
+                }
+            }
+            if (has_mac && !udp_conn_list->db_udp_clients[i].is_gcs) {
+                continue; // Skip: WiFi STA that has not identified itself as a GCS
+            }
+        }
+
+        // Apply Blacklist: Skip if system ID is blacklisted and it's not a Heartbeat
+        if (!is_heartbeat && is_system_id_blacklisted(udp_conn_list->db_udp_clients[i].system_id)) {
+            continue;
+        }
+
         int sent = sendto(udp_conn_list->udp_socket, data, data_length, 0,
                           (struct sockaddr *) &udp_conn_list->db_udp_clients[i].udp_client,
                           sizeof(udp_conn_list->db_udp_clients[i].udp_client));
@@ -384,6 +445,12 @@ add_to_known_udp_clients(udp_conn_list_t *n_udp_conn_list, struct db_udp_client_
         if ((n_udp_conn_list->db_udp_clients[i].udp_client.sin_port == new_db_udp_client.udp_client.sin_port) &&
             (n_udp_conn_list->db_udp_clients[i].udp_client.sin_addr.s_addr ==
              new_db_udp_client.udp_client.sin_addr.s_addr)) {
+            // Update GCS status if the new packet identifies it as GCS
+            if (new_db_udp_client.is_gcs && !n_udp_conn_list->db_udp_clients[i].is_gcs) {
+                n_udp_conn_list->db_udp_clients[i].is_gcs = true;
+                ESP_LOGI(TAG, "Identified existing UDP client as GCS");
+            }
+            n_udp_conn_list->db_udp_clients[i].system_id = new_db_udp_client.system_id;
             return false; // client existing - do not add
         }
     }
@@ -394,7 +461,7 @@ add_to_known_udp_clients(udp_conn_list_t *n_udp_conn_list, struct db_udp_client_
     char ip_string[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &(new_db_udp_client.udp_client.sin_addr), ip_string, INET_ADDRSTRLEN);
     sprintf(ip_port_string, "%s:%d", ip_string, htons (new_db_udp_client.udp_client.sin_port));
-    ESP_LOGI(TAG, "Added %s to udp client distribution list - save to NVM: %i", ip_port_string, save_to_nvm);
+    ESP_LOGI(TAG, "Added %s to udp client distribution list (is_gcs: %i) - save to NVM: %i", ip_port_string, new_db_udp_client.is_gcs, save_to_nvm);
     // save to memory
     if (save_to_nvm) {
         save_udp_client_to_nvm(&new_db_udp_client, false);
@@ -502,7 +569,7 @@ _Noreturn void control_module_esp_now() {
             if (DB_PARAM_SERIAL_PROTO == DB_SERIAL_PROTOCOL_MAVLINK) {
                 // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
                 // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existing packet
-                db_parse_mavlink_from_radio(NULL, NULL, db_espnow_uart_evt.data, db_espnow_uart_evt.data_len);
+                db_parse_mavlink_from_radio(NULL, NULL, db_espnow_uart_evt.data, db_espnow_uart_evt.data_len, true);
             } else {
                 // no parsing with any other protocol - transparent here - just pass through
                 write_to_serial(db_espnow_uart_evt.data, db_espnow_uart_evt.data_len);
@@ -676,7 +743,7 @@ _Noreturn void control_module_udp_tcp() {
                     if (DB_PARAM_SERIAL_PROTO == DB_SERIAL_PROTOCOL_MAVLINK) {
                         // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
                         // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existign packet
-                        db_parse_mavlink_from_radio(connected_tcp_clients, udp_conn_list, tcp_client_buffer, recv_length);
+                        db_parse_mavlink_from_radio(connected_tcp_clients, udp_conn_list, tcp_client_buffer, recv_length, true);
                     } else {
                         // no parsing with any other protocol - transparent here
                         write_to_serial(tcp_client_buffer, recv_length);
@@ -701,23 +768,77 @@ _Noreturn void control_module_udp_tcp() {
                                        (struct sockaddr *) &new_db_udp_client.udp_client, &udp_socklen);
         if (recv_length > 0) {
             data_processed = true;
-            if (DB_PARAM_SERIAL_PROTO == DB_SERIAL_PROTOCOL_MAVLINK) {
-                // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
-                // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existing packet
-                db_parse_mavlink_from_radio(connected_tcp_clients, udp_conn_list, udp_buffer, recv_length);
-            } else {
-                // no parsing with any other protocol - transparent here
-                write_to_serial(udp_buffer, recv_length);
+
+            // Simple MAVLink Sniffer to identify GCS and Heartbeats
+            bool is_gcs_packet = false;
+            bool is_heartbeat = false;
+            uint8_t source_sys_id = 0;
+            if (recv_length >= 8) {
+                if (udp_buffer[0] == 0xFE) { // MAVLink v1
+                    source_sys_id = udp_buffer[3];
+                    if (source_sys_id == 255) is_gcs_packet = true;
+                    if (udp_buffer[5] == 0) is_heartbeat = true;
+                } else if (udp_buffer[0] == 0xFD && recv_length >= 10) { // MAVLink v2
+                    source_sys_id = udp_buffer[5];
+                    if (source_sys_id == 255) is_gcs_packet = true;
+                    if (udp_buffer[7] == 0 && udp_buffer[8] == 0 && udp_buffer[9] == 0) is_heartbeat = true;
+                }
             }
+            new_db_udp_client.system_id = source_sys_id;
+            new_db_udp_client.is_gcs = is_gcs_packet;
+
             // all devices that send us UDP data will be added to the list of UDP receivers
             // Allows to register new app on different port. Used e.g. for UDP conn setup in sta-mode.
-            // Devices/Ports added this way cannot be removed in sta-mode since UDP is connectionless, and we cannot
-            // determine if the client is still existing. This will blow up the list connected devices.
-            // In AP-Mode the devices can be removed based on the IP/MAC address
+            // Register client before forwarding so that target checks (is_gcs) work for responses
             add_to_known_udp_clients(udp_conn_list, new_db_udp_client, false);
+
+            if (DB_PARAM_SERIAL_PROTO == DB_SERIAL_PROTOCOL_MAVLINK) {
+                // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link if allowed.
+                // Packets from other drones are parsed (for ESP32 params) but not pushed to local FC UART if Hub is disabled.
+                // Apply blacklist to serial: if the local FC's SysID is blacklisted, only heartbeats reach it.
+                // GCS packets (SysID 255) always bypass the blacklist so commands always reach the FC.
+                bool should_forward_to_serial = (is_gcs_packet || DB_PARAM_MAV_BROADCAST || is_heartbeat)
+                                                && (is_heartbeat || is_gcs_packet || !is_system_id_blacklisted(db_get_mav_sys_id()));
+                db_parse_mavlink_from_radio(connected_tcp_clients, udp_conn_list, udp_buffer, recv_length, should_forward_to_serial);
+
+                // Forward radio data to all other network clients (MAVLink Router/Hub functionality)
+                // This ensures STAs can see each other and the GCS can see all STAs
+                // Uses Split-Horizon: Do not send back to source.
+                // Only applies to MAVLink mode since hub logic relies on MAVLink header sniffing.
+                if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_AP || DB_PARAM_RADIO_MODE == DB_WIFI_MODE_AP_LR) {
+                    for (int i = 0; i < udp_conn_list->size; i++) {
+                        // Skip the source client
+                        if (udp_conn_list->db_udp_clients[i].udp_client.sin_addr.s_addr == new_db_udp_client.udp_client.sin_addr.s_addr &&
+                            udp_conn_list->db_udp_clients[i].udp_client.sin_port == new_db_udp_client.udp_client.sin_port) {
+                            continue;
+                        }
+
+                        // Forwarding Logic:
+                        // 1. Always forward Heartbeats (Msg ID 0) to everyone to keep links alive.
+                        // 2. Always forward everything from a GCS (SysID 255).
+                        // 3. If Hub mode is ON: Forward everything (unless blacklisted).
+                        // 4. If Hub mode is OFF: Only forward to identified GCS clients.
+                        if (is_heartbeat || is_gcs_packet || DB_PARAM_MAV_BROADCAST || udp_conn_list->db_udp_clients[i].is_gcs) {
+                            // Apply blacklist: skip blacklisted targets (heartbeats and GCS packets always pass through)
+                            if (!is_heartbeat && !is_gcs_packet && is_system_id_blacklisted(udp_conn_list->db_udp_clients[i].system_id)) {
+                                continue;
+                            }
+                            sendto(udp_conn_list->udp_socket, udp_buffer, recv_length, 0,
+                                   (struct sockaddr *)&udp_conn_list->db_udp_clients[i].udp_client,
+                                   sizeof(struct sockaddr_in));
+                        }
+                    }
+                }
+            } else {
+                // no parsing with any other protocol - only forward if it's from GCS or Hub is enabled
+                if (is_gcs_packet || DB_PARAM_MAV_BROADCAST || is_heartbeat) {
+                    write_to_serial(udp_buffer, recv_length);
+                }
+            }
         } else {
             // received nothing, keep on going
         }
+
         if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_STA) {
             handle_internal_telemetry(db_internal_telem_udp_sock, udp_buffer, &udp_socklen,
                                       &new_db_udp_client.udp_client);
@@ -810,7 +931,7 @@ _Noreturn void control_module_ble() {
                 // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
                 // We cannot write to serial first since we might inject packets and do not know when to do so to not "destroy" an
                 // existing packet
-                db_parse_mavlink_from_radio(NULL, NULL, bleData.data, bleData.data_len);
+                db_parse_mavlink_from_radio(NULL, NULL, bleData.data, bleData.data_len, true);
             } else {
                 // no parsing with any other protocol - transparent here - just pass through
                 write_to_serial(bleData.data, bleData.data_len);
