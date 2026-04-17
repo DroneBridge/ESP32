@@ -1,0 +1,27 @@
+key,type,encoding,value
+settings,namespace,,
+ssid,data,string,DroneBridge for ESP32
+wifi_pass,data,string,dronebridge
+ap_ip,data,string,192.168.2.1
+ip_sta,data,string,
+ip_sta_gw,data,string,
+ip_sta_netmsk,data,string,
+udp_client_ip,data,string,
+wifi_hostname,data,string,DroneBridgeESP32
+esp32_mode,data,u8,1
+wifi_chan,data,u8,6
+wifi_en_gn,data,u8,1
+ant_use_ext,data,u8,0
+baud,data,i32,57600
+gpio_tx,data,u8,0
+gpio_rx,data,u8,0
+gpio_rts,data,u8,0
+gpio_cts,data,u8,0
+rts_thresh,data,u8,127
+proto,data,u8,4
+trans_pack_size,data,u16,576
+serial_timeout,data,u16,20
+ltm_per_packet,data,u8,2
+radio_dis_onarm,data,u8,0
+udp_client_port,data,u16,0
+rep_rssi_dbm,data,u8,1

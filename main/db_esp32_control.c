@@ -48,6 +48,8 @@
 
 uint16_t app_port_proxy = APP_PORT_PROXY;
 
+udp_conn_list_t *udp_conn_list;
+int connected_tcp_clients[CONFIG_LWIP_MAX_ACTIVE_TCP];
 int8_t num_connected_tcp_clients = 0;
 
 /**
@@ -82,43 +84,6 @@ int db_open_serial_udp_socket() {
     ESP_LOGI(TAG, "Opened UDP socket on port %i", APP_PORT_PROXY_UDP);
     return udp_socket;
 }
-
-#ifdef CONFIG_DB_SKYBRUSH_SUPPORT
-
-/**
- * Opens non-blocking UDP socket used for WiFi to UART communication using WiFi UDP broadcast packets e.g. by Skybrush.
- * @return returns socket file descriptor
- */
-int db_open_serial_udp_broadcast_socket() {
-    struct sockaddr_in server_addr;
-    server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(UDP_BROADCAST_PORT_SKYBRUSH);
-    int addr_family = AF_INET;
-    int ip_protocol = IPPROTO_IP;
-    char addr_str[128];
-    inet_ntoa_r(server_addr.sin_addr, addr_str, sizeof(addr_str) - 1);
-
-    int udp_socket = socket(addr_family, SOCK_DGRAM, ip_protocol);
-    if (udp_socket < 0) {
-        ESP_LOGE(TAG, "Unable to create socket for Skybrush communication: errno %d", errno);
-        return -1;
-    }
-    int broadcastEnable = 1;
-    int err = setsockopt(udp_socket, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
-    if (err < 0) {
-        ESP_LOGE(TAG, "Socket unable to set Skybrush udp socket to accept broadcast messages: errno %d", errno);
-    }
-    err = bind(udp_socket, (struct sockaddr *) &server_addr, sizeof(server_addr));
-    if (err < 0) {
-        ESP_LOGE(TAG, "Socket unable to bind Skybrush socket to %i errno %d", UDP_BROADCAST_PORT_SKYBRUSH, errno);
-    }
-    fcntl(udp_socket, F_SETFL, O_NONBLOCK);
-    ESP_LOGI(TAG, "Opened UDP broadcast enabled socket on port %i", UDP_BROADCAST_PORT_SKYBRUSH);
-    return udp_socket;
-}
-
-#endif
 
 /**
  * Opens non-blocking UDP socket used for internal DroneBridge telemetry. Socket shall only be opened when local ESP32
@@ -194,18 +159,23 @@ int db_open_int_telemetry_udp_socket() {
 
 /**
  * Sends data to all clients that are part of the udp connection list. No resending of packets in case of failure.
- * @param n_udp_conn_list List of known UDP clients/connections
+ * Special behavior in DroneShow Edition:
+ *  - If there is no UDP client detected or manually set, we send packets to broadcast address and pre-defined port so
+ *    that the GCS can detect the ESP32.
+ *  - This is a feature that can be enabled/disabled by the user together with the target port
+ *
  * @param data Buffer with the data to send
  * @param data_length Length of the data in the buffer
  */
-void db_send_to_all_udp_clients(udp_conn_list_t *n_udp_conn_list, const uint8_t *data, uint data_length) {
-    for (int i = 0; i < n_udp_conn_list->size; i++) {  // send to all UDP clients
-        int sent = sendto(n_udp_conn_list->udp_socket, data, data_length, 0,
-                          (struct sockaddr *) &n_udp_conn_list->db_udp_clients[i].udp_client,
-                          sizeof(n_udp_conn_list->db_udp_clients[i].udp_client));
+void db_send_to_all_udp_clients(const uint8_t *data, uint data_length) {
+    for (int i = 0; i < udp_conn_list->size; i++) {  // send to all UDP clients
+        int sent = sendto(udp_conn_list->udp_socket, data, data_length, 0,
+                          (struct sockaddr *) &udp_conn_list->db_udp_clients[i].udp_client,
+                          sizeof(udp_conn_list->db_udp_clients[i].udp_client));
         if (sent != data_length) {
             int err = errno;
-            ESP_LOGE(TAG, "UDP - Error sending (%i/%i) to because of %d", sent, data_length, err);
+            char *client_ip = inet_ntoa(((struct sockaddr_in *)&udp_conn_list->db_udp_clients[i].udp_client)->sin_addr);
+            ESP_LOGE(TAG, "UDP - Error sending (%i/%i) to %s because of %s", sent, data_length, client_ip, strerror(err));
         }
     }
 }
@@ -282,7 +252,58 @@ void db_send_to_all_clients(int tcp_clients[], udp_conn_list_t *n_udp_conn_list,
         default:
             // Other modes (WiFi Modes using TCP/UDP)
             db_send_to_all_tcp_clients(tcp_clients, data, data_length);
-            db_send_to_all_udp_clients(n_udp_conn_list, data, data_length);
+            db_send_to_all_udp_clients(data, data_length);
+            break;
+    }
+}
+
+/**
+ * New function to replace the legacy db_send_to_all_clients(). No need to pass tcp & udp clients
+ * Sends the message to all connected clients using the radio (WiFi, ESP-NOW or BLE) link.
+ * @param data
+ * @param data_length
+ */
+void db_send_to_all_radio_clients(uint8_t data[], uint16_t data_length) {
+#ifdef CONFIG_BT_ENABLED
+    db_ble_queue_event_t bleData;
+#endif
+    switch (DB_PARAM_RADIO_MODE) {
+        case DB_WIFI_MODE_ESPNOW_AIR:
+        case DB_WIFI_MODE_ESPNOW_GND:
+            // ESP-NOW mode
+            if (data_length > DB_ESPNOW_PAYLOAD_MAXSIZE) {
+                // Data not properly sized, split into multiple packets
+                uint16_t sent_bytes = 0;
+                uint16_t next_chunk_len = 0;
+                do {
+                    next_chunk_len = data_length - sent_bytes;
+                    if (next_chunk_len > DB_ESPNOW_PAYLOAD_MAXSIZE) {
+                        next_chunk_len = DB_ESPNOW_PAYLOAD_MAXSIZE;
+                    }
+                    db_send_to_all_espnow(&data[sent_bytes], &next_chunk_len);
+                    sent_bytes += next_chunk_len;
+                } while (sent_bytes < data_length);
+            } else {
+                // Packet is properly sized - send to ESP-NOW outbound queue
+                db_send_to_all_espnow(data, &data_length);
+            }
+            break;
+        case DB_BLUETOOTH_MODE:
+#ifdef CONFIG_BT_ENABLED
+            bleData.data = malloc(data_length);
+            bleData.data_len = data_length;
+            memcpy(bleData.data, data, bleData.data_len);
+            if (xQueueSend(db_uart_read_queue_ble, &bleData, portMAX_DELAY) != pdPASS) {
+                ESP_LOGE(TAG, "Failed to send BLE data to queue");
+                free(bleData.data);
+            }
+#endif
+            break;
+
+        default:
+            // Other modes (WiFi Modes using TCP/UDP)
+            db_send_to_all_tcp_clients(connected_tcp_clients, data, data_length);
+            db_send_to_all_udp_clients(data, data_length);
             break;
     }
 }
@@ -476,7 +497,7 @@ _Noreturn void control_module_esp_now() {
         read_process_serial_link(NULL, &transparent_buff_pos, &msp_ltm_buff_pos, msp_message_buffer, serial_buffer,
                                  &db_msp_ltm_port);
         // read queue that was filled by esp-now task to check for data that needs to be sent via serial link
-        if (db_uart_write_queue != NULL && xQueueReceive(db_uart_write_queue, &db_espnow_uart_evt, 0) == pdTRUE) {
+        if (db_uart_write_queue != NULL && xQueueReceive(db_uart_write_queue, &db_espnow_uart_evt, 1) == pdTRUE) {
             if (DB_PARAM_SERIAL_PROTO == DB_SERIAL_PROTOCOL_MAVLINK) {
                 // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
                 // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existing packet
@@ -611,20 +632,11 @@ _Noreturn void control_module_udp_tcp() {
         vTaskDelete(NULL);
     }
     fcntl(tcp_master_socket, F_SETFL, O_NONBLOCK);
-    int tcp_clients[CONFIG_LWIP_MAX_ACTIVE_TCP];
     for (int i = 0; i < CONFIG_LWIP_MAX_ACTIVE_TCP; i++) {
-        tcp_clients[i] = -1;
+        connected_tcp_clients[i] = -1;
     }
 
     udp_conn_list->udp_socket = db_open_serial_udp_socket();
-#ifdef CONFIG_DB_SKYBRUSH_SUPPORT
-    int udp_broadcast_skybrush_socket = -1;
-    if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_STA) {
-        udp_broadcast_skybrush_socket = db_open_serial_udp_broadcast_socket();
-    } else {
-        // we do only support Skybrush Wi-Fi and the broadcast port when in Wi-Fi client mode
-    }
-#endif
     int db_internal_telem_udp_sock = -1;
     if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_AP_LR || DB_PARAM_RADIO_MODE == DB_WIFI_MODE_STA) {
         db_internal_telem_udp_sock = db_open_int_telemetry_udp_socket();
@@ -649,38 +661,42 @@ _Noreturn void control_module_udp_tcp() {
     while (1) {
         // Read incoming wireless data (Wi-Fi)
         // Wi-Fi based modes that use TCP and UDP communication
-        
         bool data_processed = false;
         uint32_t prev_serial_count = serial_total_byte_count;
         int8_t prev_tcp_clients = num_connected_tcp_clients;
 
-        handle_tcp_master(tcp_master_socket, tcp_clients);
+        handle_tcp_master(tcp_master_socket, connected_tcp_clients);
         if (num_connected_tcp_clients != prev_tcp_clients) data_processed = true;
         for (int i = 0; i < CONFIG_LWIP_MAX_ACTIVE_TCP; i++) {  // handle TCP clients
-            if (tcp_clients[i] > 0) {
-                ssize_t recv_length = recv(tcp_clients[i], tcp_client_buffer, TCP_BUFF_SIZ, 0);
+            if (connected_tcp_clients[i] > 0) {
+                ssize_t recv_length = recv(connected_tcp_clients[i], tcp_client_buffer, TCP_BUFF_SIZ, 0);
                 if (recv_length > 0) {
                     data_processed = true;
                     if (DB_PARAM_SERIAL_PROTO == DB_SERIAL_PROTOCOL_MAVLINK) {
                         // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
+<<<<<<< jj/fix/networking-api-and-cleanup
                         // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existing packet
                         db_parse_mavlink_from_radio(tcp_clients, udp_conn_list, tcp_client_buffer, recv_length);
+=======
+                        // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existign packet
+                        db_parse_mavlink_from_radio(connected_tcp_clients, udp_conn_list, tcp_client_buffer, recv_length);
+>>>>>>> master
                     } else {
                         // no parsing with any other protocol - transparent here
                         write_to_serial(tcp_client_buffer, recv_length);
                     }
                 } else if (recv_length == 0) {
-                    shutdown(tcp_clients[i], 0);
-                    close(tcp_clients[i]);
-                    tcp_clients[i] = -1;
+                    shutdown(connected_tcp_clients[i], 0);
+                    close(connected_tcp_clients[i]);
+                    connected_tcp_clients[i] = -1;
                     ESP_LOGI(TAG, "TCP client disconnected");
                     num_connected_tcp_clients--;
                 } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                    ESP_LOGE(TAG, "Error receiving from TCP client %i (fd: %i): %d", i, tcp_clients[i], errno);
-                    shutdown(tcp_clients[i], 0);
-                    close(tcp_clients[i]);
+                    ESP_LOGE(TAG, "Error receiving from TCP client %i (fd: %i): %d", i, connected_tcp_clients[i], errno);
+                    shutdown(connected_tcp_clients[i], 0);
+                    close(connected_tcp_clients[i]);
                     num_connected_tcp_clients--;
-                    tcp_clients[i] = -1;
+                    connected_tcp_clients[i] = -1;
                 }
             }
         }
@@ -692,7 +708,7 @@ _Noreturn void control_module_udp_tcp() {
             if (DB_PARAM_SERIAL_PROTO == DB_SERIAL_PROTOCOL_MAVLINK) {
                 // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
                 // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existing packet
-                db_parse_mavlink_from_radio(tcp_clients, udp_conn_list, udp_buffer, recv_length);
+                db_parse_mavlink_from_radio(connected_tcp_clients, udp_conn_list, udp_buffer, recv_length);
             } else {
                 // no parsing with any other protocol - transparent here
                 write_to_serial(udp_buffer, recv_length);
@@ -706,22 +722,6 @@ _Noreturn void control_module_udp_tcp() {
         } else {
             // received nothing, keep on going
         }
-#ifdef CONFIG_DB_SKYBRUSH_SUPPORT
-        if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_STA && udp_broadcast_skybrush_socket != -1) {
-            // This is special support for Skybrush. Skybrush sends some UDP broadcast msgs to 14555 in addition to regular msgs to 14550
-            // We only read and directly forward here. No parsing and no adding to known UDP clients
-            recv_length = recvfrom(udp_broadcast_skybrush_socket, udp_buffer, UDP_BUF_SIZE, 0,
-                                   (struct sockaddr *) &new_db_udp_client.udp_client, &udp_socklen);
-            if (recv_length > 0) {
-                data_processed = true;
-                // no parsing - transparent here
-                write_to_serial(udp_buffer, recv_length);
-                // add Skybrush server to known UDP target/distribution list
-                add_to_known_udp_clients(udp_conn_list, new_db_udp_client, false);
-            }
-        }
-#endif
-
         if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_STA) {
             handle_internal_telemetry(db_internal_telem_udp_sock, udp_buffer, &udp_socklen,
                                       &new_db_udp_client.udp_client);
@@ -730,9 +730,10 @@ _Noreturn void control_module_udp_tcp() {
         }
 
         // Second check for incoming UART data and send it to TCP/UDP
-        read_process_serial_link(tcp_clients, &transparent_buff_pos, &msp_ltm_buff_pos, msp_message_buffer,
+        read_process_serial_link(connected_tcp_clients, &transparent_buff_pos, &msp_ltm_buff_pos, msp_message_buffer,
                                  serial_buffer,
                                  &db_msp_ltm_port);
+        if (serial_total_byte_count != prev_serial_count) data_processed = true;
 
         if (serial_total_byte_count != prev_serial_count) data_processed = true;
 
@@ -763,7 +764,7 @@ _Noreturn void control_module_udp_tcp() {
         }
 
         if (!data_processed) {
-            vTaskDelay(1);
+            vTaskDelay(pdMS_TO_TICKS(1));   // Add a delay of 1 ms since we did not read anything in the last cycle
         }
     }
     vTaskDelete(NULL);
@@ -808,7 +809,7 @@ _Noreturn void control_module_ble() {
                                  &db_msp_ltm_port       // msp port
         );
 
-        if (db_uart_write_queue_ble != NULL && xQueueReceive(db_uart_write_queue_ble, &bleData, 0) == pdTRUE) {
+        if (db_uart_write_queue_ble != NULL && xQueueReceive(db_uart_write_queue_ble, &bleData, 1) == pdTRUE) {
             if (DB_PARAM_SERIAL_PROTO == DB_SERIAL_PROTOCOL_MAVLINK) {
                 // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
                 // We cannot write to serial first since we might inject packets and do not know when to do so to not "destroy" an

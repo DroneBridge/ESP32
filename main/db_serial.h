@@ -22,6 +22,7 @@
 
 #include "msp_ltm_serial.h"
 #include "db_esp32_control.h"
+#include "lib/fastmavlink_types.h"
 
 #define UART_NUM UART_NUM_1             // The UART interface of the ESP32 we use
 #define DB_SERIAL_READ_TIMEOUT_MS_DEFAULT  50      // Serial read timeout for transparent and MAVLink mode, after that the packet will be sent over the air even when the max. packet size was not reached.
@@ -40,6 +41,9 @@ typedef union {
     uint32_t uint32;
     int32_t int32;
 } float_int_union;
+
+extern fmav_status_t fmav_status_serial;    // fmav parser status struct for parser handling serial interface
+extern fmav_status_t fmav_status_radio; // fmav parser status struct for parser handling the radio/ESPNOW/WiFi/BLE interface
 
 int open_serial_socket();
 void write_to_serial(const uint8_t data_buffer[], unsigned int data_length);

@@ -7,10 +7,10 @@ import logging
 import serial_asyncio
 
 # --- Configuration ---
-UART_PORT = "/dev/ttyACM0"  # Change to your serial port
-BAUD_RATE = 115200
+UART_PORT = "/COM22"  # Change to your serial port
+BAUD_RATE = 921600
 TCP_HOST = "127.0.0.1"
-TCP_PORT = 5761  # SITL's UART1 port
+TCP_PORT = 5760  # SITL's UART1 port
 
 logging.basicConfig(level=logging.DEBUG)  # Change logging level to DEBUG for detailed output
 logger = logging.getLogger(__name__)
