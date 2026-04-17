@@ -45,6 +45,7 @@
 #include "mdns.h"
 #include "db_esp_now.h"
 #include "db_serial.h"
+#include "db_led_indicator.h"
 #include "globals.h"
 
 #include <db_timers.h>
@@ -711,6 +712,7 @@ void app_main() {
     DB_RADIO_MODE_DESIGNATED = DB_PARAM_RADIO_MODE; // must always match, mismatch only allowed when changed by user action and not rebooted, yet.
     set_reset_trigger();
     db_configure_antenna();
+    db_status_led_init();
 
     switch (DB_PARAM_RADIO_MODE) {
         case DB_WIFI_MODE_AP:
@@ -754,6 +756,7 @@ void app_main() {
 
     db_timer_start_mavlink_heartbeat();
     db_timer_start_mavlink_radio_status();
+    db_timer_start_status_led();
 
     if (DB_PARAM_RADIO_MODE != DB_WIFI_MODE_ESPNOW_AIR && DB_PARAM_RADIO_MODE != DB_WIFI_MODE_ESPNOW_GND &&
         DB_PARAM_RADIO_MODE != DB_WIFI_MODE_AP_LR) {

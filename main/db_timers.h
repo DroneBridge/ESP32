@@ -23,11 +23,16 @@
 #define DB_TIMER_RSSI_PERIOD_MS 1000
 #define DB_TIMER_MAVLINK_HEARTBEAT_MS 1000 // Heartbeat every second
 #define DB_TIMER_MAVLINK_RADIOSTATUS_MS 1000 // Radio Status every second
+// Periodic LED state evaluation interval (db_status_led_process()).
+#define DB_TIMER_STATUS_LED_MS 1000
 
 void db_timer_start_wifi_rssi_timer();
 
 void db_timer_start_mavlink_heartbeat();
 
 void db_timer_start_mavlink_radio_status();
+
+// Starts periodic processing for the C6 status LED logic.
+void db_timer_start_status_led();
 
 #endif // DB_ESP32_DB_TIMERS_H

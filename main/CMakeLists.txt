@@ -9,6 +9,7 @@ set(SRCS
         db_serial.c
         db_mavlink_msgs.c
         db_parameters.c
+        db_led_indicator.c
         db_timers.c
 )
 

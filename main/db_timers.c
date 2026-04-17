@@ -23,6 +23,7 @@
 #include "esp_log.h"
 #include "globals.h"
 #include <esp_wifi.h>
+#include "db_led_indicator.h"
 
 #define TAG "DB_TIMERS"
 
@@ -172,5 +173,35 @@ void db_timer_start_mavlink_radio_status() {
     if (xRadioStatusTimerHandle != NULL) {
         ESP_LOGI(TAG, "Starting to send radio status packets.");
         xTimerStart(xRadioStatusTimerHandle, 0);
+    }
+}
+
+/**
+ * Timer callback that periodically updates the status LED state.
+ * Uses db_status_led_process() for all mode-specific logic and timeout handling.
+ */
+void db_timer_status_led_callback(TimerHandle_t pxTimer) {
+    db_status_led_process();
+}
+
+/**
+ * Starts the periodic status LED processing timer.
+ */
+void db_timer_start_status_led() {
+    static TimerHandle_t xStatusLedTimerHandle;
+    xStatusLedTimerHandle = xTimerCreate(
+            "Status_LED_Timer",
+            pdMS_TO_TICKS(DB_TIMER_STATUS_LED_MS),
+            pdTRUE,
+            (void *) 0,
+            db_timer_status_led_callback
+    );
+
+    if (xStatusLedTimerHandle == NULL) {
+        ESP_LOGE(TAG, "Failed to create status LED timer.");
+    }
+    if (xStatusLedTimerHandle != NULL) {
+        ESP_LOGI(TAG, "Starting status LED timer.");
+        xTimerStart(xStatusLedTimerHandle, 0);
     }
 }

@@ -32,6 +32,7 @@
 #include <driver/usb_serial_jtag.h>
 #include "db_serial.h"
 #include "main.h"
+#include "db_led_indicator.h"
 #include "db_esp32_control.h"
 #include "db_protocol.h"
 #include "msp_ltm_serial.h"
@@ -272,6 +273,7 @@ void db_parse_mavlink_from_radio(int *tcp_clients, udp_conn_list_t *udp_conns, u
             // Decode message and react to it if it was for us
             fmav_frame_buf_to_msg(&msg, &result, mav_parser_rx_buf);
             if (result.res == FASTMAVLINK_PARSE_RESULT_OK) {
+                db_status_led_mark_radio_rx();
                 if (fmav_msg_is_for_me(db_get_mav_sys_id(), db_get_mav_comp_id(), &msg)) {
                     handle_mavlink_message(&msg, tcp_clients, udp_conns, &fmav_status_radio, DB_MAVLINK_DATA_ORIGIN_RADIO);
                 } else {
@@ -386,6 +388,7 @@ void db_read_serial_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, 
             // Decode message and react to it if it was for us
             fmav_frame_buf_to_msg(&msg, &result, mav_parser_rx_buf);
             if (result.res == FASTMAVLINK_PARSE_RESULT_OK) {
+                db_status_led_mark_serial_mavlink_rx();
                 serial_total_decoded_mav_msgs++;
                 if (fmav_msg_is_for_me(db_get_mav_sys_id(), db_get_mav_comp_id(), &msg)) {
                     // This will also instantly send a response. That is OK at this position since we buffer and send
