@@ -33,6 +33,7 @@
 struct db_udp_client_t {
     uint8_t mac[6];     // MAC address of connected client
     struct sockaddr_in udp_client;    // socket address (IP & PORT) of connected client
+    uint8_t send_fail_count; // consecutive send failures; client removed when exceeds threshold
 };
 
 typedef struct udp_conn_list_s {
