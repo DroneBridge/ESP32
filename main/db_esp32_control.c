@@ -687,13 +687,8 @@ _Noreturn void control_module_udp_tcp() {
                     data_processed = true;
                     if (DB_PARAM_SERIAL_PROTO == DB_SERIAL_PROTOCOL_MAVLINK) {
                         // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
-<<<<<<< jj/fix/networking-api-and-cleanup
-                        // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existing packet
-                        db_parse_mavlink_from_radio(tcp_clients, udp_conn_list, tcp_client_buffer, recv_length);
-=======
                         // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existign packet
                         db_parse_mavlink_from_radio(connected_tcp_clients, udp_conn_list, tcp_client_buffer, recv_length);
->>>>>>> master
                     } else {
                         // no parsing with any other protocol - transparent here
                         write_to_serial(tcp_client_buffer, recv_length);
