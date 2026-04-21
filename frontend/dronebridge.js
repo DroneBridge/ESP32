@@ -295,6 +295,13 @@ function get_stats() {
 		} else if (!isNaN(tcp_clients)) {
 			document.getElementById("tcp_connected").innerHTML = tcp_clients + " clients"
 		}
+
+		if (json_data["fc_connected"]) {
+			document.getElementById("fc_sys_id_div").innerHTML = "MAVLink System ID: " + json_data["fc_sys_id"];
+		} else {
+			document.getElementById("fc_sys_id_div").innerHTML = "No Flight Controller connected.";
+		}
+
 		// UDP clients for tooltip
 		let udp_clients_string = ""
 		if (json_data.hasOwnProperty("udp_clients")) {
