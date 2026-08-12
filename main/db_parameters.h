@@ -40,6 +40,7 @@
 #define DB_PARAM_NAME_MAXLEN        16      // max len of a parameter/key stored in the ESP32 NVM
 #define DB_PARAM_MAX_MAV_PARAM_NAME_LEN 16  // max len of the field used to store the mav param name (max len 16 by def.)
 #define DB_PARAM_VALUE_MAXLEN       64      // max len of a value stored for a key in the ESP32 NVM (string len)
+#define DB_SERIAL_PACK_SIZE_MAX     1023U   // maximum configured serial packet size; keep below UART_BUF_SIZE
 #define MAX_LTM_FRAMES_IN_BUFFER    5
 
 
@@ -112,7 +113,7 @@ typedef struct db_parameter_str_s {
     uint8_t *value;
     uint8_t *default_value;
     uint8_t min_len;    // valid if >= min_len
-    uint8_t max_len;    // valid if <= max_len
+    uint8_t max_len;    // allocated capacity including NUL; valid string length is < max_len
 } db_param_str_t;
 
 typedef struct db_parameter_u8_s {

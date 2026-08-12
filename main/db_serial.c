@@ -321,14 +321,27 @@ void db_parse_mavlink_from_radio(int *tcp_clients, udp_conn_list_t *udp_conns, u
 void db_read_serial_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *serial_buffer,
                                   unsigned int *serial_buff_pos) {
     static uint8_t mav_parser_rx_buf[296];  // at least 280 bytes which is the max len for a MAVLink v2 packet
-    uint8_t uart_read_buf[DB_PARAM_SERIAL_PACK_SIZE];
+    uint8_t uart_read_buf[DB_SERIAL_PACK_SIZE_MAX];
+    uint16_t packet_size = DB_PARAM_SERIAL_PACK_SIZE;
+    if (packet_size < 1U) {
+        packet_size = 1U;
+    } else if (packet_size > DB_SERIAL_PACK_SIZE_MAX) {
+        packet_size = DB_SERIAL_PACK_SIZE_MAX;
+    }
+
+    // Flush data accumulated with a larger previous packet size before using the new limit.
+    if (*serial_buff_pos >= packet_size) {
+        db_send_to_all_clients(tcp_clients, udp_conns, serial_buffer, *serial_buff_pos);
+        *serial_buff_pos = 0;
+    }
+
     // timeout variables
     static TickType_t last_tick = 0;    // time when we received something from the serial interface for the last time
     static TickType_t current_tick = 0;
     current_tick = xTaskGetTickCount(); // get current time
 
     // Read bytes from serial link (UART or USB/JTAG interface)
-    int bytes_read = db_read_serial(uart_read_buf, DB_PARAM_SERIAL_PACK_SIZE);
+    int bytes_read = db_read_serial(uart_read_buf, packet_size);
 
     if (bytes_read == 0) {
         // did not read anything this cycle -> check serial read timeout
@@ -359,20 +372,24 @@ void db_read_serial_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, 
             ESP_LOGD(TAG, "Parser detected a full message (%lu total): result.frame_len %i", serial_total_decoded_mav_msgs,
                      result.frame_len);
             // Check if the new message will fit in the buffer
-            if (*serial_buff_pos == 0 && result.frame_len > DB_PARAM_SERIAL_PACK_SIZE) {
+            if (result.frame_len > packet_size) {
+                if (*serial_buff_pos > 0) {
+                    db_send_to_all_clients(tcp_clients, udp_conns, serial_buffer, *serial_buff_pos);
+                    *serial_buff_pos = 0;
+                }
                 // frame_len is bigger than DB_PARAM_SERIAL_PACK_SIZE -> Split into multiple messages since
                 // e.g. ESP-NOW can only handle DB_ESPNOW_PAYLOAD_MAXSIZE bytes which is less than MAVLink max msg length
                 uint16_t sent_bytes = 0;
                 uint16_t next_chunk_len = 0;
                 do {
                     next_chunk_len = result.frame_len - sent_bytes;
-                    if (next_chunk_len > DB_PARAM_SERIAL_PACK_SIZE) {
-                        next_chunk_len = DB_PARAM_SERIAL_PACK_SIZE;
+                    if (next_chunk_len > packet_size) {
+                        next_chunk_len = packet_size;
                     } else {}
                     db_send_to_all_clients(tcp_clients, udp_conns, &mav_parser_rx_buf[sent_bytes], next_chunk_len);
                     sent_bytes += next_chunk_len;
                 } while (sent_bytes < result.frame_len);
-            } else if (*serial_buff_pos + result.frame_len > DB_PARAM_SERIAL_PACK_SIZE) {
+            } else if (*serial_buff_pos + result.frame_len > packet_size) {
                 // New message won't fit into the buffer, send buffer first
                 db_send_to_all_clients(tcp_clients, udp_conns, serial_buffer, *serial_buff_pos);
                 *serial_buff_pos = 0;
@@ -422,12 +439,26 @@ void db_read_serial_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, 
 void db_read_serial_parse_transparent(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_t serial_buffer[],
                                       unsigned int *serial_read_bytes) {
     uint16_t read;
+    uint16_t packet_size = DB_PARAM_SERIAL_PACK_SIZE;
+    if (packet_size < 1U) {
+        packet_size = 1U;
+    } else if (packet_size > DB_SERIAL_PACK_SIZE_MAX) {
+        packet_size = DB_SERIAL_PACK_SIZE_MAX;
+    }
+
     static bool serial_read_timeout_reached = false;
     static TickType_t last_tick = 0;    // time when we received something from the serial interface for the last time
     static TickType_t current_tick = 0;
     current_tick = xTaskGetTickCount(); // get current time
+
+    // A runtime decrease can leave bytes buffered past the new packet limit. Flush them before subtracting.
+    if (*serial_read_bytes >= packet_size) {
+        db_send_to_all_clients(tcp_clients, udp_connection, serial_buffer, *serial_read_bytes);
+        *serial_read_bytes = 0;
+    }
+
     // read from UART directly into TCP & UDP send buffer
-    if ((read = db_read_serial(&serial_buffer[*serial_read_bytes], (DB_PARAM_SERIAL_PACK_SIZE - *serial_read_bytes))) > 0) {
+    if ((read = db_read_serial(&serial_buffer[*serial_read_bytes], (packet_size - *serial_read_bytes))) > 0) {
         serial_total_byte_count += read;    // increase total bytes read via UART
         *serial_read_bytes += read; // set new buffer position
         serial_read_timeout_reached = false;    // reset serial read timeout
@@ -442,7 +473,7 @@ void db_read_serial_parse_transparent(int tcp_clients[], udp_conn_list_t *udp_co
         }
     }
     // send serial data over the air interface
-    if (*serial_read_bytes >= DB_PARAM_SERIAL_PACK_SIZE || (serial_read_timeout_reached && *serial_read_bytes > 0)) {
+    if (*serial_read_bytes >= packet_size || (serial_read_timeout_reached && *serial_read_bytes > 0)) {
         db_send_to_all_clients(tcp_clients, udp_connection, serial_buffer, *serial_read_bytes);
         *serial_read_bytes = 0; // reset buffer position
         serial_read_timeout_reached = false;    // reset serial read timeout

@@ -504,7 +504,7 @@ _Noreturn void control_module_esp_now() {
     uint transparent_buff_pos = 0;
     uint msp_ltm_buff_pos = 0;
     uint8_t msp_message_buffer[UART_BUF_SIZE];
-    uint8_t serial_buffer[DB_PARAM_SERIAL_PACK_SIZE];
+    uint8_t serial_buffer[DB_SERIAL_PACK_SIZE_MAX];
     msp_ltm_port_t db_msp_ltm_port;
     db_espnow_queue_event_t db_espnow_uart_evt;
     uint delay_timer_cnt = 0;
@@ -671,7 +671,7 @@ _Noreturn void control_module_udp_tcp() {
     uint8_t tcp_client_buffer[TCP_BUFF_SIZ];
     memset(tcp_client_buffer, 0, TCP_BUFF_SIZ);
     uint8_t msp_message_buffer[UART_BUF_SIZE];
-    uint8_t serial_buffer[DB_PARAM_SERIAL_PACK_SIZE];
+    uint8_t serial_buffer[DB_SERIAL_PACK_SIZE_MAX];
     msp_ltm_port_t db_msp_ltm_port;
     int delay_timer_cnt = 0;
 
@@ -804,7 +804,7 @@ _Noreturn void control_module_ble() {
 #endif
 
     uint8_t msp_message_buffer[UART_BUF_SIZE];
-    uint8_t serial_buffer[DB_PARAM_SERIAL_PACK_SIZE];
+    uint8_t serial_buffer[DB_SERIAL_PACK_SIZE_MAX];
     msp_ltm_port_t db_msp_ltm_port;
     db_ble_queue_event_t bleData;
     uint transparent_buff_pos = 0;

@@ -301,7 +301,7 @@ db_parameter_t db_param_serial_pack_size = {
                         .value = 576,
                         .default_value = 576,
                         .min = 16,
-                        .max = 1023,
+                        .max = DB_SERIAL_PACK_SIZE_MAX,
                 }
         }
 };
@@ -832,11 +832,15 @@ bool is_valid_ip4(const char *ipaddress) {
  */
 bool db_param_is_valid_str(char *new_string_value, db_parameter_t *target_param) {
     // ToDo: Add IPv4 check for strings via custom validation function in db_parameter_t
-    if (new_string_value != NULL &&
-        strlen(new_string_value) <= target_param->value.db_param_str.max_len &&
-        strlen(new_string_value) >= target_param->value.db_param_str.min_len) {
-        return true;
-    } else { return false; }
+    if (new_string_value != NULL) {
+        const size_t string_len = strlen(new_string_value);
+        if (target_param->value.db_param_str.max_len > 0 &&
+            string_len < target_param->value.db_param_str.max_len &&
+            string_len >= target_param->value.db_param_str.min_len) {
+            return true;
+        }
+    }
+    return false;
 };
 
 /**
@@ -883,7 +887,9 @@ bool db_param_is_valid_i32(const int32_t new_i32_value, db_parameter_t *target_p
  */
 bool db_param_is_valid_assign_str(char *new_string_value, db_parameter_t *target_param) {
     if (db_param_is_valid_str(new_string_value, target_param)) {
-        strncpy((char *) target_param->value.db_param_str.value, new_string_value, DB_PARAM_VALUE_MAXLEN);
+        strlcpy((char *) target_param->value.db_param_str.value,
+                new_string_value,
+                target_param->value.db_param_str.max_len);
         return true;
     } else {
         // new value is not valid - do not assign
