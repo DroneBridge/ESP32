@@ -311,11 +311,8 @@
     <div style="margin-bottom: 2rem" class="row">&copy; Wolfgang Christl 2018 - Apache 2.0 License</div>
 </div>
 <script>
-    // get settings once upon page load
-    while (get_system_info() < 0) {
-    }
-    while (get_settings() < 0) {
-    }
+    // Get system information and settings once upon page load.
+    refresh_static_data()
     // get stats every half a second
     setInterval(get_stats, 500)
     setInterval(update_conn_status, 500)
