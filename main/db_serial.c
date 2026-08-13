@@ -50,13 +50,13 @@
 uint8_t DB_MAV_SYS_ID = 1;
 uint32_t serial_total_byte_count = 0;
 uint32_t serial_total_decoded_mav_msgs = 0;
-uint16_t DB_SERIAL_READ_TIMEOUT_MS = DB_SERIAL_READ_TIMEOUT_MS_DEFAULT;
+static uint16_t DB_SERIAL_READ_TIMEOUT_MS = DB_SERIAL_READ_TIMEOUT_MS_DEFAULT;
 
-uint8_t ltm_frame_buffer[MAX_LTM_FRAMES_IN_BUFFER * LTM_MAX_FRAME_SIZE];
-uint ltm_frames_in_buffer = 0;
-uint ltm_frames_in_buffer_pnt = 0;
+static uint8_t ltm_frame_buffer[MAX_LTM_FRAMES_IN_BUFFER * LTM_MAX_FRAME_SIZE];
+static uint ltm_frames_in_buffer = 0;
+static uint ltm_frames_in_buffer_pnt = 0;
 
-fmav_message_t msg;
+static fmav_message_t msg;
 
 // global parser variables used by timers and mavlink parser functions
 fmav_status_t fmav_status_serial;    // fmav parser status struct for parser handling serial interface

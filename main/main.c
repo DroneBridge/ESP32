@@ -87,7 +87,7 @@ static EventGroupHandle_t s_wifi_event_group;
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT      BIT1
 
-esp_netif_t *esp_default_netif;
+static esp_netif_t *esp_default_netif;
 
 static esp_err_t db_set_dns_server(esp_netif_t *netif, uint32_t addr, esp_netif_dns_type_t type) {
     if (addr && (addr != IPADDR_NONE)) {

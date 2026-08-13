@@ -39,11 +39,11 @@
 
 #define TAG "DB_ESPNOW"
 
-const uint8_t BROADCAST_MAC[ESP_NOW_ETH_ALEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+static const uint8_t BROADCAST_MAC[ESP_NOW_ETH_ALEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 static QueueHandle_t db_espnow_send_recv_callback_queue;    // Queue that contains ESP-NOW callback results
 QueueHandle_t db_espnow_send_queue;    // Queue that contains data to be sent via ESP-NOW (filled by control task)
 QueueHandle_t db_uart_write_queue;    // Queue that contains data to be written to UART (filled by ESP-NOW task)
-db_esp_now_clients_list_t *db_esp_now_clients_list; // Local list of known ESP-NOW peers with the last RSSI value and noise floor and sequence number
+static db_esp_now_clients_list_t *db_esp_now_clients_list; // Local list of known ESP-NOW peers with the last RSSI value and noise floor and sequence number
 
 // packet that is filled with payload and sent. Updates the sequ. number with every send.
 static db_esp_now_packet_t db_esp_now_packet_global = {
@@ -52,7 +52,7 @@ static db_esp_now_packet_t db_esp_now_packet_global = {
 };   // make static so it gets instanced only once
 
 mbedtls_gcm_context aes;
-uint8_t const db_esp_now_packet_header_len = sizeof(db_esp_now_packet_header_t);
+static uint8_t const db_esp_now_packet_header_len = sizeof(db_esp_now_packet_header_t);
 
 /**
  * Generates a AES key from a password using pkcs5 - pbkdf2 and mbedTLS

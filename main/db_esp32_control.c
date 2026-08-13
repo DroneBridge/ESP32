@@ -46,10 +46,10 @@
 
 #define TAG "DB_CONTROL"
 
-uint16_t app_port_proxy = APP_PORT_PROXY;
+static uint16_t app_port_proxy = APP_PORT_PROXY;
 
 udp_conn_list_t *udp_conn_list;
-int connected_tcp_clients[CONFIG_LWIP_MAX_ACTIVE_TCP];
+static int connected_tcp_clients[CONFIG_LWIP_MAX_ACTIVE_TCP];
 int8_t num_connected_tcp_clients = 0;
 
 /**

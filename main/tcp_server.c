@@ -26,15 +26,13 @@
 
 int open_tcp_server(int port) {
     char addr_str[128];
-    int addr_family;
-    int ip_protocol;
 
     struct sockaddr_in dest_addr;
     dest_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     dest_addr.sin_family = AF_INET;
     dest_addr.sin_port = htons(port);
-    addr_family = AF_INET;
-    ip_protocol = IPPROTO_IP;
+    int addr_family = AF_INET;
+    int ip_protocol = IPPROTO_IP;
     inet_ntoa_r(dest_addr.sin_addr, addr_str, sizeof(addr_str) - 1);
 
     int listen_sock = socket(addr_family, SOCK_STREAM, ip_protocol);
