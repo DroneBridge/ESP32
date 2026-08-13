@@ -29,6 +29,8 @@
 
 uint8_t db_get_mav_comp_id();
 uint8_t db_get_mav_sys_id();
+bool fc_connected();
+uint8_t db_get_fc_sys_id();
 int8_t db_format_rssi(int8_t signal_strength, int8_t noise_floor);
 uint16_t db_mav_create_heartbeat(uint8_t *buff, fmav_status_t *fmav_status);
 uint16_t db_get_mavmsg_param_value(uint8_t *buff, fmav_status_t *fmav_status, uint16_t param_index, float_int_union *value, uint8_t type, char *param_id);

@@ -18,6 +18,7 @@
  */
 #include <string.h>
 #include <esp_log.h>
+#include <esp_timer.h>
 
 #include "db_mavlink_msgs.h"
 #include "db_parameters.h"
@@ -36,6 +37,22 @@
 #define FASTMAVLINK_ROUTER_COMPONENTS_MAX  5
 
 #define TAG "DB_MAV_MSGS"
+uint8_t DB_MAV_SYS_ID = 1;
+uint32_t last_fc_heartbeat_ms = 0;
+
+/**
+ * Returns true if we recently saw a heartbeat from a flight controller on the serial link
+ */
+bool fc_connected() {
+    return (esp_timer_get_time() / 1000 - last_fc_heartbeat_ms) < 2500;
+}
+
+/**
+ * Returns the current flight controller system ID (last seen)
+ */
+uint8_t db_get_fc_sys_id() {
+    return DB_MAV_SYS_ID;
+}
 
 /**
  * Based on the system architecture and configured wifi mode the ESP32 may have a different role and system id.
@@ -334,6 +351,7 @@ void handle_mavlink_message(fmav_message_t *new_msg, int *tcp_clients, udp_conn_
                     // This means we are connected to the FC since we only parse mavlink on UART and thus only see the
                     // device we are connected to via UART
                     DB_MAV_SYS_ID = new_msg->sysid;
+                    last_fc_heartbeat_ms = esp_timer_get_time() / 1000;
                     // Check if FC is armed and the Wi-Fi switch based on armed status is configured by the user
                     if (DB_PARAM_DIS_RADIO_ON_ARM &&
                     (payload.base_mode & MAV_MODE_FLAG_SAFETY_ARMED ||
