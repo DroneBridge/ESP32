@@ -329,8 +329,9 @@ void db_send_to_all_radio_clients(uint8_t data[], uint16_t data_length) {
  *
  * @param tcp_master_socket Main open TCP socket to accept TCP connections/clients
  * @param tcp_clients List of active TCP client connections (socket IDs)
+ * @param tcp_parsers MAVLink parser state indexed by TCP client slot
  */
-void handle_tcp_master(const int tcp_master_socket, int tcp_clients[]) {
+void handle_tcp_master(const int tcp_master_socket, int tcp_clients[], db_mavlink_parser_t tcp_parsers[]) {
     struct sockaddr_in6 source_addr; // Large enough for both IPv4 or IPv6
     uint32_t addr_len = sizeof(source_addr);
     int new_tcp_client = accept(tcp_master_socket, (struct sockaddr *) &source_addr, &addr_len);
@@ -338,6 +339,7 @@ void handle_tcp_master(const int tcp_master_socket, int tcp_clients[]) {
         for (int i = 0; i < CONFIG_LWIP_MAX_ACTIVE_TCP; i++) {
             if (tcp_clients[i] <= 0) {
                 tcp_clients[i] = new_tcp_client;
+                memset(&tcp_parsers[i], 0, sizeof(tcp_parsers[i]));
                 fcntl(tcp_clients[i], F_SETFL, O_NONBLOCK);
                 char addr_str[128];
                 inet_ntoa_r(((struct sockaddr_in *) &source_addr)->sin_addr, addr_str, sizeof(addr_str) - 1);
@@ -506,6 +508,7 @@ _Noreturn void control_module_esp_now() {
     uint8_t msp_message_buffer[UART_BUF_SIZE];
     uint8_t serial_buffer[DB_SERIAL_PACK_SIZE_MAX];
     msp_ltm_port_t db_msp_ltm_port;
+    db_mavlink_parser_t espnow_parser = {0};
     db_espnow_queue_event_t db_espnow_uart_evt;
     uint delay_timer_cnt = 0;
 
@@ -519,7 +522,8 @@ _Noreturn void control_module_esp_now() {
             if (DB_PARAM_SERIAL_PROTO == DB_SERIAL_PROTOCOL_MAVLINK) {
                 // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
                 // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existing packet
-                db_parse_mavlink_from_radio(NULL, NULL, db_espnow_uart_evt.data, db_espnow_uart_evt.data_len);
+                db_parse_mavlink_from_radio(NULL, NULL, db_espnow_uart_evt.data, db_espnow_uart_evt.data_len,
+                                             &espnow_parser);
             } else {
                 // no parsing with any other protocol - transparent here - just pass through
                 write_to_serial(db_espnow_uart_evt.data, db_espnow_uart_evt.data_len);
@@ -673,6 +677,8 @@ _Noreturn void control_module_udp_tcp() {
     uint8_t msp_message_buffer[UART_BUF_SIZE];
     uint8_t serial_buffer[DB_SERIAL_PACK_SIZE_MAX];
     msp_ltm_port_t db_msp_ltm_port;
+    db_mavlink_parser_t tcp_parsers[CONFIG_LWIP_MAX_ACTIVE_TCP] = {0};
+    db_mavlink_parser_t udp_parser = {0};
     int delay_timer_cnt = 0;
 
     ESP_LOGI(TAG, "Started control module (Wi-Fi)");
@@ -683,7 +689,7 @@ _Noreturn void control_module_udp_tcp() {
         uint32_t prev_serial_count = serial_total_byte_count;
         int8_t prev_tcp_clients = num_connected_tcp_clients;
 
-        handle_tcp_master(tcp_master_socket, connected_tcp_clients);
+        handle_tcp_master(tcp_master_socket, connected_tcp_clients, tcp_parsers);
         if (num_connected_tcp_clients != prev_tcp_clients) data_processed = true;
         for (int i = 0; i < CONFIG_LWIP_MAX_ACTIVE_TCP; i++) {  // handle TCP clients
             if (connected_tcp_clients[i] > 0) {
@@ -693,7 +699,8 @@ _Noreturn void control_module_udp_tcp() {
                     if (DB_PARAM_SERIAL_PROTO == DB_SERIAL_PROTOCOL_MAVLINK) {
                         // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
                         // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existign packet
-                        db_parse_mavlink_from_radio(connected_tcp_clients, udp_conn_list, tcp_client_buffer, recv_length);
+                        db_parse_mavlink_from_radio(connected_tcp_clients, udp_conn_list, tcp_client_buffer, recv_length,
+                                                     &tcp_parsers[i]);
                     } else {
                         // no parsing with any other protocol - transparent here
                         write_to_serial(tcp_client_buffer, recv_length);
@@ -702,6 +709,7 @@ _Noreturn void control_module_udp_tcp() {
                     shutdown(connected_tcp_clients[i], 0);
                     close(connected_tcp_clients[i]);
                     connected_tcp_clients[i] = -1;
+                    memset(&tcp_parsers[i], 0, sizeof(tcp_parsers[i]));
                     ESP_LOGI(TAG, "TCP client disconnected");
                     num_connected_tcp_clients--;
                 } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
@@ -710,6 +718,7 @@ _Noreturn void control_module_udp_tcp() {
                     close(connected_tcp_clients[i]);
                     num_connected_tcp_clients--;
                     connected_tcp_clients[i] = -1;
+                    memset(&tcp_parsers[i], 0, sizeof(tcp_parsers[i]));
                 }
             }
         }
@@ -721,7 +730,9 @@ _Noreturn void control_module_udp_tcp() {
             if (DB_PARAM_SERIAL_PROTO == DB_SERIAL_PROTOCOL_MAVLINK) {
                 // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
                 // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existing packet
-                db_parse_mavlink_from_radio(connected_tcp_clients, udp_conn_list, udp_buffer, recv_length);
+                fmav_status_reset_rx(&udp_parser.status);
+                db_parse_mavlink_from_radio(connected_tcp_clients, udp_conn_list, udp_buffer, recv_length,
+                                             &udp_parser);
             } else {
                 // no parsing with any other protocol - transparent here
                 write_to_serial(udp_buffer, recv_length);
@@ -806,6 +817,7 @@ _Noreturn void control_module_ble() {
     uint8_t msp_message_buffer[UART_BUF_SIZE];
     uint8_t serial_buffer[DB_SERIAL_PACK_SIZE_MAX];
     msp_ltm_port_t db_msp_ltm_port;
+    db_mavlink_parser_t ble_parser = {0};
     db_ble_queue_event_t bleData;
     uint transparent_buff_pos = 0;
     uint msp_ltm_buff_pos = 0;
@@ -827,7 +839,7 @@ _Noreturn void control_module_ble() {
                 // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
                 // We cannot write to serial first since we might inject packets and do not know when to do so to not "destroy" an
                 // existing packet
-                db_parse_mavlink_from_radio(NULL, NULL, bleData.data, bleData.data_len);
+                db_parse_mavlink_from_radio(NULL, NULL, bleData.data, bleData.data_len, &ble_parser);
             } else {
                 // no parsing with any other protocol - transparent here - just pass through
                 write_to_serial(bleData.data, bleData.data_len);

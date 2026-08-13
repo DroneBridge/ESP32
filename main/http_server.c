@@ -216,18 +216,29 @@ static esp_err_t settings_clients_udp_post(httpd_req_t *req) {
     }
     buf[total_len] = '\0';
 
-    // Obtain & process JSON from request
+    // Validate the complete JSON request before changing the UDP client list.
     cJSON *root = cJSON_Parse(buf);
+    if (!cJSON_IsObject(root)) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "invalid JSON object");
+        return ESP_FAIL;
+    }
 
-    int new_udp_port = 0;
+    cJSON *ip_json = cJSON_GetObjectItem(root, (char *) db_param_udp_client_ip.db_name);
+    cJSON *port_json = cJSON_GetObjectItem(root, (char *) db_param_udp_client_port.db_name);
+    if (!cJSON_IsString(ip_json) || ip_json->valuestring == NULL ||
+        strlen(ip_json->valuestring) >= IP4ADDR_STRLEN_MAX || !cJSON_IsNumber(port_json) ||
+        port_json->valuedouble < 1 || port_json->valuedouble > UINT16_MAX ||
+        port_json->valuedouble != port_json->valueint) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "invalid UDP client");
+        return ESP_FAIL;
+    }
+
     char new_ip[IP4ADDR_STRLEN_MAX];
+    strlcpy(new_ip, ip_json->valuestring, sizeof(new_ip));
     uint8_t save_to_nvm = false;
-    cJSON *json = cJSON_GetObjectItem(root, (char *) db_param_udp_client_ip.db_name);
-    if (json) strncpy(new_ip, json->valuestring, sizeof(new_ip));
-    new_ip[IP4ADDR_STRLEN_MAX-1] = '\0';    // to remove warning and to be sure
-    json = cJSON_GetObjectItem(root, (char *) db_param_udp_client_port.db_name);
-    if (json) new_udp_port = json->valueint;
-    json = cJSON_GetObjectItem(root, "save");
+    cJSON *json = cJSON_GetObjectItem(root, "save");
     if (json && cJSON_IsBool(json)) {
         if(cJSON_IsTrue(json)) {
             save_to_nvm = true;
@@ -240,8 +251,12 @@ static esp_err_t settings_clients_udp_post(httpd_req_t *req) {
     struct sockaddr_in new_sockaddr;
     memset(&new_sockaddr, 0, sizeof(new_sockaddr));
     new_sockaddr.sin_family = AF_INET;
-    inet_pton(AF_INET, new_ip, &new_sockaddr.sin_addr);
-    new_sockaddr.sin_port = htons(new_udp_port);
+    if (inet_pton(AF_INET, new_ip, &new_sockaddr.sin_addr) != 1) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "invalid IPv4 address");
+        return ESP_FAIL;
+    }
+    new_sockaddr.sin_port = htons((uint16_t) port_json->valueint);
     struct db_udp_client_t new_udp_client = {
             .udp_client = new_sockaddr,
             .mac = {0, 0, 0, 0, 0, 0}   // dummy MAC

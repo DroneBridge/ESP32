@@ -42,8 +42,16 @@ typedef union {
     int32_t int32;
 } float_int_union;
 
+/**
+ * MAVLink receive state for one independent radio byte stream.
+ */
+typedef struct {
+    fmav_status_t status;
+    uint8_t frame_buf[FASTMAVLINK_FRAME_LEN_MAX];
+} db_mavlink_parser_t;
+
 extern fmav_status_t fmav_status_serial;    // fmav parser status struct for parser handling serial interface
-extern fmav_status_t fmav_status_radio; // fmav parser status struct for parser handling the radio/ESPNOW/WiFi/BLE interface
+extern fmav_status_t fmav_status_radio; // transmit sequence state for generated radio MAVLink messages
 
 int open_serial_socket();
 void write_to_serial(const uint8_t data_buffer[], unsigned int data_length);
@@ -53,7 +61,8 @@ void db_parse_msp_ltm(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_
 void db_read_serial_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *serial_buffer, unsigned int *serial_buff_pos);
 void db_read_serial_parse_transparent(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_t serial_buffer[],
                                       unsigned int *serial_read_bytes);
-void db_parse_mavlink_from_radio(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *buffer, int bytes_read);
+void db_parse_mavlink_from_radio(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *buffer, int bytes_read,
+                                 db_mavlink_parser_t *parser);
 void db_route_mavlink_response(uint8_t *buffer, uint16_t length, enum DB_MAVLINK_DATA_ORIGIN origin, int *tcp_clients,
                                udp_conn_list_t *udp_conns);
 

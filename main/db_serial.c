@@ -60,7 +60,7 @@ fmav_message_t msg;
 
 // global parser variables used by timers and mavlink parser functions
 fmav_status_t fmav_status_serial;    // fmav parser status struct for parser handling serial interface
-fmav_status_t fmav_status_radio; // fmav parser status struct for parser handling the radio/ESPNOW/WiFi/BLE interface
+fmav_status_t fmav_status_radio; // transmit sequence state for generated radio MAVLink messages
 
 /**
  * Opens UART socket.
@@ -259,23 +259,26 @@ void db_route_mavlink_response(uint8_t *buffer, uint16_t length, enum DB_MAVLINK
  * @param up_conns Structure containing all UDP connection data including the sockets
  * @param buffer Buffer containing the raw bytes to be parsed
  * @param bytes_read Number of bytes in the buffer
- * @param origin Origin of the data - serial link or radio link
+ * @param parser Receive state for the independent input byte stream
  */
-void db_parse_mavlink_from_radio(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *buffer, int bytes_read) {
-    static uint8_t mav_parser_rx_buf[296];  // at least 280 bytes which is the max len for a MAVLink v2 packet
-
+void db_parse_mavlink_from_radio(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *buffer, int bytes_read,
+                                 db_mavlink_parser_t *parser) {
+    if (parser == NULL) {
+        ESP_LOGE(TAG, "Cannot parse MAVLink without parser state");
+        return;
+    }
     // Parse each byte received
     for (int i = 0; i < bytes_read; ++i) {
         fmav_result_t result = {0};
-        if (fmav_parse_and_check_to_frame_buf(&result, mav_parser_rx_buf, &fmav_status_radio, buffer[i])) {
+        if (fmav_parse_and_check_to_frame_buf(&result, parser->frame_buf, &parser->status, buffer[i])) {
             // Parser detected a full message, write to serial
-            write_to_serial(mav_parser_rx_buf, result.frame_len);
+            write_to_serial(parser->frame_buf, result.frame_len);
             // Decode message and react to it if it was for us
-            fmav_frame_buf_to_msg(&msg, &result, mav_parser_rx_buf);
+            fmav_frame_buf_to_msg(&msg, &result, parser->frame_buf);
             if (result.res == FASTMAVLINK_PARSE_RESULT_OK) {
                 db_status_led_mark_radio_rx();
                 if (fmav_msg_is_for_me(db_get_mav_sys_id(), db_get_mav_comp_id(), &msg)) {
-                    handle_mavlink_message(&msg, tcp_clients, udp_conns, &fmav_status_radio, DB_MAVLINK_DATA_ORIGIN_RADIO);
+                    handle_mavlink_message(&msg, tcp_clients, udp_conns, &parser->status, DB_MAVLINK_DATA_ORIGIN_RADIO);
                 } else {
                     // message was not for us so ignore it
                 }
