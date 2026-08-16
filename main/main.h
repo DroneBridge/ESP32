@@ -27,9 +27,12 @@
 #define DB_HAS_RF_SWITCH 0
 #endif
 
+struct db_udp_client_t;
+
 void db_jtag_serial_info_print();
 void db_write_settings_to_nvs();
 void save_udp_client_to_nvm(struct db_udp_client_t *new_db_udp_client, bool clear_client);
 void db_set_radio_status(uint8_t enable_wifi);
+void db_init_wifi_espnow_channel(uint8_t channel);
 
 #endif //DB_ESP32_MAIN_H

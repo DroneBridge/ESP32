@@ -44,6 +44,7 @@
 #include "db_parameters.h"
 #include "mdns.h"
 #include "db_esp_now.h"
+#include "db_espnow_binding.h"
 #include "db_serial.h"
 #include "db_led_indicator.h"
 #include "globals.h"
@@ -438,9 +439,9 @@ int db_init_wifi_clientmode() {
      * happened. */
     bool enable_temp_ap_mode = false;
     if (bits & WIFI_CONNECTED_BIT) {
-        ESP_LOGI(TAG, "Connected to ap SSID:%s password:%s", DB_PARAM_WIFI_SSID, DB_PARAM_PASS);
+        ESP_LOGI(TAG, "Connected to ap SSID:%s", DB_PARAM_WIFI_SSID);
     } else if (bits & WIFI_FAIL_BIT) {
-        ESP_LOGW(TAG, "Failed to connect to SSID:%s, password:%s", DB_PARAM_WIFI_SSID, DB_PARAM_PASS);
+        ESP_LOGW(TAG, "Failed to connect to SSID:%s", DB_PARAM_WIFI_SSID);
         enable_temp_ap_mode = true;
     } else {
         ESP_LOGE(TAG, "UNEXPECTED WIFI EVENT");
@@ -461,7 +462,7 @@ int db_init_wifi_clientmode() {
  * LR mode makes it very inconvenient to change settings but gives the most range. No AP mode since AP will not be
  * visible.
  */
-void db_init_wifi_espnow() {
+void db_init_wifi_espnow_channel(uint8_t channel) {
     ESP_LOGI(TAG, "Setting up Wi-Fi for ESP-NOW");
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
@@ -471,10 +472,17 @@ void db_init_wifi_espnow() {
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
     ESP_ERROR_CHECK(esp_wifi_start());
-    ESP_ERROR_CHECK(esp_wifi_set_channel(DB_PARAM_CHANNEL, WIFI_SECOND_CHAN_NONE));
+    ESP_ERROR_CHECK(esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE));
     ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_LR));
     ESP_LOGI(TAG, "Enabled ESP-NOW WiFi Mode! LR Mode is set. This device will be invisible to non-ESP32 devices!");
     ESP_ERROR_CHECK(esp_read_mac(LOCAL_MAC_ADDRESS, ESP_MAC_WIFI_STA));
+}
+
+/**
+ * Initialize Wi-Fi for regular ESP-NOW operation using the configured channel.
+ */
+void db_init_wifi_espnow() {
+    db_init_wifi_espnow_channel(DB_PARAM_CHANNEL);
 }
 
 /**
@@ -624,6 +632,10 @@ void db_read_settings_nvs() {
  * @param arg
  */
 void short_press_callback(void *arg, void *usr_data) {
+    if (db_espnow_binding_request_stop()) {
+        ESP_LOGI(TAG, "Ending ESP-NOW GND group binding session");
+        return;
+    }
     ESP_LOGW(TAG, "Short press detected setting wifi mode to access point with password: dronebridge");
     DB_RADIO_MODE_DESIGNATED = DB_WIFI_MODE_AP;  // Do not directly change DB_PARAM_RADIO_MODE since it is not safe and constantly processed by other tasks. Save settings and reboot will assign DB_RADIO_MODE_DESIGNATED to DB_PARAM_RADIO_MODE.
     db_param_set_to_default(&db_param_ssid);
@@ -639,10 +651,65 @@ void short_press_callback(void *arg, void *usr_data) {
  */
 void long_press_callback(void *arg, void *usr_data) {
     ESP_LOGW(TAG, "Reset triggered via GPIO %i. Resetting settings and rebooting", DB_RESET_PIN);
+    db_espnow_binding_cancel();
     DB_RADIO_MODE_DESIGNATED = DB_WIFI_MODE_AP;  // Do not directly change DB_PARAM_RADIO_MODE since it is not safe and constantly processed by other tasks. Save settings and reboot will assign DB_RADIO_MODE_DESIGNATED to DB_PARAM_RADIO_MODE.
     db_param_reset_all();
     db_write_settings_to_nvs();
     esp_restart();
+}
+
+/**
+ * Requests a GND-side ESP-NOW binding session and reboots into the dedicated binding runtime.
+ *
+ * @param arg Button callback argument.
+ * @param usr_data Application callback data.
+ */
+void double_click_callback(void *arg, void *usr_data) {
+    if (db_espnow_binding_is_active()) {
+        ESP_LOGI(TAG, "Ignoring GND add request while binding is active");
+        return;
+    }
+    if (db_espnow_binding_request(DB_ESPNOW_BIND_ROLE_GND)) {
+        ESP_LOGW(TAG, "ESP-NOW GND binding requested");
+        esp_restart();
+    }
+    ESP_LOGE(TAG, "Failed to request ESP-NOW GND binding");
+}
+
+/**
+ * Requests an AIR-side ESP-NOW binding session and reboots into the dedicated binding runtime.
+ *
+ * @param arg Button callback argument.
+ * @param usr_data Application callback data.
+ */
+void triple_click_callback(void *arg, void *usr_data) {
+    if (db_espnow_binding_is_active()) {
+        ESP_LOGI(TAG, "Ignoring AIR bind request while binding is active");
+        return;
+    }
+    if (db_espnow_binding_request(DB_ESPNOW_BIND_ROLE_AIR)) {
+        ESP_LOGW(TAG, "ESP-NOW AIR binding requested");
+        esp_restart();
+    }
+    ESP_LOGE(TAG, "Failed to request ESP-NOW AIR binding");
+}
+
+/**
+ * Requests a GND group replacement session that rotates the ESP-NOW secret before binding AIR units.
+ *
+ * @param arg Button callback argument.
+ * @param usr_data Application callback data.
+ */
+void four_click_callback(void *arg, void *usr_data) {
+    if (db_espnow_binding_is_active()) {
+        ESP_LOGI(TAG, "Ignoring GND group replacement request while binding is active");
+        return;
+    }
+    if (db_espnow_binding_request_new_group()) {
+        ESP_LOGW(TAG, "ESP-NOW GND new-group binding requested");
+        esp_restart();
+    }
+    ESP_LOGE(TAG, "Failed to request ESP-NOW GND new-group binding");
 }
 
 /**
@@ -663,6 +730,11 @@ void set_reset_trigger() {
         ESP_LOGE(TAG, "Button create failed");
     } else {
         iot_button_register_cb(gpio_btn, BUTTON_SINGLE_CLICK, NULL, short_press_callback, NULL);
+        iot_button_register_cb(gpio_btn, BUTTON_DOUBLE_CLICK, NULL, double_click_callback, NULL);
+        button_event_args_t triple_click_args = {.multiple_clicks.clicks = 3};
+        iot_button_register_cb(gpio_btn, BUTTON_MULTIPLE_CLICK, &triple_click_args, triple_click_callback, NULL);
+        button_event_args_t four_click_args = {.multiple_clicks.clicks = 4};
+        iot_button_register_cb(gpio_btn, BUTTON_MULTIPLE_CLICK, &four_click_args, four_click_callback, NULL);
         iot_button_register_cb(gpio_btn, BUTTON_LONG_PRESS_UP, NULL, long_press_callback, NULL);
     }
 }
@@ -713,6 +785,10 @@ void app_main() {
     set_reset_trigger();
     db_configure_antenna();
     db_status_led_init();
+
+    if (db_espnow_binding_start_if_requested()) {
+        return;
+    }
 
     switch (DB_PARAM_RADIO_MODE) {
         case DB_WIFI_MODE_AP:

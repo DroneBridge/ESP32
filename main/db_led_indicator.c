@@ -38,6 +38,7 @@ static const char *TAG = "DB_LED_IND";
 static TickType_t db_status_led_last_serial_mavlink_tick = 0;
 static TickType_t db_status_led_last_radio_tick = 0;
 static bool db_status_led_initialized = false;
+static db_status_led_binding_state_t db_status_led_binding_state = DB_STATUS_LED_BINDING_NONE;
 
 /**
  * Checks whether an activity timestamp is still inside the LED "on" timeout window.
@@ -108,6 +109,19 @@ void db_status_led_mark_radio_rx() {
 }
 
 /**
+ * Selects the temporary LED pattern used by the ESP-NOW binding runtime.
+ *
+ * @param state Binding state to display; DB_STATUS_LED_BINDING_NONE restores traffic indication.
+ */
+void db_status_led_set_binding_state(db_status_led_binding_state_t state) {
+#ifdef CONFIG_DB_OFFICIAL_BOARD_1_X_C6
+    db_status_led_binding_state = state;
+#else
+    (void) state;
+#endif
+}
+
+/**
  * Evaluates current mode + recent activity timestamps and updates LED GPIO if needed.
  * Intended to be called periodically (timer-driven).
  */
@@ -120,7 +134,27 @@ void db_status_led_process() {
     TickType_t now_tick = xTaskGetTickCount();
     bool should_led_be_on = false;
 
-    if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_AP ||
+    if (db_status_led_binding_state != DB_STATUS_LED_BINDING_NONE) {
+        const uint32_t elapsed_ms = now_tick * portTICK_PERIOD_MS;
+        switch (db_status_led_binding_state) {
+            case DB_STATUS_LED_BINDING_SEARCHING:
+                should_led_be_on = (elapsed_ms % 1000U) < 250U;
+                break;
+            case DB_STATUS_LED_BINDING_NEGOTIATING:
+                should_led_be_on = (elapsed_ms % 250U) < 125U;
+                break;
+            case DB_STATUS_LED_BINDING_SUCCESS:
+                should_led_be_on = true;
+                break;
+            case DB_STATUS_LED_BINDING_FAILURE:
+                should_led_be_on = (elapsed_ms % 1000U) < 150U ||
+                                   ((elapsed_ms % 1000U) >= 300U && (elapsed_ms % 1000U) < 450U) ||
+                                   ((elapsed_ms % 1000U) >= 600U && (elapsed_ms % 1000U) < 750U);
+                break;
+            default:
+                break;
+        }
+    } else if (DB_PARAM_RADIO_MODE == DB_WIFI_MODE_AP ||
         DB_PARAM_RADIO_MODE == DB_WIFI_MODE_ESPNOW_AIR ||
         DB_PARAM_RADIO_MODE == DB_WIFI_MODE_STA) {
         // AP, ESP-NOW AIR, STA: indicate MAVLink activity on serial

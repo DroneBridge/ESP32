@@ -92,12 +92,20 @@
             </div>
             <div class="row">
                 <div class="six columns" id="wifi_ssid_div">
-                    <label for="ssid">SSID</label>
+                    <label for="ssid">Wi-Fi SSID</label>
                     <input type="text" name="ssid" value="" id="ssid" maxlength="31">
                 </div>
                 <div class="six columns" id="pass_div">
-                    <label for="wifi_pass">Password</label>
+                    <label for="wifi_pass">Wi-Fi Password</label>
                     <input type="text" name="wifi_pass" value="" id="wifi_pass" minlength="8" maxlength="63" required>
+                </div>
+            </div>
+            <div class="row" id="espnow_secret_div">
+                <div class="twelve columns">
+                    <label for="espnow_secret">ESP-NOW link secret</label>
+                    <input type="text" name="espnow_secret" value="" id="espnow_secret" minlength="43" maxlength="43" pattern="[A-Za-z0-9_-]{43}">
+                    <button class="button-primary" type="button" id="espnow_rotate_secret_button" onclick="rotate_espnow_secret()">Rotate</button>
+                    <div class="info note">Binding creates the ESP-NOW link secret automatically. Rotating it disconnects all currently bound AIR units; they need to be re-bound.<br>Leave it empty only to use the legacy Wi-Fi password for ESP-NOW.<br>AIR and GND must have matching secrets.</div>
                 </div>
             </div>
             <div class="row">
@@ -258,6 +266,7 @@
                         <option value="128">128</option>
                         <option value="160">160</option>
                         <option value="192">192</option>
+                        <option value="215">215</option>
                         <option value="224">224</option>
                         <option value="256">256</option>
                         <option value="288">288</option>

@@ -34,7 +34,7 @@
 #define DB_MATURITY_VERSION "stable"
 #define DB_TYPE_VERSION 255 // FIRMWARE_VERSION_TYPE_OFFICIAL -> https://mavlink.io/en/messages/common.html#FIRMWARE_VERSION_TYPE
 
-#define DB_PARAM_TOTAL_NUM          25  // total number of db parameters
+#define DB_PARAM_TOTAL_NUM          26  // total number of db parameters
 #define DB_PARAM_MAV_CNT            17  // Number of MAVLink parameters returned by ESP32 in the PARAM message. Needed by GCS.
 
 #define DB_PARAM_NAME_MAXLEN        16      // max len of a parameter/key stored in the ESP32 NVM
@@ -75,6 +75,7 @@
 /* ---------- Optional Macros for quick access to param values ---------- */
 #define DB_PARAM_WIFI_SSID (char *) db_param_ssid.value.db_param_str.value
 #define DB_PARAM_PASS (char *) db_param_pass.value.db_param_str.value
+#define DB_PARAM_ESPNOW_LINK_SECRET ((char *) db_param_espnow_link_secret.value.db_param_str.value)
 #define DB_PARAM_CHANNEL db_param_channel.value.db_param_u8.value
 #define DB_PARAM_RADIO_MODE db_param_radio_mode.value.db_param_u8.value
 #define DB_PARAM_STA_IP db_param_wifi_sta_ip.value.db_param_str.value
@@ -165,6 +166,7 @@ extern db_parameter_t *db_params[DB_PARAM_TOTAL_NUM];
 
 extern db_parameter_t db_param_ssid;
 extern db_parameter_t db_param_pass;
+extern db_parameter_t db_param_espnow_link_secret;
 extern db_parameter_t db_param_wifi_ap_ip;
 extern db_parameter_t db_param_wifi_sta_ip;
 extern db_parameter_t db_param_wifi_sta_gw;
