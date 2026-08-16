@@ -25,6 +25,10 @@
 <div class="container">
     <form id="settings_form">
         <div>
+            <div class="info note" id="uart_pins_info_div" style="display: none;">
+                <h4>Attention:</h4>
+                UART TX and RX pins are not configured. Set the correct GPIO pins for UART TX and RX before DroneBridge can forward data.
+            </div>
             <div class="info issue" id="issue_div">
                 There might be an issue with your baud rate configuration.<br>Match the UART baud rates on the flight controller and the ESP32.<br>The ESP32 is receiving serial bytes but fails to decode the MAVLink messages.
             </div>

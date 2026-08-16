@@ -281,6 +281,7 @@ function refresh_static_data() {
 			const refresh_succeeded = results.every(result => result === true);
 			if (refresh_succeeded) {
 				static_data_ready = true;
+				check_for_issues();
 			}
 			return refresh_succeeded;
 		})
@@ -444,6 +445,7 @@ async function get_settings() {
 		set_telem_proto = document.getElementById("proto").value;
 		change_ap_ip_visibility();
 		change_msp_ltm_visibility();
+		check_for_issues();
 		return true;
 	} catch (error) {
 		console.error("Failed to load or display settings:", error);
@@ -541,6 +543,17 @@ function check_for_issues() {
 		issue_div.style.display = "block";
 	} else {
 		issue_div.style.display = "none";
+	}
+
+	let uart_pins_info_div = document.getElementById("uart_pins_info_div");
+	let gpio_tx = document.getElementById("gpio_tx");
+	let gpio_rx = document.getElementById("gpio_rx");
+	let uart_pins_not_configured = static_data_ready && serial_via_JTAG === 0 &&
+		gpio_tx.value !== "" && gpio_rx.value !== "" && gpio_tx.value === gpio_rx.value;
+	if (uart_pins_not_configured) {
+		uart_pins_info_div.style.display = "block";
+	} else {
+		uart_pins_info_div.style.display = "none";
 	}
 }
 
