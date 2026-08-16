@@ -68,9 +68,7 @@ These boards are very affordable, have everything you need, and are also very co
 
 **[You can find more info on how to get the official boards here!](https://dronebridge.gitbook.io/docs/dronebridge-for-esp32/hardware-and-wiring#officially-supported-boards)**
 
-<img src="https://github.com/user-attachments/assets/efd2b305-8046-4431-a4a0-ec8de07fd264" alt="Official Boadrd DroneBridge for ESP32 featuring the ESP32C3" width="350">
-  
-**[Order the PCB yourself using the KiCAD PCB Project & Production files with private and commercial use options! Easy solder version now available!](https://buymeacoffee.com/seeul8er/extras)**
+![Official Board DroneBridge for ESP32 featuring the ESP32C6](wiki/officialboard.webp)
 
 [For further info please check the wiki!](https://dronebridge.gitbook.io/docs/dronebridge-for-esp32/hardware-and-wiring)
 
@@ -108,10 +106,7 @@ In any other case, there are multiple ways how to flash the firmware.
 -   **In case of a UDP connection the GCS must send at least one packet (e.g. MAVLink heart beat etc.) to the UDP port of the ESP32 to register as an endpoint. Add ESP32 as an UDP target in the GCS**
 -   Manually add a UDP target using the web interface
 
-## Further Support & Donations
-
-**If you benefited from this project please consider a donation:** 
--   [PayPal](https://www.paypal.com/donate/?hosted_button_id=SG97392AJN73J)
+## Further Support
 
 For questions or general chatting regarding DroneBridge for ESP32 please visit the Discord channel  
 <div>
