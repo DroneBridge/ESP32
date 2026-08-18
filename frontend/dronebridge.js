@@ -35,6 +35,8 @@ function change_ap_ip_visibility() {
 		wifi_en_gn_div: document.getElementById("wifi_en_gn_div"),
 		static_ip_config_div: document.getElementById("static_ip_config_div"),
 		pass_div: document.getElementById("pass_div"),
+		espnow_secret_div: document.getElementById("espnow_secret_div"),
+		espnow_rotate_secret_button: document.getElementById("espnow_rotate_secret_button"),
 	};
 
 	if (esp32Mode === "2") {
@@ -70,8 +72,12 @@ function change_ap_ip_visibility() {
 	if (esp32Mode > "3" && esp32Mode < "6") {
 		elements.ap_ip_div.style.display = "none";
 		elements.wifi_ssid_div.style.visibility = "hidden";
+		elements.espnow_secret_div.style.display = "block";
+		elements.espnow_rotate_secret_button.style.display = esp32Mode === "5" ? "inline-block" : "none";
 	} else {
 		elements.wifi_ssid_div.style.visibility = "visible";
+		elements.espnow_secret_div.style.display = "none";
+		elements.espnow_rotate_secret_button.style.display = "none";
 	}
 	change_radio_dis_arm_visibility();
 }
@@ -188,6 +194,22 @@ async function get_json(api_path) {
 }
 
 /**
+ * Rotates the ESP-NOW group secret after warning that every AIR unit must be rebound.
+ */
+async function rotate_espnow_secret() {
+	if (!confirm("Rotate the ESP-NOW link secret? All currently bound AIR units will disconnect and must be rebound.")) {
+		return;
+	}
+	try {
+		const response = await send_json("api/settings/espnow-secret/rotate");
+		document.getElementById("espnow_secret").value = response.espnow_secret;
+		show_toast(response.msg);
+	} catch (error) {
+		show_toast(error.message);
+	}
+}
+
+/**
  * Create a response with JSON data attached
  * @param api_path API URL path
  * @param json_data JSON body data to send
@@ -281,6 +303,7 @@ function refresh_static_data() {
 			const refresh_succeeded = results.every(result => result === true);
 			if (refresh_succeeded) {
 				static_data_ready = true;
+				check_for_issues();
 			}
 			return refresh_succeeded;
 		})
@@ -444,6 +467,7 @@ async function get_settings() {
 		set_telem_proto = document.getElementById("proto").value;
 		change_ap_ip_visibility();
 		change_msp_ltm_visibility();
+		check_for_issues();
 		return true;
 	} catch (error) {
 		console.error("Failed to load or display settings:", error);
@@ -532,15 +556,34 @@ function check_validity() {
 		show_toast("Error: 8<(password length)<64");
 		valid = false;
 	}
+	let espnow_secret = document.getElementById("espnow_secret")
+	if (!espnow_secret.checkValidity()) {
+		show_toast("Error: ESP-NOW link secret must be 43 Base64URL characters");
+		valid = false;
+	}
 	return valid;
 }
 
+/**
+ * Update the frontend information boxes based on current serial and MAVLink state.
+ */
 function check_for_issues() {
 	let issue_div = document.getElementById("issue_div");
 	if (set_telem_proto === "4" && serial_dec_mav_msgs === 0 && recv_ser_bytes !== 0) {
 		issue_div.style.display = "block";
 	} else {
 		issue_div.style.display = "none";
+	}
+
+	let uart_pins_info_div = document.getElementById("uart_pins_info_div");
+	let gpio_tx = document.getElementById("gpio_tx");
+	let gpio_rx = document.getElementById("gpio_rx");
+	let uart_pins_not_configured = static_data_ready && serial_via_JTAG === 0 &&
+		gpio_tx.value !== "" && gpio_rx.value !== "" && gpio_tx.value === gpio_rx.value;
+	if (uart_pins_not_configured) {
+		uart_pins_info_div.style.display = "block";
+	} else {
+		uart_pins_info_div.style.display = "none";
 	}
 }
 

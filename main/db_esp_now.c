@@ -501,12 +501,8 @@ void db_espnow_broadcast_peers_list_destroy(db_esp_now_clients_list_t *esp_now_c
  */
 int init_gcm_encryption_module(uint8_t *aes_key) {
     mbedtls_gcm_init(&aes);
-    generate_pkcs5_key(DB_PARAM_PASS, aes_key, AES_256_KEY_BYTES);
-    ESP_LOGI(TAG, "Derived AES Key:");
-    for (int i = 0; i < AES_256_KEY_BYTES; ++i) {
-        printf("%02x", aes_key[i]);
-    }
-    printf("\n");
+    const char *espnow_secret = strlen(DB_PARAM_ESPNOW_LINK_SECRET) > 0 ? DB_PARAM_ESPNOW_LINK_SECRET : DB_PARAM_PASS;
+    generate_pkcs5_key(espnow_secret, aes_key, AES_256_KEY_BYTES);
     int ret = mbedtls_gcm_setkey(&aes, MBEDTLS_CIPHER_ID_AES, aes_key, DB_ESPNOW_AES_KEY_LEN);
     return ret;
 }

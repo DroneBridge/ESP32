@@ -20,10 +20,19 @@
 #ifndef DB_ESP32_DB_LED_INDICATOR_H
 #define DB_ESP32_DB_LED_INDICATOR_H
 
+typedef enum {
+    DB_STATUS_LED_BINDING_NONE = 0,
+    DB_STATUS_LED_BINDING_SEARCHING,
+    DB_STATUS_LED_BINDING_NEGOTIATING,
+    DB_STATUS_LED_BINDING_SUCCESS,
+    DB_STATUS_LED_BINDING_FAILURE,
+} db_status_led_binding_state_t;
+
 // Status LED API (used by serial/radio processing paths and timer module).
 void db_status_led_init();
 void db_status_led_mark_serial_mavlink_rx();
 void db_status_led_mark_radio_rx();
 void db_status_led_process();
+void db_status_led_set_binding_state(db_status_led_binding_state_t state);
 
 #endif // DB_ESP32_DB_LED_INDICATOR_H

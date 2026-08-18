@@ -32,6 +32,7 @@
 #include "globals.h"
 #include "main.h"
 #include "db_serial.h"
+#include "db_espnow_binding.h"
 
 #define TAG "DB_HTTP_REST"
 #define REST_CHECK(a, str, goto_tag, ...)                                              \
@@ -183,6 +184,30 @@ static esp_err_t settings_post_handler(httpd_req_t *req) {
 
     vTaskDelay(pdMS_TO_TICKS(2000));  // wait to allow the website displaying the success message
     esp_restart();
+    return ESP_OK;
+}
+
+/**
+ * Generates and persists a replacement ESP-NOW group secret for the web interface.
+ *
+ * @param req HTTP request that triggered the rotation.
+ * @return ESP_OK when the new secret was saved and returned.
+ */
+static esp_err_t settings_espnow_secret_rotate_post_handler(httpd_req_t *req) {
+    if (!db_espnow_binding_rotate_secret()) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to rotate ESP-NOW secret");
+        return ESP_FAIL;
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "status", "success");
+    cJSON_AddStringToObject(root, "msg", "ESP-NOW link secret rotated. Rebind all AIR units before using ESP-NOW.");
+    cJSON_AddStringToObject(root, "espnow_secret", (const char *) DB_PARAM_ESPNOW_LINK_SECRET);
+    const char *response = cJSON_PrintUnformatted(root);
+    db_http_resp_sendstr_with_retry(req, response);
+    free((void *) response);
+    cJSON_Delete(root);
     return ESP_OK;
 }
 
@@ -487,6 +512,14 @@ esp_err_t start_rest_server(const char *base_path) {
             .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &settings_post_uri);
+
+    httpd_uri_t settings_espnow_secret_rotate_post_uri = {
+            .uri = "/api/settings/espnow-secret/rotate",
+            .method = HTTP_POST,
+            .handler = settings_espnow_secret_rotate_post_handler,
+            .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &settings_espnow_secret_rotate_post_uri);
 
     /* URI handler for adding a new udp client connection */
     httpd_uri_t settings_clients_udp_post_uri = {
