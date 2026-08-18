@@ -27,10 +27,10 @@
 #include <driver/gpio.h>
 #include "common/common.h"
 
-#define DB_BUILD_VERSION 19
+#define DB_BUILD_VERSION 20
 #define DB_MAJOR_VERSION 2
-#define DB_MINOR_VERSION 2
-#define DB_PATCH_VERSION 1
+#define DB_MINOR_VERSION 3
+#define DB_PATCH_VERSION 0
 #define DB_MATURITY_VERSION "stable"
 #define DB_TYPE_VERSION 255 // FIRMWARE_VERSION_TYPE_OFFICIAL -> https://mavlink.io/en/messages/common.html#FIRMWARE_VERSION_TYPE
 
