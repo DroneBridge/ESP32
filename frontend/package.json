@@ -1,13 +1,11 @@
 {
   "name": "@dronebridge/esp32-frontend",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "devDependencies": {
-    "i": "^0.3.7",
-    "inline-source-cli": "^2.0.0",
-    "npm": "^11.12.0",
-    "shx": "^0.4.0"
+    "npm": "^11.19.0",
+    "inline-source": "^8.0.3"
   },
   "scripts": {
-    "build": "inline-source --compress < index.html > build/index.html && shx cp *.png *.ico build/"
+    "build": "node build.mjs"
   }
 }
