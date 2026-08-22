@@ -23,8 +23,8 @@
 
 #include <stdint.h>
 #include <esp_now.h>
+#include "db_espnow_limits.h"
 
-#define DB_ESPNOW_MAX_BROADCAST_PEERS   19 // Number of max. broadcast peers. that we support with internal telemetry. Limit is 255, but this is the max we can fit into one packet 250bytes
 #define ESPNOW_QUEUE_SIZE   6
 #define ESPNOW_MAXDELAY     512
 #define DB_ESPNOW_AES_IV_LEN       12   // 96 bit
@@ -84,12 +84,20 @@ typedef enum {
     DB_ESP_NOW_PACKET_TYPE_INTERNAL_TELEMETRY = 1,
 } db_espnow_queue_event_type_t;
 
-/* Element of db_espnow_send_queue and db_uart_write_queue */
+/* Element of db_espnow_send_queue. */
 typedef struct {
     uint8_t data_len;
     uint8_t *data;
     db_espnow_queue_event_type_t packet_type;   // only relevant when reading queue that sends via ESP-NOW
 } __attribute__((__packed__)) db_espnow_queue_event_t;
+
+/** Element of db_uart_write_queue, including the source stream identity. */
+typedef struct {
+    uint8_t data_len;
+    uint8_t *data;
+    uint8_t source_mac[ESP_NOW_ETH_ALEN];
+    uint32_t seq_num;
+} db_espnow_uart_queue_event_t;
 
 enum {
     DB_ESPNOW_ORIGIN_GND = 0,

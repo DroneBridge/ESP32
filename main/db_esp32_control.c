@@ -43,6 +43,7 @@
 #include "main.h"
 #include "db_serial.h"
 #include "db_esp_now.h"
+#include "db_espnow_mavlink_parser.h"
 
 #define TAG "DB_CONTROL"
 
@@ -508,8 +509,9 @@ _Noreturn void control_module_esp_now() {
     uint8_t msp_message_buffer[UART_BUF_SIZE];
     uint8_t serial_buffer[DB_SERIAL_PACK_SIZE_MAX];
     msp_ltm_port_t db_msp_ltm_port;
-    db_mavlink_parser_t espnow_parser = {0};
-    db_espnow_queue_event_t db_espnow_uart_evt;
+    db_espnow_mavlink_parser_table_t espnow_parser_table;
+    db_espnow_mavlink_parser_table_init(&espnow_parser_table);
+    db_espnow_uart_queue_event_t db_espnow_uart_evt;
     uint delay_timer_cnt = 0;
 
     ESP_LOGI(TAG, "Started control module (ESP-NOW)");
@@ -522,8 +524,28 @@ _Noreturn void control_module_esp_now() {
             if (DB_PARAM_SERIAL_PROTO == DB_SERIAL_PROTOCOL_MAVLINK) {
                 // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
                 // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existing packet
-                db_parse_mavlink_from_radio(NULL, NULL, db_espnow_uart_evt.data, db_espnow_uart_evt.data_len,
-                                             &espnow_parser);
+                bool sequence_gap = false;
+                db_mavlink_parser_t *espnow_parser = db_espnow_mavlink_parser_table_select(
+                        &espnow_parser_table,
+                        db_espnow_uart_evt.source_mac,
+                        db_espnow_uart_evt.seq_num,
+                        /* GND receives only AIR data packets. AIR also receives
+                         * GND internal telemetry, which consumes sequence
+                         * numbers but is not placed on this queue. */
+                        DB_PARAM_RADIO_MODE == DB_WIFI_MODE_ESPNOW_GND,
+                        &sequence_gap);
+                if (espnow_parser == NULL) {
+                    ESP_LOGW(TAG, "No MAVLink parser available for ESP-NOW source");
+                } else {
+                    if (sequence_gap) {
+                        ESP_LOGW(TAG, "ESP-NOW sequence gap from source %02x:%02x:%02x:%02x:%02x:%02x; resetting MAVLink parser",
+                                 db_espnow_uart_evt.source_mac[0], db_espnow_uart_evt.source_mac[1],
+                                 db_espnow_uart_evt.source_mac[2], db_espnow_uart_evt.source_mac[3],
+                                 db_espnow_uart_evt.source_mac[4], db_espnow_uart_evt.source_mac[5]);
+                    }
+                    db_parse_mavlink_from_radio(NULL, NULL, db_espnow_uart_evt.data, db_espnow_uart_evt.data_len,
+                                                 espnow_parser);
+                }
             } else {
                 // no parsing with any other protocol - transparent here - just pass through
                 write_to_serial(db_espnow_uart_evt.data, db_espnow_uart_evt.data_len);

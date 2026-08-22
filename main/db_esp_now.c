@@ -332,11 +332,13 @@ void db_espnow_process_rcv_data(uint8_t *data, uint16_t data_len, uint8_t *src_a
         /* Process packet depending on packet type */
         if (db_esp_now_packet->db_esp_now_packet_header.packet_type == DB_ESP_NOW_PACKET_TYPE_DATA) {
             // Pass data to UART queue
-            db_espnow_queue_event_t db_uart_evt;
+            db_espnow_uart_queue_event_t db_uart_evt = {0};
             db_uart_evt.data_len = db_decrypted_data[0];    // should be equal to len_payload-1 if everything worked out
             db_uart_evt.data = malloc(db_uart_evt.data_len);
             // For some reason it seems we cannot directly decrypt to db_espnow_uart_event_t -> Queues get set to NULL
             memcpy(db_uart_evt.data, &db_decrypted_data[1], db_uart_evt.data_len);
+            memcpy(db_uart_evt.source_mac, src_addr, ESP_NOW_ETH_ALEN);
+            db_uart_evt.seq_num = db_esp_now_packet->db_esp_now_packet_header.seq_num;
             if (xQueueSend(db_uart_write_queue, &db_uart_evt, ESPNOW_MAXDELAY) != pdTRUE) {
                 ESP_LOGW(TAG, "Send to db_uart_write_queue failed");
                 free(db_uart_evt.data);
@@ -533,7 +535,7 @@ esp_err_t db_espnow_init() {
 
     /* Init Queues for communication with control task */
     db_espnow_send_queue = xQueueCreate(ESPNOW_QUEUE_SIZE, sizeof(db_espnow_queue_event_t));
-    db_uart_write_queue = xQueueCreate(ESPNOW_QUEUE_SIZE, sizeof(db_espnow_queue_event_t));
+    db_uart_write_queue = xQueueCreate(ESPNOW_QUEUE_SIZE, sizeof(db_espnow_uart_queue_event_t));
     if (db_espnow_send_queue == NULL) {
         ESP_LOGE(TAG, "Create db_espnow_send_queue mutex fail");
         return ESP_FAIL;

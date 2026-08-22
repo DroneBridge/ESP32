@@ -25,3 +25,18 @@ add_custom_command (
 set(PROJECT_VER "2.3.0 (stable)")
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(db_esp32)
+
+# Configure, build, and run the native parser unit tests without adding them to
+# the ESP-IDF firmware. The nested build uses the same CMake generator as the
+# firmware build and therefore can be invoked with the regular CMake build
+# command after the firmware has been configured.
+set(DB_ESP32_UNIT_TEST_BUILD_DIR "${CMAKE_BINARY_DIR}/unit-tests")
+add_custom_target(db_esp32_unit_tests
+        COMMAND ${CMAKE_COMMAND} -S "${CMAKE_SOURCE_DIR}/test"
+                -B "${DB_ESP32_UNIT_TEST_BUILD_DIR}"
+                -G "${CMAKE_GENERATOR}"
+        COMMAND ${CMAKE_COMMAND} --build "${DB_ESP32_UNIT_TEST_BUILD_DIR}"
+        COMMAND ${CMAKE_CTEST_COMMAND} --test-dir "${DB_ESP32_UNIT_TEST_BUILD_DIR}" --output-on-failure
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        USES_TERMINAL
+        COMMENT "Building and running native ESP-NOW parser unit tests")
