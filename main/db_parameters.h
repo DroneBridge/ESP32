@@ -27,6 +27,16 @@
 #include <driver/gpio.h>
 #include "common/common.h"
 
+/**
+ * Consumes one formatted parameter line emitted by db_param_stream_values().
+ *
+ * @param line Formatted parameter line, including its trailing newline.
+ * @param line_length Number of bytes in line, excluding a string terminator.
+ * @param context Caller-owned context passed through unchanged.
+ * @return true to continue streaming or false to stop streaming.
+ */
+typedef bool (*db_param_output_callback_t)(const uint8_t *line, size_t line_length, void *context);
+
 #define DB_BUILD_VERSION 20
 #define DB_MAJOR_VERSION 2
 #define DB_MINOR_VERSION 3
@@ -194,7 +204,8 @@ extern db_parameter_t db_param_rssi_dbm;
 void db_param_init_parameters();
 void db_param_set_to_default(db_parameter_t *db_parameter);
 void db_param_reset_all();
-int db_param_print_values_to_buffer(uint8_t *str_buffer);
+bool db_param_stream_values(db_param_output_callback_t output_callback, void *context);
+void db_param_log_values();
 void db_param_read_all_params_nvs(const nvs_handle_t *nvs_handle);
 void db_param_write_all_params_nvs(const nvs_handle_t *nvs_handle);
 void db_param_read_all_params_json(const cJSON *root_obj);

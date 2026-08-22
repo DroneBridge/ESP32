@@ -526,9 +526,7 @@ void db_set_radio_status(uint8_t enable_wifi) {
 void db_write_settings_to_nvs() {
     // print parameters to console for logging
     ESP_LOGI(TAG, "Trying to save parameters:");
-    uint8_t param_str_buffer[512] = {0};
-    db_param_print_values_to_buffer(param_str_buffer);
-    ESP_LOGI(TAG, "%s", param_str_buffer);
+    db_param_log_values();
     ESP_LOGI(TAG, "Saving to NVS %s", NVS_NAMESPACE);
     nvs_handle_t my_handle;
     ESP_ERROR_CHECK(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &my_handle));
@@ -588,18 +586,15 @@ void db_read_settings_nvs() {
         db_write_settings_to_nvs();
 
         // Print parameters to console for logging
-        uint8_t param_str_buffer[512] = {0};
-        db_param_print_values_to_buffer(param_str_buffer);
-        ESP_LOGI(TAG, "Initialized with default values:\n%s", (char *)param_str_buffer);
+        ESP_LOGI(TAG, "Initialized with default values:");
+        db_param_log_values();
     } else {
         ESP_LOGI(TAG, "Reading settings from NVS");
         db_param_read_all_params_nvs(&my_handle);
         nvs_close(my_handle);
 
         // print parameters to console for logging
-        uint8_t param_str_buffer[512] = {0};
-        db_param_print_values_to_buffer(param_str_buffer);
-        ESP_LOGI(TAG, "%s", (char *) param_str_buffer);
+        db_param_log_values();
 
         // Check if we have a saved UDP client from the last session. Add it to the known udp clients if there is one.
         if (strlen((char *) db_param_udp_client_ip.value.db_param_str.value) > 0 &&
@@ -741,13 +736,31 @@ void set_reset_trigger() {
 
 
 /**
- * For simple debugging when serial via JTAG is enabled. Printed once control module configured USB serial socket.
- * Write settings to JTAG/USB, so we can debug issues better
+ * Writes one formatted parameter line to the configured serial interface.
+ *
+ * @param line Formatted parameter line to write.
+ * @param line_length Number of bytes in line.
+ * @param context Unused callback context.
+ * @return true when the line was accepted for serial output.
+ */
+static bool db_jtag_serial_write_parameter_line(const uint8_t *line, const size_t line_length, void *context) {
+    (void) context;
+    if (line == NULL || line_length == 0U) {
+        return false;
+    }
+    write_to_serial(line, (unsigned int) line_length);
+    return true;
+}
+
+/**
+ * Streams settings to JTAG/USB after the serial interface has been configured.
  */
 void db_jtag_serial_info_print() {
-    uint8_t buffer[512];
-    const int len = db_param_print_values_to_buffer(buffer);
-    write_to_serial(buffer, len);
+    static const uint8_t prefix[] = "\n";
+    write_to_serial(prefix, sizeof(prefix) - 1U);
+    if (!db_param_stream_values(db_jtag_serial_write_parameter_line, NULL)) {
+        ESP_LOGE(TAG, "Unable to write all parameter values to JTAG");
+    }
 }
 
 /**

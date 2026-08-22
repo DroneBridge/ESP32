@@ -25,6 +25,7 @@
 #include <lwip/sockets.h>
 
 #define TAG "DB_PARAM"
+#define DB_PARAM_PRINT_LINE_BUFFER_SIZE 128U
 
 /**
  * Steps to add new parameters.
@@ -565,45 +566,99 @@ void db_param_reset_all() {
 }
 
 /**
- * Helper function to convert all parameters with their values to a string buffer for logging etc.
- * @param str_buffer Buffer to write the parameter string - must be long enough ~512 bytes
+ * Formats one parameter value into a bounded, redacted diagnostic line.
+ *
+ * @param parameter Parameter to format.
+ * @param line_buffer Destination buffer for one complete line.
+ * @param line_buffer_size Capacity of line_buffer in bytes.
+ * @param line_length Receives the line length excluding the terminator.
+ * @return true when the complete line fit in line_buffer, otherwise false.
  */
-int db_param_print_values_to_buffer(uint8_t *str_buffer) {
-    int str_len = 1; // overall length of the string in the str_buffer
-    str_buffer[0] = '\n';
-    str_buffer[1] = '\0';
-    for (int i = 0; i < sizeof(db_params) / sizeof(db_params[0]); i++) {
-        uint8_t param_str_buf[128]; // buffer for the string of a single value
-        switch (db_params[i]->type) {
-            case STRING:
-                if (strcmp((char *) db_params[i]->db_name, (char *) db_param_pass.db_name) == 0 ||
-                    strcmp((char *) db_params[i]->db_name, (char *) db_param_espnow_link_secret.db_name) == 0) {
-                    str_len += sprintf((char *) param_str_buf, "\t%s: [redacted]\n", (char *) db_params[i]->db_name);
-                } else {
-                    str_len += sprintf((char *) param_str_buf, "\t%s: %s\n", (char *) db_params[i]->db_name,
-                                       (char *) db_params[i]->value.db_param_str.value);
-                }
-                break;
-            case UINT8:
-                str_len += sprintf((char *) param_str_buf, "\t%s: %i\n", (char *) db_params[i]->db_name,
-                                   db_params[i]->value.db_param_u8.value);
-                break;
-            case UINT16:
-                str_len += sprintf((char *) param_str_buf, "\t%s: %i\n", (char *) db_params[i]->db_name,
-                                   db_params[i]->value.db_param_u16.value);
-                break;
-            case INT32:
-                str_len += sprintf((char *) param_str_buf, "\t%s: %li\n", (char *) db_params[i]->db_name,
-                                   db_params[i]->value.db_param_i32.value);
-                break;
-            default:
-                ESP_LOGE(TAG, "db_param_print_values_to_buffer() -> db_parameter.type unknown!");
-                break;
-        }
-        strcat((char *) str_buffer,
-               (char *) param_str_buf); // add the string of the individual printed param to the big buffer
+static bool db_param_format_value_line(const db_parameter_t *parameter, uint8_t *line_buffer,
+                                       const size_t line_buffer_size, size_t *line_length) {
+    if (parameter == NULL || line_buffer == NULL || line_length == NULL || line_buffer_size == 0U) {
+        return false;
     }
-    return str_len;
+
+    int written = -1;
+    switch (parameter->type) {
+        case STRING:
+            if (strcmp((char *) parameter->db_name, (char *) db_param_pass.db_name) == 0 ||
+                strcmp((char *) parameter->db_name, (char *) db_param_espnow_link_secret.db_name) == 0) {
+                written = snprintf((char *) line_buffer, line_buffer_size, "\t%s: [redacted]\n",
+                                   (char *) parameter->db_name);
+            } else {
+                written = snprintf((char *) line_buffer, line_buffer_size, "\t%s: %s\n", (char *) parameter->db_name,
+                                   (char *) parameter->value.db_param_str.value);
+            }
+            break;
+        case UINT8:
+            written = snprintf((char *) line_buffer, line_buffer_size, "\t%s: %i\n", (char *) parameter->db_name,
+                               parameter->value.db_param_u8.value);
+            break;
+        case UINT16:
+            written = snprintf((char *) line_buffer, line_buffer_size, "\t%s: %i\n", (char *) parameter->db_name,
+                               parameter->value.db_param_u16.value);
+            break;
+        case INT32:
+            written = snprintf((char *) line_buffer, line_buffer_size, "\t%s: %li\n", (char *) parameter->db_name,
+                               parameter->value.db_param_i32.value);
+            break;
+        default:
+            ESP_LOGE(TAG, "db_param_format_value_line() -> db_parameter.type unknown!");
+            return false;
+    }
+
+    if (written < 0 || (size_t) written >= line_buffer_size) {
+        ESP_LOGE(TAG, "Parameter log line does not fit for %s", (char *) parameter->db_name);
+        return false;
+    }
+    *line_length = (size_t) written;
+    return true;
+}
+
+/**
+ * Streams all parameter values as independently bounded, redacted diagnostic lines.
+ *
+ * @param output_callback Callback that consumes every formatted parameter line.
+ * @param context Caller-owned context passed to output_callback.
+ * @return true when every parameter was emitted, otherwise false.
+ */
+bool db_param_stream_values(const db_param_output_callback_t output_callback, void *context) {
+    if (output_callback == NULL) {
+        return false;
+    }
+
+    uint8_t line_buffer[DB_PARAM_PRINT_LINE_BUFFER_SIZE] = {0};
+    for (int i = 0; i < sizeof(db_params) / sizeof(db_params[0]); i++) {
+        size_t line_length = 0U;
+        if (!db_param_format_value_line(db_params[i], line_buffer, sizeof(line_buffer), &line_length) ||
+            !output_callback(line_buffer, line_length, context)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * Writes all parameter values to the ESP log without exposing sensitive values.
+ */
+static bool db_param_log_value_line(const uint8_t *line, const size_t line_length, void *context) {
+    (void) context;
+    if (line == NULL || line_length == 0U) {
+        return false;
+    }
+    ESP_LOGI(TAG, "%.*s", (int) (line_length - 1U), (const char *) line);
+    return true;
+}
+
+/**
+ * Logs all parameter values using bounded per-parameter formatting.
+ */
+void db_param_log_values() {
+    if (!db_param_stream_values(db_param_log_value_line, NULL)) {
+        ESP_LOGE(TAG, "Unable to print all parameter values");
+    }
 }
 
 /**
