@@ -272,9 +272,11 @@ void db_parse_mavlink_from_radio(int *tcp_clients, udp_conn_list_t *udp_conns, u
     for (int i = 0; i < bytes_read; ++i) {
         fmav_result_t result = {0};
         if (fmav_parse_and_check_to_frame_buf(&result, parser->frame_buf, &parser->status, buffer[i])) {
-            if (result.res == FASTMAVLINK_PARSE_RESULT_OK) {
-                // Only validated MAVLink frames may reach the connected serial device.
+            if (db_mavlink_parse_result_is_forwardable(result.res)) {
+                // Preserve custom-dialect frames while rejecting known-invalid MAVLink frames.
                 write_to_serial(parser->frame_buf, result.frame_len);
+            }
+            if (result.res == FASTMAVLINK_PARSE_RESULT_OK) {
                 db_status_led_mark_radio_rx();
                 // AIR-to-AIR traffic is forwarded to the local FC without allowing peer traffic to control this endpoint.
                 if (allow_local_endpoint_handling) {
@@ -286,7 +288,7 @@ void db_parse_mavlink_from_radio(int *tcp_clients, udp_conn_list_t *udp_conns, u
             } else {
                 switch (result.res) {
                     case FASTMAVLINK_PARSE_RESULT_MSGID_UNKNOWN:
-                        ESP_LOGW(TAG, "fastmavlink parser had an error FASTMAVLINK_PARSE_RESULT_MSGID_UNKNOWN msgID: %lu", result.msgid);
+                        ESP_LOGD(TAG, "Forwarding custom MAVLink message with unknown msgID: %lu", result.msgid);
                         break;
                     case FASTMAVLINK_PARSE_RESULT_LENGTH_ERROR:
                         ESP_LOGW(TAG, "fastmavlink parser had an error FASTMAVLINK_PARSE_RESULT_LENGTH_ERROR msgID: %lu", result.msgid);

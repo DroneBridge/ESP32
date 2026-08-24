@@ -20,6 +20,8 @@
 #ifndef DB_ESP32_DB_MAVLINK_PARSER_H
 #define DB_ESP32_DB_MAVLINK_PARSER_H
 
+#include <stdbool.h>
+
 #include "lib/fastmavlink_types.h"
 
 /** MAVLink receive and transmit state for one independent byte stream. */
@@ -27,5 +29,21 @@ typedef struct {
     fmav_status_t status;
     uint8_t frame_buf[FASTMAVLINK_FRAME_LEN_MAX];
 } db_mavlink_parser_t;
+
+/**
+ * Returns whether a structurally complete MAVLink frame may be forwarded.
+ *
+ * Unknown message IDs are intentionally forwarded transparently because this
+ * firmware only compiles the common MAVLink dialect and therefore cannot
+ * validate the CRC extra of custom dialect messages. Such frames must never
+ * be decoded or handled by the local DroneBridge endpoint.
+ *
+ * @param parse_result fastMavlink parse result for the completed frame.
+ * @return true for validated or unknown-dialect frames, otherwise false.
+ */
+static inline bool db_mavlink_parse_result_is_forwardable(const uint8_t parse_result) {
+    return parse_result == FASTMAVLINK_PARSE_RESULT_OK ||
+           parse_result == FASTMAVLINK_PARSE_RESULT_MSGID_UNKNOWN;
+}
 
 #endif // DB_ESP32_DB_MAVLINK_PARSER_H

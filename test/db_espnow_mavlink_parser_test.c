@@ -29,6 +29,7 @@
 
 typedef struct {
     uint16_t lengths[TEST_MAX_CAPTURED_FRAMES];
+    uint8_t results[TEST_MAX_CAPTURED_FRAMES];
     uint8_t frames[TEST_MAX_CAPTURED_FRAMES][FASTMAVLINK_FRAME_LEN_MAX];
     size_t count;
 } captured_frames_t;
@@ -43,6 +44,34 @@ typedef struct {
 static uint16_t create_heartbeat(uint8_t *buffer, uint8_t sysid) {
     fmav_status_t status = {0};
     return fmav_msg_heartbeat_pack_to_frame_buf(buffer, sysid, 1, 2, 3, 0, sysid, 4, &status);
+}
+
+/**
+ * Creates a structurally complete MAVLink v2 frame with a message ID that is
+ * absent from the compiled minimal dialect.
+ *
+ * The checksum bytes are intentionally opaque: without the custom dialect's
+ * CRC extra this bridge can identify the frame boundary but cannot validate
+ * its checksum.
+ *
+ * @param buffer Destination frame buffer.
+ * @return Number of bytes written to the frame buffer.
+ */
+static uint16_t create_unknown_mavlink_v2_frame(uint8_t *buffer) {
+    static const uint8_t unknown_frame[] = {
+            FASTMAVLINK_MAGIC_V2,
+            3U,     // payload length
+            0U,     // incompatibility flags
+            0U,     // compatibility flags
+            17U,    // sequence number
+            42U,    // system ID
+            191U,   // component ID
+            0xDEU, 0xBCU, 0x0AU, // unknown 24-bit message ID 0x0ABCDE
+            0x11U, 0x22U, 0x33U, // payload
+            0x44U, 0x55U          // dialect-specific checksum
+    };
+    memcpy(buffer, unknown_frame, sizeof(unknown_frame));
+    return sizeof(unknown_frame);
 }
 
 /**
@@ -61,10 +90,82 @@ static void feed_fragment(db_mavlink_parser_t *parser, const uint8_t *data, size
             assert(result.res == FASTMAVLINK_PARSE_RESULT_OK);
             assert(captured->count < TEST_MAX_CAPTURED_FRAMES);
             captured->lengths[captured->count] = result.frame_len;
+            captured->results[captured->count] = result.res;
             memcpy(captured->frames[captured->count], parser->frame_buf, result.frame_len);
             captured->count++;
         }
     }
+}
+
+/**
+ * Feeds bytes into a parser and captures frames accepted by the transparent
+ * forwarding policy.
+ *
+ * @param parser Parser receiving the fragment.
+ * @param data Fragment bytes.
+ * @param length Number of bytes in the fragment.
+ * @param captured Destination for forwardable frames.
+ */
+static void feed_forwardable_fragment(db_mavlink_parser_t *parser, const uint8_t *data, size_t length,
+                                      captured_frames_t *captured) {
+    for (size_t i = 0; i < length; i++) {
+        fmav_result_t result = {0};
+        if (fmav_parse_and_check_to_frame_buf(&result, parser->frame_buf, &parser->status, data[i])) {
+            if (db_mavlink_parse_result_is_forwardable(result.res)) {
+                assert(captured->count < TEST_MAX_CAPTURED_FRAMES);
+                captured->lengths[captured->count] = result.frame_len;
+                captured->results[captured->count] = result.res;
+                memcpy(captured->frames[captured->count], parser->frame_buf, result.frame_len);
+                captured->count++;
+            }
+        }
+    }
+}
+
+/**
+ * Verifies the policy accepts valid and custom-dialect frames while rejecting
+ * parse results that identify a known-invalid frame.
+ */
+static void test_mavlink_forwarding_policy(void) {
+    assert(db_mavlink_parse_result_is_forwardable(FASTMAVLINK_PARSE_RESULT_OK));
+    assert(db_mavlink_parse_result_is_forwardable(FASTMAVLINK_PARSE_RESULT_MSGID_UNKNOWN));
+    assert(!db_mavlink_parse_result_is_forwardable(FASTMAVLINK_PARSE_RESULT_NONE));
+    assert(!db_mavlink_parse_result_is_forwardable(FASTMAVLINK_PARSE_RESULT_HAS_HEADER));
+    assert(!db_mavlink_parse_result_is_forwardable(FASTMAVLINK_PARSE_RESULT_LENGTH_ERROR));
+    assert(!db_mavlink_parse_result_is_forwardable(FASTMAVLINK_PARSE_RESULT_CRC_ERROR));
+    assert(!db_mavlink_parse_result_is_forwardable(FASTMAVLINK_PARSE_RESULT_SIGNATURE_ERROR));
+}
+
+/**
+ * Verifies an unknown custom MAVLink frame split across two contiguous
+ * ESP-NOW packets is reconstructed and forwarded byte-for-byte.
+ */
+static void test_unknown_frame_is_forwarded_across_fragments(void) {
+    const uint8_t mac[DB_ESPNOW_MAC_ADDR_LEN] = {0x02, 0x00, 0x00, 0x00, 0x00, 0x09};
+    uint8_t frame[FASTMAVLINK_FRAME_LEN_MAX] = {0};
+    const uint16_t frame_length = create_unknown_mavlink_v2_frame(frame);
+    const size_t split = frame_length / 2U;
+    bool sequence_gap = false;
+    db_espnow_mavlink_parser_table_t table;
+    captured_frames_t captured = {0};
+
+    db_espnow_mavlink_parser_table_init(&table);
+    db_mavlink_parser_t *parser = db_espnow_mavlink_parser_table_select(
+            &table, mac, 80U, true, &sequence_gap);
+    assert(parser != NULL);
+    assert(!sequence_gap);
+    feed_forwardable_fragment(parser, frame, split, &captured);
+    assert(captured.count == 0U);
+
+    parser = db_espnow_mavlink_parser_table_select(&table, mac, 81U, true, &sequence_gap);
+    assert(parser != NULL);
+    assert(!sequence_gap);
+    feed_forwardable_fragment(parser, &frame[split], frame_length - split, &captured);
+
+    assert(captured.count == 1U);
+    assert(captured.results[0] == FASTMAVLINK_PARSE_RESULT_MSGID_UNKNOWN);
+    assert(captured.lengths[0] == frame_length);
+    assert(memcmp(captured.frames[0], frame, frame_length) == 0);
 }
 
 /**
@@ -263,6 +364,8 @@ static void test_parser_table_capacity(void) {
  * @return Zero when all assertions pass.
  */
 int main(void) {
+    test_mavlink_forwarding_policy();
+    test_unknown_frame_is_forwarded_across_fragments();
     test_interleaved_fragments_are_isolated();
     test_sequence_gap_resets_only_affected_source();
     test_sequence_wrap_is_contiguous();
