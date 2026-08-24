@@ -64,6 +64,7 @@ typedef struct {
 typedef struct {
     uint8_t mac_addr[ESP_NOW_ETH_ALEN];
     int8_t rssi;
+    int8_t noise_floor;
     uint8_t data_len;
     uint8_t *data;
 } db_espnow_event_recv_cb_t;
@@ -97,6 +98,7 @@ typedef struct {
     uint8_t *data;
     uint8_t source_mac[ESP_NOW_ETH_ALEN];
     uint32_t seq_num;
+    uint8_t origin;
 } db_espnow_uart_queue_event_t;
 
 enum {

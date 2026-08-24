@@ -416,6 +416,27 @@ db_parameter_t db_param_rssi_dbm = {
 };
 
 /**
+ * Enables delivery of authenticated MAVLink traffic from other ESP-NOW AIR units to the local flight controller.
+ */
+db_parameter_t db_param_espnow_air2air = {
+        .db_name = "espnow_air2air",
+        .type = UINT8,
+        .mav_t = {
+                .param_name = "ESPNOW_AIR2AIR",
+                .param_index = 17,
+                .param_type = MAV_PARAM_TYPE_UINT8,
+        },
+        .value = {
+                .db_param_u8 = {
+                        .value = false,
+                        .default_value = false,
+                        .min = false,
+                        .max = true,
+                }
+        }
+};
+
+/**
  * Array containing all references to the DB parameters assigned with db_param_init_parameters()
  */
 db_parameter_t *db_params[DB_PARAM_TOTAL_NUM] = {NULL};
@@ -524,7 +545,8 @@ void db_param_init_parameters() {
             &db_param_ltm_per_packet,
             &db_param_dis_radio_armed,
             &db_param_udp_client_port,
-            &db_param_rssi_dbm
+            &db_param_rssi_dbm,
+            &db_param_espnow_air2air
     };
     memcpy(db_params, db_params_l, sizeof(db_params_l));
 }

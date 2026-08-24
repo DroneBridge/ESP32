@@ -80,6 +80,17 @@ function change_ap_ip_visibility() {
 		elements.espnow_rotate_secret_button.style.display = "none";
 	}
 	change_radio_dis_arm_visibility();
+	change_espnow_air2air_visibility();
+}
+
+/**
+ * Shows AIR-to-AIR MAVLink forwarding only where it can safely apply.
+ */
+function change_espnow_air2air_visibility() {
+	const espnow_air2air_div = document.getElementById("espnow_air2air_div");
+	const esp32_mode = document.getElementById("esp32_mode");
+	const telemetry_protocol = document.getElementById("proto");
+	espnow_air2air_div.style.display = esp32_mode.value === "4" && telemetry_protocol.value === "4" ? "block" : "none";
 }
 
 function change_msp_ltm_visibility(){
@@ -101,6 +112,7 @@ function change_msp_ltm_visibility(){
 		rep_rssi_dbm_div.style.display = "none";
 	}
 	change_radio_dis_arm_visibility();
+	change_espnow_air2air_visibility();
 }
 
 function change_uart_visibility() {

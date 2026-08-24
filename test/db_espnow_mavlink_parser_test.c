@@ -1,7 +1,7 @@
 /*
  *   This file is part of DroneBridge: https://github.com/DroneBridge/ESP32
  *
- *   Copyright 2024 Wolfgang Christl
+ *   Copyright 2026 Wolfgang Christl
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -198,6 +198,48 @@ static void test_sequence_tracking_can_be_disabled(void) {
 }
 
 /**
+ * Verifies that an AIR stream detects missing data while a GND stream can
+ * skip its non-data internal telemetry without resetting its MAVLink parser.
+ */
+static void test_air_and_gnd_sequence_policies_are_independent(void) {
+    const uint8_t air_mac[DB_ESPNOW_MAC_ADDR_LEN] = {0x02, 0x00, 0x00, 0x00, 0x00, 0x4A};
+    const uint8_t gnd_mac[DB_ESPNOW_MAC_ADDR_LEN] = {0x02, 0x00, 0x00, 0x00, 0x00, 0x4B};
+    uint8_t frame[FASTMAVLINK_FRAME_LEN_MAX] = {0};
+    const uint16_t frame_length = create_heartbeat(frame, 51);
+    const size_t split = frame_length / 2U;
+    bool sequence_gap = false;
+    db_espnow_mavlink_parser_table_t table;
+    captured_frames_t captured_air = {0};
+    captured_frames_t captured_gnd = {0};
+
+    db_espnow_mavlink_parser_table_init(&table);
+    db_mavlink_parser_t *air_parser = db_espnow_mavlink_parser_table_select(
+            &table, air_mac, 100U, true, &sequence_gap);
+    assert(air_parser != NULL);
+    feed_fragment(air_parser, frame, split, &captured_air);
+
+    db_mavlink_parser_t *gnd_parser = db_espnow_mavlink_parser_table_select(
+            &table, gnd_mac, 100U, false, &sequence_gap);
+    assert(gnd_parser != NULL);
+    feed_fragment(gnd_parser, frame, split, &captured_gnd);
+
+    air_parser = db_espnow_mavlink_parser_table_select(&table, air_mac, 102U, true, &sequence_gap);
+    assert(air_parser != NULL);
+    assert(sequence_gap);
+    feed_fragment(air_parser, &frame[split], frame_length - split, &captured_air);
+
+    gnd_parser = db_espnow_mavlink_parser_table_select(&table, gnd_mac, 102U, false, &sequence_gap);
+    assert(gnd_parser != NULL);
+    assert(!sequence_gap);
+    feed_fragment(gnd_parser, &frame[split], frame_length - split, &captured_gnd);
+
+    assert(captured_air.count == 0U);
+    assert(captured_gnd.count == 1U);
+    assert(captured_gnd.lengths[0] == frame_length);
+    assert(memcmp(captured_gnd.frames[0], frame, frame_length) == 0);
+}
+
+/**
  * Verifies that the parser table rejects a source after all supported slots are used.
  */
 static void test_parser_table_capacity(void) {
@@ -225,6 +267,7 @@ int main(void) {
     test_sequence_gap_resets_only_affected_source();
     test_sequence_wrap_is_contiguous();
     test_sequence_tracking_can_be_disabled();
+    test_air_and_gnd_sequence_policies_are_independent();
     test_parser_table_capacity();
     return 0;
 }

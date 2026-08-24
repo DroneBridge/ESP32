@@ -108,6 +108,14 @@
                     <div class="info note">Binding creates the ESP-NOW link secret automatically. Rotating it disconnects all currently bound AIR units; they need to be re-bound.<br>Leave it empty only to use the legacy Wi-Fi password for ESP-NOW.<br>AIR and GND must have matching secrets.</div>
                 </div>
             </div>
+            <div class="row" id="espnow_air2air_div">
+                <div class="twelve columns">
+                    <div class="checkbox-wrapper-14">
+                        <input id="espnow_air2air" name="espnow_air2air" type="checkbox" class="switch">
+                        <label class="tooltip" for="espnow_air2air"><span class="tooltiptext">For ESP-NOW AIR units using MAVLink only. When enabled, all authenticated MAVLink frames sent by other AIR units in the same ESP-NOW group are forwarded to this unit's flight controller. Enable this only when the flight controllers intentionally share a MAVLink bus and use unique system IDs.</span>Forward MAVLink from other AIR units</label>
+                    </div>
+                </div>
+            </div>
             <div class="row">
                 <div id="ap_channel_div" class="six columns">
                     <label for="wifi_chan">Channel</label>

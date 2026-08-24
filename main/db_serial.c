@@ -260,9 +260,10 @@ void db_route_mavlink_response(uint8_t *buffer, uint16_t length, enum DB_MAVLINK
  * @param buffer Buffer containing the raw bytes to be parsed
  * @param bytes_read Number of bytes in the buffer
  * @param parser Receive state for the independent input byte stream
+ * @param allow_local_endpoint_handling Whether messages for this DroneBridge endpoint may be handled locally
  */
 void db_parse_mavlink_from_radio(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *buffer, int bytes_read,
-                                 db_mavlink_parser_t *parser) {
+                                 db_mavlink_parser_t *parser, bool allow_local_endpoint_handling) {
     if (parser == NULL) {
         ESP_LOGE(TAG, "Cannot parse MAVLink without parser state");
         return;
@@ -271,16 +272,16 @@ void db_parse_mavlink_from_radio(int *tcp_clients, udp_conn_list_t *udp_conns, u
     for (int i = 0; i < bytes_read; ++i) {
         fmav_result_t result = {0};
         if (fmav_parse_and_check_to_frame_buf(&result, parser->frame_buf, &parser->status, buffer[i])) {
-            // Parser detected a full message, write to serial
-            write_to_serial(parser->frame_buf, result.frame_len);
-            // Decode message and react to it if it was for us
-            fmav_frame_buf_to_msg(&msg, &result, parser->frame_buf);
             if (result.res == FASTMAVLINK_PARSE_RESULT_OK) {
+                // Only validated MAVLink frames may reach the connected serial device.
+                write_to_serial(parser->frame_buf, result.frame_len);
                 db_status_led_mark_radio_rx();
-                if (fmav_msg_is_for_me(db_get_mav_sys_id(), db_get_mav_comp_id(), &msg)) {
+                // AIR-to-AIR traffic is forwarded to the local FC without allowing peer traffic to control this endpoint.
+                if (allow_local_endpoint_handling) {
+                    fmav_frame_buf_to_msg(&msg, &result, parser->frame_buf);
+                }
+                if (allow_local_endpoint_handling && fmav_msg_is_for_me(db_get_mav_sys_id(), db_get_mav_comp_id(), &msg)) {
                     handle_mavlink_message(&msg, tcp_clients, udp_conns, &parser->status, DB_MAVLINK_DATA_ORIGIN_RADIO);
-                } else {
-                    // message was not for us so ignore it
                 }
             } else {
                 switch (result.res) {

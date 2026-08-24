@@ -529,10 +529,10 @@ _Noreturn void control_module_esp_now() {
                         &espnow_parser_table,
                         db_espnow_uart_evt.source_mac,
                         db_espnow_uart_evt.seq_num,
-                        /* GND receives only AIR data packets. AIR also receives
-                         * GND internal telemetry, which consumes sequence
-                         * numbers but is not placed on this queue. */
-                        DB_PARAM_RADIO_MODE == DB_WIFI_MODE_ESPNOW_GND,
+                        /* GND internal telemetry consumes GND sequence numbers
+                         * without entering this queue. AIR currently emits only
+                         * data packets, so its sequence is a complete byte stream. */
+                        db_espnow_uart_evt.origin == DB_ESPNOW_ORIGIN_AIR,
                         &sequence_gap);
                 if (espnow_parser == NULL) {
                     ESP_LOGW(TAG, "No MAVLink parser available for ESP-NOW source");
@@ -544,7 +544,9 @@ _Noreturn void control_module_esp_now() {
                                  db_espnow_uart_evt.source_mac[4], db_espnow_uart_evt.source_mac[5]);
                     }
                     db_parse_mavlink_from_radio(NULL, NULL, db_espnow_uart_evt.data, db_espnow_uart_evt.data_len,
-                                                 espnow_parser);
+                                                 espnow_parser,
+                                                 DB_PARAM_RADIO_MODE != DB_WIFI_MODE_ESPNOW_AIR ||
+                                                 db_espnow_uart_evt.origin != DB_ESPNOW_ORIGIN_AIR);
                 }
             } else {
                 // no parsing with any other protocol - transparent here - just pass through
@@ -722,7 +724,7 @@ _Noreturn void control_module_udp_tcp() {
                         // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
                         // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existign packet
                         db_parse_mavlink_from_radio(connected_tcp_clients, udp_conn_list, tcp_client_buffer, recv_length,
-                                                     &tcp_parsers[i]);
+                                                     &tcp_parsers[i], true);
                     } else {
                         // no parsing with any other protocol - transparent here
                         write_to_serial(tcp_client_buffer, recv_length);
@@ -754,7 +756,7 @@ _Noreturn void control_module_udp_tcp() {
                 // We can not write to serial first since we might inject packets and do not know when to do so to not "destroy" an existing packet
                 fmav_status_reset_rx(&udp_parser.status);
                 db_parse_mavlink_from_radio(connected_tcp_clients, udp_conn_list, udp_buffer, recv_length,
-                                             &udp_parser);
+                                             &udp_parser, true);
             } else {
                 // no parsing with any other protocol - transparent here
                 write_to_serial(udp_buffer, recv_length);
@@ -861,7 +863,7 @@ _Noreturn void control_module_ble() {
                 // Parse, so we can listen in and react to certain messages - function will send parsed messages to serial link.
                 // We cannot write to serial first since we might inject packets and do not know when to do so to not "destroy" an
                 // existing packet
-                db_parse_mavlink_from_radio(NULL, NULL, bleData.data, bleData.data_len, &ble_parser);
+                db_parse_mavlink_from_radio(NULL, NULL, bleData.data, bleData.data_len, &ble_parser, true);
             } else {
                 // no parsing with any other protocol - transparent here - just pass through
                 write_to_serial(bleData.data, bleData.data_len);
