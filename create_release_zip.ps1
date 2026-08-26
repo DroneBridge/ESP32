@@ -1,8 +1,8 @@
 # Execute in an esp-idf enabled PowerShell
 # This script will create a combined zip file containing binaries for all supported esp32 boards
 
-$release_foldername = "DroneBridge_ESP32_v2_3_0_stable"
-$release_name_zip = "DroneBridge_ESP32_v2_3_0_stable.zip"
+$release_foldername = "DroneBridge_ESP32_v2_4_0_stable"
+$release_name_zip = "DroneBridge_ESP32_v2_4_0_stable.zip"
 
 mkdir $release_foldername
 mkdir build
@@ -10,7 +10,7 @@ cp .\flashing_instructions.txt $release_foldername
 cp .\db_params.csv $release_foldername
 
 function BuildAndCopy($config, $folder, $target) {
-    rm -Recurse -Force .\build
+	rm sdkconfig
     idf.py fullclean
 	Copy-Item -Path .\config_defaults\$config -Destination .\sdkconfig.defaults -PassThru
     idf.py set-target $target

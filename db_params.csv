@@ -25,3 +25,4 @@ ltm_per_packet,data,u8,2
 radio_dis_onarm,data,u8,0
 udp_client_port,data,u16,0
 rep_rssi_dbm,data,u8,1
+espnow_air2air,data,u8,0
