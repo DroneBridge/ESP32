@@ -37,9 +37,9 @@
  */
 typedef bool (*db_param_output_callback_t)(const uint8_t *line, size_t line_length, void *context);
 
-#define DB_BUILD_VERSION 20
+#define DB_BUILD_VERSION 21
 #define DB_MAJOR_VERSION 2
-#define DB_MINOR_VERSION 3
+#define DB_MINOR_VERSION 4
 #define DB_PATCH_VERSION 0
 #define DB_MATURITY_VERSION "stable"
 #define DB_TYPE_VERSION 255 // FIRMWARE_VERSION_TYPE_OFFICIAL -> https://mavlink.io/en/messages/common.html#FIRMWARE_VERSION_TYPE
