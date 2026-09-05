@@ -110,6 +110,7 @@ In any other case, there are multiple ways how to flash the firmware.
 
 For questions or general chatting regarding DroneBridge for ESP32 please visit the Discord channel  
 <div>
+   
 <a href="https://discord.gg/pqmHJNArE3">
 <img src="wiki/discord-logo-blue.png" width="200px">
 </a>
