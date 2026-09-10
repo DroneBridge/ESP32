@@ -31,6 +31,7 @@
 #include <stdint-gcc.h>
 #include <driver/usb_serial_jtag.h>
 #include "db_serial.h"
+#include "db_espnow_diagnostics.h"
 #include "main.h"
 #include "db_led_indicator.h"
 #include "db_esp32_control.h"
@@ -96,7 +97,11 @@ esp_err_t open_uart_serial_socket() {
     ESP_ERROR_CHECK(uart_set_pin(UART_NUM, DB_PARAM_GPIO_TX, DB_PARAM_GPIO_RX,
                                  flow_control ? DB_PARAM_GPIO_RTS : UART_PIN_NO_CHANGE,
                                  flow_control ? DB_PARAM_GPIO_CTS : UART_PIN_NO_CHANGE));
+#ifdef CONFIG_DB_ESPNOW_DIAGNOSTICS
+    return uart_driver_install(UART_NUM, 1024, 0, 10, &db_diag_uart_events, 0);
+#else
     return uart_driver_install(UART_NUM, 1024, 0, 10, NULL, 0);
+#endif
 }
 
 /**
@@ -136,11 +141,17 @@ esp_err_t open_serial_socket() {
  * Writes data from buffer to the opened serial device
  * @param data_buffer Payload to write to UART
  * @param data_length Size of payload to write to UART
+ * @param source Diagnostic origin of this write; no effect on transmission.
  */
-void write_to_serial(const uint8_t data_buffer[], const unsigned int data_length) {
+static void write_to_serial_from(const uint8_t data_buffer[], const unsigned int data_length,
+                                 db_diag_source_t source) {
+    const int64_t start = DB_DIAG_NOW();
+    (void)start;
+    (void)source;
 #ifdef CONFIG_DB_SERIAL_OPTION_JTAG
     // Writes data from buffer to JTAG based serial interface
     int written = usb_serial_jtag_write_bytes(data_buffer, data_length, 20 / portTICK_PERIOD_MS);
+    db_diag_write(source, data_length, written, start);
     if (written != data_length) {
         ESP_LOGW(TAG, "Wrote only %i of %i bytes to JTAG", written, data_length);
     } else {
@@ -150,6 +161,7 @@ void write_to_serial(const uint8_t data_buffer[], const unsigned int data_length
     // UART based serial socket for comms with FC or GCS via FTDI - configured by pins in the web interface
     // Writes data from buffer to native UART interface
     int written = uart_write_bytes(UART_NUM, data_buffer, data_length);
+    db_diag_write(source, data_length, written, start);
     if (written != data_length) {
         // This is a debug log since it happens very rarely that not all bytes get written. Save some cpu cycles.
         ESP_LOGD(TAG, "Wrote only %i of %i bytes to UART", written, data_length);
@@ -159,6 +171,11 @@ void write_to_serial(const uint8_t data_buffer[], const unsigned int data_length
 #endif
 }
 
+/** Write a locally generated frame, retaining the existing serial API. */
+void write_to_serial(const uint8_t data_buffer[], const unsigned int data_length) {
+    write_to_serial_from(data_buffer, data_length, DB_DIAG_LOCAL);
+}
+
 /**
  * Read data from the open serial interface in non-blocking fashion.
  * @param uart_read_buf Pointer to buffer to put the read bytes into
@@ -166,6 +183,7 @@ void write_to_serial(const uint8_t data_buffer[], const unsigned int data_length
  * @return number of read bytes
  */
 int db_read_serial(uint8_t *uart_read_buf, uint length) {
+    db_diag_read();
 #ifdef CONFIG_DB_SERIAL_OPTION_JTAG
     return usb_serial_jtag_read_bytes(uart_read_buf, length, 0);
 #else
@@ -273,8 +291,17 @@ void db_parse_mavlink_from_radio(int *tcp_clients, udp_conn_list_t *udp_conns, u
         fmav_result_t result = {0};
         if (fmav_parse_and_check_to_frame_buf(&result, parser->frame_buf, &parser->status, buffer[i])) {
             if (db_mavlink_parse_result_is_forwardable(result.res)) {
+                // Peer link reports must not throttle the local FC or its MAVFTP sender.
+                const bool peer_air_to_fc = DB_PARAM_RADIO_MODE == DB_WIFI_MODE_ESPNOW_AIR &&
+                                            !allow_local_endpoint_handling;
+                if (db_mavlink_filter_peer_radio_status(result.msgid, peer_air_to_fc)) {
+                    db_diag_peer_radio_status_filtered();
+                    continue;
+                }
                 // Preserve custom-dialect frames while rejecting known-invalid MAVLink frames.
-                write_to_serial(parser->frame_buf, result.frame_len);
+                write_to_serial_from(parser->frame_buf, result.frame_len,
+                                     DB_PARAM_RADIO_MODE == DB_WIFI_MODE_ESPNOW_GND ||
+                                     !allow_local_endpoint_handling ? DB_DIAG_PEER : DB_DIAG_GND);
             }
             if (result.res == FASTMAVLINK_PARSE_RESULT_OK) {
                 db_status_led_mark_radio_rx();

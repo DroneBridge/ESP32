@@ -37,6 +37,8 @@
 #include "main.h"
 #include "espnow.h"
 
+#include "db_espnow_diagnostics.h"
+
 #define TAG "DB_ESPNOW"
 
 static const uint8_t BROADCAST_MAC[ESP_NOW_ETH_ALEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
@@ -381,7 +383,8 @@ void db_espnow_process_rcv_data(uint8_t *data, uint16_t data_len, uint8_t *src_a
             memcpy(db_uart_evt.source_mac, src_addr, ESP_NOW_ETH_ALEN);
             db_uart_evt.seq_num = db_esp_now_packet->db_esp_now_packet_header.seq_num;
             db_uart_evt.origin = origin;
-            if (xQueueSend(db_uart_write_queue, &db_uart_evt, ESPNOW_MAXDELAY) != pdTRUE) {
+            if (db_diag_queue_send(origin == DB_ESPNOW_ORIGIN_AIR ? DB_DIAG_RX_PEER : DB_DIAG_RX_GND,
+                                   db_uart_write_queue, &db_uart_evt, ESPNOW_MAXDELAY) != pdTRUE) {
                 ESP_LOGW(TAG, "Send to db_uart_write_queue failed");
                 free(db_uart_evt.data);
             } else {
@@ -454,7 +457,7 @@ static void db_espnow_send_callback(const uint8_t *mac_addr, esp_now_send_status
     memcpy(send_cb->mac_addr, mac_addr, ESP_NOW_ETH_ALEN);
 #endif
     send_cb->status = status;
-    if (xQueueSend(db_espnow_send_recv_callback_queue, &evt, ESPNOW_MAXDELAY) != pdTRUE) {
+    if (db_diag_queue_send(DB_DIAG_CALLBACK, db_espnow_send_recv_callback_queue, &evt, ESPNOW_MAXDELAY) != pdTRUE) {
         ESP_LOGW(TAG, "Send to send queue fail");
     }
 }
@@ -507,7 +510,7 @@ static void db_espnow_receive_callback(const esp_now_recv_info_t *recv_info, con
         recv_cb->noise_floor = recv_info->rx_ctrl->noise_floor;
     }
 #endif
-    if (db_espnow_send_recv_callback_queue != NULL && xQueueSend(db_espnow_send_recv_callback_queue, &evt, ESPNOW_MAXDELAY) != pdTRUE) {
+    if (db_espnow_send_recv_callback_queue != NULL && db_diag_queue_send(DB_DIAG_CALLBACK, db_espnow_send_recv_callback_queue, &evt, ESPNOW_MAXDELAY) != pdTRUE) {
         ESP_LOGW(TAG, "Send to receive queue fail");
         free(recv_cb->data);
     }
@@ -650,7 +653,7 @@ bool db_espnow_schedule_internal_telemetry_packet() {
     memcpy(evt.data, db_esp_now_clients_list, payload_size);
     evt.data_len = payload_size;
     evt.packet_type = DB_ESP_NOW_PACKET_TYPE_INTERNAL_TELEMETRY;
-    if (xQueueSend(db_espnow_send_queue, &evt, ESPNOW_MAXDELAY) != pdTRUE) {
+    if (db_diag_queue_send(DB_DIAG_TX, db_espnow_send_queue, &evt, ESPNOW_MAXDELAY) != pdTRUE) {
         ESP_LOGW(TAG, "Send to db_espnow_send_queue queue fail");
         free(evt.data);
         return false;

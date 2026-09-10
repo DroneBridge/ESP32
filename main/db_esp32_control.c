@@ -45,6 +45,8 @@
 #include "db_esp_now.h"
 #include "db_espnow_mavlink_parser.h"
 
+#include "db_espnow_diagnostics.h"
+
 #define TAG "DB_CONTROL"
 
 static uint16_t app_port_proxy = APP_PORT_PROXY;
@@ -210,7 +212,7 @@ void db_send_to_all_espnow(uint8_t data[], const uint16_t *data_length) {
     memcpy(evt.data, data, *data_length);
     evt.data_len = *data_length;
     evt.packet_type = DB_ESP_NOW_PACKET_TYPE_DATA;
-    if (xQueueSend(db_espnow_send_queue, &evt, ESPNOW_MAXDELAY) != pdTRUE) {
+    if (db_diag_queue_send(DB_DIAG_TX, db_espnow_send_queue, &evt, ESPNOW_MAXDELAY) != pdTRUE) {
         ESP_LOGW(TAG, "Send to db_espnow_send_queue queue fail");
         free(evt.data);
     } else {
@@ -515,6 +517,7 @@ _Noreturn void control_module_esp_now() {
     uint delay_timer_cnt = 0;
 
     ESP_LOGI(TAG, "Started control module (ESP-NOW)");
+    db_diag_start();
     while (1) {
         // read UART (and split into packets & process MAVLink if desired); send to ESP-NOW queue to be processed by esp-now task
         read_process_serial_link(NULL, &transparent_buff_pos, &msp_ltm_buff_pos, msp_message_buffer, serial_buffer,

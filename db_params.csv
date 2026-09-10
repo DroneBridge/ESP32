@@ -2,6 +2,7 @@ key,type,encoding,value
 settings,namespace,,
 ssid,data,string,DroneBridge for ESP32
 wifi_pass,data,string,dronebridge
+espnow_secret,data,string,
 ap_ip,data,string,192.168.2.1
 ip_sta,data,string,
 ip_sta_gw,data,string,

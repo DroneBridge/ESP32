@@ -46,4 +46,15 @@ static inline bool db_mavlink_parse_result_is_forwardable(const uint8_t parse_re
            parse_result == FASTMAVLINK_PARSE_RESULT_MSGID_UNKNOWN;
 }
 
+/**
+ * Exclude another AIR's link-local flow-control reports from the local FC.
+ * Called only after a complete, forwardable frame has been assembled. Numeric
+ * IDs cover common RADIO_STATUS (109) and legacy ardupilotmega RADIO (166),
+ * including the latter when absent from the compiled dialect. Other paths
+ * retain their transparent forwarding policy.
+ */
+static inline bool db_mavlink_filter_peer_radio_status(uint32_t message_id, bool peer_air_to_fc) {
+    return peer_air_to_fc && (message_id == 109U || message_id == 166U);
+}
+
 #endif // DB_ESP32_DB_MAVLINK_PARSER_H

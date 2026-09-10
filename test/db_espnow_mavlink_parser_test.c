@@ -23,7 +23,7 @@
 #include <string.h>
 
 #include "db_espnow_mavlink_parser.h"
-#include "minimal/minimal.h"
+#include "common/common.h"
 
 #define TEST_MAX_CAPTURED_FRAMES 4U
 
@@ -106,17 +106,73 @@ static void feed_fragment(db_mavlink_parser_t *parser, const uint8_t *data, size
  * @param length Number of bytes in the fragment.
  * @param captured Destination for forwardable frames.
  */
-static void feed_forwardable_fragment(db_mavlink_parser_t *parser, const uint8_t *data, size_t length,
-                                      captured_frames_t *captured) {
+static void feed_forwardable_fragment_for_path(db_mavlink_parser_t *parser, const uint8_t *data, size_t length,
+                                               captured_frames_t *captured, bool peer_air_to_fc) {
     for (size_t i = 0; i < length; i++) {
         fmav_result_t result = {0};
         if (fmav_parse_and_check_to_frame_buf(&result, parser->frame_buf, &parser->status, data[i])) {
             if (db_mavlink_parse_result_is_forwardable(result.res)) {
+                if (db_mavlink_filter_peer_radio_status(result.msgid, peer_air_to_fc)) continue;
                 assert(captured->count < TEST_MAX_CAPTURED_FRAMES);
                 captured->lengths[captured->count] = result.frame_len;
                 captured->results[captured->count] = result.res;
                 memcpy(captured->frames[captured->count], parser->frame_buf, result.frame_len);
                 captured->count++;
+            }
+        }
+    }
+}
+
+/** Feed the unchanged GND-to-FC/AIR-to-GND forwarding policy. */
+static void feed_forwardable_fragment(db_mavlink_parser_t *parser, const uint8_t *data, size_t length,
+                                      captured_frames_t *captured) {
+    feed_forwardable_fragment_for_path(parser, data, length, captured, false);
+}
+
+/**
+ * Verify both radio-report IDs are suppressed only on the peer path at every
+ * fragmentation boundary, without losing a following heartbeat/custom frame.
+ * Legacy RADIO is intentionally unknown to common, as in production.
+ */
+static void test_peer_radio_status_filter(void) {
+    for (unsigned legacy = 0; legacy < 2; legacy++) {
+        uint8_t stream[3 * FASTMAVLINK_FRAME_LEN_MAX] = {0};
+        fmav_status_t status = {0};
+        fmav_radio_status_t radio = {0};
+        uint16_t radio_len = fmav_msg_radio_status_encode_to_frame_buf(stream, 127, 191, &radio, &status);
+        if (legacy) {
+            // A structurally complete unknown-dialect RADIO frame, opaque CRC.
+            stream[7] = 166;
+            stream[8] = stream[9] = 0;
+        }
+        const uint16_t heartbeat_len = create_heartbeat(stream + radio_len, 127);
+        const uint16_t custom_len = create_unknown_mavlink_v2_frame(stream + radio_len + heartbeat_len);
+        const size_t length = radio_len + heartbeat_len + custom_len;
+        for (size_t split = 1; split < radio_len; split++) {
+            for (unsigned peer = 0; peer < 2; peer++) {
+                db_espnow_mavlink_parser_table_t table;
+                db_espnow_mavlink_parser_table_init(&table);
+                const uint8_t mac[DB_ESPNOW_MAC_ADDR_LEN] = {2, 0, 0, 0, 0, 127};
+                bool gap;
+                captured_frames_t captured = {0};
+                db_mavlink_parser_t *parser = db_espnow_mavlink_parser_table_select(&table, mac, 10, true, &gap);
+                assert(parser != NULL && !gap);
+                feed_forwardable_fragment_for_path(parser, stream, split, &captured, peer);
+                assert(captured.count == 0);
+                parser = db_espnow_mavlink_parser_table_select(&table, mac, 11, true, &gap);
+                assert(parser != NULL && !gap);
+                feed_forwardable_fragment_for_path(parser, stream + split, length - split, &captured, peer);
+                assert(captured.count == (peer ? 2U : 3U));
+                const unsigned first = peer ? 0U : 1U;
+                if (!peer) {
+                    assert(captured.lengths[0] == radio_len);
+                    assert(memcmp(captured.frames[0], stream, radio_len) == 0);
+                    assert(captured.results[0] == (legacy ? FASTMAVLINK_PARSE_RESULT_MSGID_UNKNOWN : FASTMAVLINK_PARSE_RESULT_OK));
+                }
+                assert(captured.lengths[first] == heartbeat_len);
+                assert(memcmp(captured.frames[first], stream + radio_len, heartbeat_len) == 0);
+                assert(captured.lengths[first + 1] == custom_len);
+                assert(memcmp(captured.frames[first + 1], stream + radio_len + heartbeat_len, custom_len) == 0);
             }
         }
     }
@@ -364,6 +420,7 @@ static void test_parser_table_capacity(void) {
  * @return Zero when all assertions pass.
  */
 int main(void) {
+    test_peer_radio_status_filter();
     test_mavlink_forwarding_policy();
     test_unknown_frame_is_forwarded_across_fragments();
     test_interleaved_fragments_are_isolated();

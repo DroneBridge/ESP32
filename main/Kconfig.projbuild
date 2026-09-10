@@ -1,5 +1,17 @@
 menu "DroneBridge for ESP32 Configuration"
 
+    config DB_ESPNOW_DIAGNOSTICS
+        bool "Measure ESP-NOW AIR-to-AIR serial and queue delays"
+        default n
+        depends on ESP_CONSOLE_UART_DEFAULT || ESP_CONSOLE_UART_CUSTOM
+        depends on ESP_CONSOLE_SECONDARY_NONE
+        help
+            Temporary diagnostics, printed once per second at INFO level on
+            the UART debug console. Requires a console UART and pins separate
+            from the MAVLink data interface. Does not change queue timeouts,
+            forwarding policy or UART data buffers. UART events are drained
+            without flushing data. Disabled outside ESP-NOW mode.
+
     choice
         prompt "ESP32 board type"
         default DB_GENERIC_BOARD

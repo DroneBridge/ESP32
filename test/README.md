@@ -1,5 +1,7 @@
 # Native unit tests
 
+For hardware latency measurements, see [ESP-NOW AIR-to-AIR diagnostics](espnow_air2air_diagnostics.md).
+
 The ESP-NOW parser regression tests are a standalone CTest project. Configure and run them with a host C compiler:
 
 ```powershell
