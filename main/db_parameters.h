@@ -97,6 +97,7 @@ typedef bool (*db_param_output_callback_t)(const uint8_t *line, size_t line_leng
 #define DB_PARAM_SERIAL_BAUD db_param_baud.value.db_param_i32.value
 #define DB_PARAM_SERIAL_PROTO db_param_proto.value.db_param_u8.value
 #define DB_PARAM_SERIAL_PACK_SIZE db_param_serial_pack_size.value.db_param_u16.value
+#define DB_PARAM_SERIAL_TIMEOUT_MS db_param_serial_read_timeout.value.db_param_u16.value
 #define DB_PARAM_GPIO_TX db_param_gpio_tx.value.db_param_u8.value
 #define DB_PARAM_GPIO_RX db_param_gpio_rx.value.db_param_u8.value
 #define DB_PARAM_GPIO_RTS db_param_gpio_rts.value.db_param_u8.value

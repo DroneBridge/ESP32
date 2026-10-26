@@ -50,7 +50,6 @@
 uint8_t DB_MAV_SYS_ID = 1;
 uint32_t serial_total_byte_count = 0;
 uint32_t serial_total_decoded_mav_msgs = 0;
-static uint16_t DB_SERIAL_READ_TIMEOUT_MS = DB_SERIAL_READ_TIMEOUT_MS_DEFAULT;
 
 static uint8_t ltm_frame_buffer[MAX_LTM_FRAMES_IN_BUFFER * LTM_MAX_FRAME_SIZE];
 static uint ltm_frames_in_buffer = 0;
@@ -329,6 +328,9 @@ void db_parse_mavlink_from_radio(int *tcp_clients, udp_conn_list_t *udp_conns, u
  * @param up_conns Structure containing all UDP connection data including the sockets
  * @param serial_buffer Buffer that gets filled with data and then sent via radio, shall be >x2 the max payload
  * @param serial_buff_pos Number of bytes already read for the current packet
+ * Reads serial_timeout on every call; runtime parameter changes apply without reopening the serial link.
+ * Timeout checks retain this mode's existing buffering and flush behavior.
+ * @return No value; buffered bytes are sent when the size limit or configured timeout is reached.
  */
 void db_read_serial_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, uint8_t *serial_buffer,
                                   unsigned int *serial_buff_pos) {
@@ -357,7 +359,7 @@ void db_read_serial_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, 
 
     if (bytes_read == 0) {
         // did not read anything this cycle -> check serial read timeout
-        if (current_tick - last_tick >= pdMS_TO_TICKS(DB_SERIAL_READ_TIMEOUT_MS)) {
+        if (current_tick - last_tick >= pdMS_TO_TICKS(DB_PARAM_SERIAL_TIMEOUT_MS)) {
             // serial read timeout detected
             last_tick = current_tick;   // reset timeout
             // flush buffer to air interface -> send what we have in the buffer (already parsed)
@@ -447,6 +449,9 @@ void db_read_serial_parse_mavlink(int *tcp_clients, udp_conn_list_t *udp_conns, 
  * @param udp_connection Structure containing all UDP connection data including the sockets
  * @param serial_buffer Buffer that gets filled with data and then sent via radio
  * @param serial_read_bytes Number of bytes already read for the current packet
+ * Reads serial_timeout on every call; runtime parameter changes apply without reopening the serial link.
+ * Timeout checks retain this mode's existing buffering and flush behavior.
+ * @return No value; buffered bytes are sent when the size limit or configured timeout is reached.
  */
 void db_read_serial_parse_transparent(int tcp_clients[], udp_conn_list_t *udp_connection, uint8_t serial_buffer[],
                                       unsigned int *serial_read_bytes) {
@@ -477,7 +482,7 @@ void db_read_serial_parse_transparent(int tcp_clients[], udp_conn_list_t *udp_co
         last_tick = current_tick;               // reset time for serial read timeout
     } else {
         /* did not read anything this cycle -> check serial read timeout */
-        if (current_tick - last_tick >= pdMS_TO_TICKS(DB_SERIAL_READ_TIMEOUT_MS)) {
+        if (current_tick - last_tick >= pdMS_TO_TICKS(DB_PARAM_SERIAL_TIMEOUT_MS)) {
             serial_read_timeout_reached = true;
             last_tick = current_tick;
         } else {

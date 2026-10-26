@@ -97,6 +97,14 @@ In any other case, there are multiple ways how to flash the firmware.
 
 **[For further info please check the wiki!](https://dronebridge.gitbook.io/docs/dronebridge-for-esp32/configuration)**
 
+### Serial forwarding timeout
+
+`serial_timeout` (MAVLink `SERIAL_T_OUT_MS`) controls the serial-to-radio flush timeout in milliseconds for both transparent and MAVLink modes. Valid values are `1` to `65535`; the firmware default is `20` ms. Both loops read the configured value on each polling cycle, including the value loaded from NVS. MAVLink parameter changes take effect on the next cycle without a reboot. Saving through the web interface keeps its existing save-and-reboot behavior.
+
+This setting does not change the UART driver read timeout or the `trans_pack_size` packet-size limit. Timeout comparisons use FreeRTOS ticks and remain subject to the configured tick resolution and task scheduling. Transparent mode flushes after a serial-read idle period. MAVLink mode retains its existing serial-read idle timeout behavior. Increasing the timeout can reduce packet overhead but increases forwarding latency.
+
+Regression checks need no ESP32 hardware. Activate this project's ESP-IDF environment with the RISC-V compiler and QEMU installed, then run python test/test_serial_timeout.py. The check executes both production loop bodies with mocked UART, radio and scheduler ticks, including live timeout changes, boundary values, packet-size flushing and tick wraparound. It also verifies that the former fixed 20 ms behavior fails. Explicit tool paths can be supplied with --cc and --qemu.
+
 ## Use with QGroundControl, Mission Planner or any other GCS
 
 ![QGroundControl](https://docs.qgroundcontrol.com/master/assets/connected_vehicle.C1qygcZV.jpg)
